@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.ui.motion.LocalReduceMotion
+import com.example.kurdishtv.ui.theme.AppShapes
 
 @Composable
 fun KurdishTvTheme(
@@ -47,7 +48,7 @@ fun KurdishTvTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,
-            shapes = Shapes,
+            shapes = AppShapes,
             content = content
         )
     }
