@@ -3,7 +3,6 @@ package com.example.kurdishtv.ui.screens
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,10 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,22 +40,27 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.components.KurdishTvIcons
+import com.example.kurdishtv.ui.components.SleepTimerDialog
+import com.example.kurdishtv.ui.components.SvgIcon
 import com.example.kurdishtv.ui.player.PlayerControlsOverlay
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoPlayerView
+import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.KurdishRed
 import com.example.ui.theme.KurdishSunGold
+import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
-import kotlinx.coroutines.delay
 
 @Composable
 fun PlayerScreen(
     channel: Channel,
-    channelsList: List<Channel>,
     sleepTimerMinutes: Int,
+    sleepTimerFormattedText: String?,
+    isPlaybackPaused: Boolean,
+    isMuted: Boolean,
+    onToggleMute: () -> Unit,
     onSetSleepTimer: (Int) -> Unit,
-    onChannelSelect: (Channel) -> Unit,
     onNextChannel: () -> Unit,
     onPreviousChannel: () -> Unit,
     onFavoriteToggle: (String) -> Unit,
@@ -68,45 +70,38 @@ fun PlayerScreen(
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
 
-    var isPlaying by remember(channel.id) { mutableStateOf(true) }
+    var isUserPlaying by remember(channel.id) { mutableStateOf(true) }
     var isControlsVisible by remember { mutableStateOf(true) }
     var resizeMode by remember { mutableStateOf(ResizeMode.FIT) }
     var isFullscreen by remember { mutableStateOf(true) }
     var errorMessage by remember(channel.id) { mutableStateOf<String?>(null) }
+    var showSleepDialog by remember { mutableStateOf(false) }
 
-    // Fullscreen Immersive Mode System Bars Handler
+    val shouldPlay = isUserPlaying && !isPlaybackPaused
+
     DisposableEffect(isFullscreen, activity) {
         val window = activity?.window
         if (window != null) {
-            val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-            windowInsetsController.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            try {
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
-            if (isFullscreen) {
-                windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            } else {
-                windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            }
+                if (isFullscreen) {
+                    controller.hide(WindowInsetsCompat.Type.systemBars())
+                } else {
+                    controller.show(WindowInsetsCompat.Type.systemBars())
+                }
+            } catch (_: Exception) {}
         }
-
         onDispose {
-            val windowObj = activity?.window
-            if (windowObj != null) {
-                val insetsController = WindowCompat.getInsetsController(windowObj, windowObj.decorView)
-                insetsController.show(WindowInsetsCompat.Type.systemBars())
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            val win = activity?.window
+            if (win != null) {
+                try {
+                    val controller = WindowCompat.getInsetsController(win, win.decorView)
+                    controller.show(WindowInsetsCompat.Type.systemBars())
+                } catch (_: Exception) {}
             }
-        }
-    }
-
-    // Sleep Timer countdown effect
-    LaunchedEffect(sleepTimerMinutes) {
-        if (sleepTimerMinutes > 0) {
-            delay(sleepTimerMinutes * 60 * 1000L)
-            isPlaying = false
-            onSetSleepTimer(0)
         }
     }
 
@@ -114,32 +109,35 @@ fun PlayerScreen(
         onBackClick()
     }
 
+    if (showSleepDialog) {
+        SleepTimerDialog(
+            currentMinutes = sleepTimerMinutes,
+            onSelectMinutes = onSetSleepTimer,
+            onDismiss = { showSleepDialog = false }
+        )
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // ExoPlayer Video Engine
         VideoPlayerView(
             streamUrl = channel.streamUrl,
-            isPlaying = isPlaying,
+            isPlaying = shouldPlay,
             resizeMode = resizeMode,
-            onPlaybackError = { error ->
-                errorMessage = error
-            },
+            onPlaybackError = { err -> errorMessage = err },
             modifier = Modifier.fillMaxSize()
         )
 
-        // Player Controls Overlay
         PlayerControlsOverlay(
             isVisible = isControlsVisible,
             onTapOverlay = { isControlsVisible = !isControlsVisible },
             channel = channel,
-            channelsList = channelsList,
-            isPlaying = isPlaying,
-            sleepTimerMinutes = sleepTimerMinutes,
-            onSetSleepTimer = onSetSleepTimer,
-            onPlayPauseToggle = { isPlaying = !isPlaying },
+            isPlaying = shouldPlay,
+            sleepTimerRemainingText = sleepTimerFormattedText,
+            onOpenSleepTimer = { showSleepDialog = true },
+            onPlayPauseToggle = { isUserPlaying = !isUserPlaying },
             onNextChannel = {
                 errorMessage = null
                 onNextChannel()
@@ -147,10 +145,6 @@ fun PlayerScreen(
             onPreviousChannel = {
                 errorMessage = null
                 onPreviousChannel()
-            },
-            onChannelSelect = { selected ->
-                errorMessage = null
-                onChannelSelect(selected)
             },
             onFavoriteToggle = { onFavoriteToggle(channel.id) },
             onBackClick = onBackClick,
@@ -164,60 +158,62 @@ fun PlayerScreen(
             },
             isFullscreen = isFullscreen,
             onFullscreenToggle = { isFullscreen = !isFullscreen },
+            isMuted = isMuted,
+            onToggleMute = onToggleMute,
             modifier = Modifier.fillMaxSize()
         )
 
-        // Error State Screen (if stream fails to load)
         if (errorMessage != null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.92f))
+                    .background(Color.Black.copy(alpha = 0.93f))
                     .clickable { isControlsVisible = true },
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(32.dp)
+                    modifier = Modifier.padding(28.dp)
                 ) {
-                    Icon(
-                        imageVector = KurdishTvIcons.Tv,
+                    SvgIcon(
+                        resId = KurdishTvIcons.Tv,
                         contentDescription = null,
                         tint = KurdishRed,
-                        modifier = Modifier.size(56.dp)
+                        modifier = Modifier.size(54.dp)
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "Unable to Stream Channel",
-                        color = Color.White,
+                        text = "Channel Stream Unavailable",
+                        color = TextPrimary,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "The live stream for ${channel.name} is temporarily unavailable or offline.",
+                        text = "The live stream for ${channel.name} is currently offline or unreachable.",
                         color = TextSecondary,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(
                             onClick = {
                                 errorMessage = null
-                                isPlaying = true
+                                isUserPlaying = true
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = KurdishSunGold),
-                            shape = RoundedCornerShape(20.dp)
+                            shape = M3ExpressiveShapes.Pill
                         ) {
-                            Icon(
-                                imageVector = KurdishTvIcons.Refresh,
+                            SvgIcon(
+                                resId = KurdishTvIcons.Refresh,
                                 contentDescription = null,
-                                tint = Color.Black
+                                tint = Color.Black,
+                                modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "Retry Stream", color = Color.Black, fontWeight = FontWeight.Bold)
+                            Text("Retry", color = Color.Black, fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
@@ -225,9 +221,9 @@ fun PlayerScreen(
                                 errorMessage = null
                                 onNextChannel()
                             },
-                            shape = RoundedCornerShape(20.dp)
+                            shape = M3ExpressiveShapes.Pill
                         ) {
-                            Text(text = "Next Channel", color = Color.White)
+                            Text("Next Channel", color = Color.White)
                         }
                     }
                 }
@@ -237,10 +233,10 @@ fun PlayerScreen(
 }
 
 private fun Context.findActivity(): Activity? {
-    var context = this
-    while (context is ContextWrapper) {
-        if (context is Activity) return context
-        context = context.baseContext
+    var ctx = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
     }
     return null
 }

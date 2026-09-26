@@ -2,43 +2,23 @@ package com.example.kurdishtv.viewmodel
 
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.Channel
+import com.example.kurdishtv.model.KurdishChannelCatalog
 
 data class TvUiState(
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = false,
+    val isOffline: Boolean = false,
     val errorMessage: String? = null,
-    val channels: List<Channel> = emptyList(),
+    val channels: List<Channel> = KurdishChannelCatalog.getDefaultChannels(),
+    val filteredChannels: List<Channel> = KurdishChannelCatalog.getDefaultChannels(),
     val recentChannels: List<Channel> = emptyList(),
     val customPlaylistUrls: Set<String> = emptySet(),
     val selectedCategory: CategoryFilter = CategoryFilter.ALL,
     val searchQuery: String = "",
     val selectedChannel: Channel? = null,
-    val sleepTimerMinutes: Int = 0
-) {
-    val filteredChannels: List<Channel>
-        get() {
-            return channels.filter { channel ->
-                val matchesCategory = when (selectedCategory) {
-                    CategoryFilter.ALL -> true
-                    CategoryFilter.NEWS -> channel.category.contains("News", ignoreCase = true)
-                    CategoryFilter.KURDISH -> channel.category.contains("Kurdish", ignoreCase = true)
-                    CategoryFilter.SPORT -> channel.category.contains("Sport", ignoreCase = true)
-                    CategoryFilter.KIDS -> channel.category.contains("Kids", ignoreCase = true)
-                    CategoryFilter.DOCUMENTARY -> channel.category.contains("Docu", ignoreCase = true)
-                    CategoryFilter.QURAN -> channel.category.contains("Quran", ignoreCase = true)
-                    CategoryFilter.MUSIC -> channel.category.contains("Music", ignoreCase = true)
-                    CategoryFilter.GENERAL -> channel.category.contains("General", ignoreCase = true) || channel.category.contains("Family", ignoreCase = true)
-                    CategoryFilter.FAVORITES -> channel.isFavorite
-                    CategoryFilter.HD -> channel.isHd
-                }
-
-                val matchesSearch = if (searchQuery.isBlank()) {
-                    true
-                } else {
-                    channel.name.contains(searchQuery, ignoreCase = true) ||
-                            channel.category.contains(searchQuery, ignoreCase = true)
-                }
-
-                matchesCategory && matchesSearch
-            }
-        }
-}
+    val sleepTimerMinutes: Int = 0,
+    val sleepTimerRemainingSeconds: Int = 0,
+    val sleepTimerFormattedText: String? = null,
+    val isPlaybackPaused: Boolean = false,
+    val isMuted: Boolean = false,
+    val importMessage: String? = null
+)

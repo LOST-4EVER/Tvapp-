@@ -51,10 +51,12 @@ fun KurdishTvNavGraph(
             if (selectedChannel != null) {
                 PlayerScreen(
                     channel = selectedChannel,
-                    channelsList = uiState.filteredChannels.ifEmpty { uiState.channels },
                     sleepTimerMinutes = uiState.sleepTimerMinutes,
+                    sleepTimerFormattedText = uiState.sleepTimerFormattedText,
+                    isPlaybackPaused = uiState.isPlaybackPaused,
+                    isMuted = uiState.isMuted,
+                    onToggleMute = { viewModel.toggleMute() },
                     onSetSleepTimer = { minutes -> viewModel.setSleepTimer(minutes) },
-                    onChannelSelect = { ch -> viewModel.onChannelSelected(ch) },
                     onNextChannel = { viewModel.selectNextChannel() },
                     onPreviousChannel = { viewModel.selectPreviousChannel() },
                     onFavoriteToggle = { id -> viewModel.onFavoriteToggled(id) },

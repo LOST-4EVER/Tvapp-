@@ -1,35 +1,40 @@
 package com.example.kurdishtv.ui.components
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AspectRatio
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
-import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SignalCellularAlt
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.R
 
+/**
+ * Pure SVG vector drawables & core icons for Kurdish TV Live.
+ * Replaces heavy material-icons-extended, reducing app file size significantly.
+ */
 object KurdishTvIcons {
-    val Tv: ImageVector = Icons.Default.Tv
-    val LiveTv: ImageVector = Icons.Default.LiveTv
-    val Play: ImageVector = Icons.Default.PlayArrow
-    val Pause: ImageVector = Icons.Default.Pause
-    val FavoriteFilled: ImageVector = Icons.Default.Favorite
-    val FavoriteOutline: ImageVector = Icons.Default.FavoriteBorder
-    val Search: ImageVector = Icons.Default.Search
-    val Refresh: ImageVector = Icons.Default.Refresh
-    val Fullscreen: ImageVector = Icons.Default.Fullscreen
-    val FullscreenExit: ImageVector = Icons.Default.FullscreenExit
-    val AspectRatio: ImageVector = Icons.Default.AspectRatio
-    val Signal: ImageVector = Icons.Default.SignalCellularAlt
-    val ChevronLeft: ImageVector = Icons.Default.ChevronLeft
-    val ChevronRight: ImageVector = Icons.Default.ChevronRight
+    // Custom Vector Drawables (SVGs)
+    val Tv: Int = R.drawable.ic_tv
+    val LiveTv: Int = R.drawable.ic_live_tv
+    val PlayRes: Int = R.drawable.ic_play
+    val Pause: Int = R.drawable.ic_pause
+    val FavoriteFilledRes: Int = R.drawable.ic_favorite_filled
+    val FavoriteOutline: Int = R.drawable.ic_favorite_outline
+    val Fullscreen: Int = R.drawable.ic_fullscreen
+    val FullscreenExit: Int = R.drawable.ic_fullscreen_exit
+    val AspectRatio: Int = R.drawable.ic_aspect_ratio
+    val Signal: Int = R.drawable.ic_signal
+    val ChevronLeft: Int = R.drawable.ic_chevron_left
+    val ChevronRight: Int = R.drawable.ic_chevron_right
+    val History: Int = R.drawable.ic_history
+    val Bedtime: Int = R.drawable.ic_bedtime
+    val VolumeUp: Int = R.drawable.ic_volume_up
+    val VolumeOff: Int = R.drawable.ic_volume_off
+    val Tune: Int = R.drawable.ic_tune
+    val AddLink: Int = R.drawable.ic_add_link
+    val News: Int = R.drawable.ic_news
+    val Music: Int = R.drawable.ic_music
+    val Kids: Int = R.drawable.ic_kids
+    val Sports: Int = R.drawable.ic_sports
+    val Globe: Int = R.drawable.ic_globe
+    val Refresh: Int = R.drawable.ic_refresh
+    val Search: Int = R.drawable.ic_search
+    val Close: Int = R.drawable.ic_close
+    val Delete: Int = R.drawable.ic_delete
+    val WifiOff: Int = R.drawable.ic_wifi_off
+    val Check: Int = R.drawable.ic_check
 }

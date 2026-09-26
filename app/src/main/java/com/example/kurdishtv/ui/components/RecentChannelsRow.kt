@@ -1,8 +1,6 @@
 package com.example.kurdishtv.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,26 +11,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
+import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.DarkCardBorder
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.KurdishSunGold
+import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 @Composable
@@ -46,17 +42,17 @@ fun RecentChannelsRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 4.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.History,
+            SvgIcon(
+                resId = KurdishTvIcons.History,
                 contentDescription = null,
                 tint = KurdishSunGold,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
@@ -72,30 +68,32 @@ fun RecentChannelsRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(recentChannels, key = { "recent_${it.id}" }) { channel ->
+            itemsIndexed(
+                items = recentChannels,
+                key = { idx, item -> "recent_${item.id}_$idx" }
+            ) { _, channel ->
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = M3ExpressiveShapes.MediumCard,
                     color = DarkSurfaceVariant,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .border(1.dp, DarkCardBorder, RoundedCornerShape(16.dp))
-                        .clickable { onChannelClick(channel) }
+                        .border(1.dp, DarkCardBorder, M3ExpressiveShapes.MediumCard)
+                        .bouncyClickable(scaleDown = 0.92f) { onChannelClick(channel) }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = KurdishTvIcons.Tv,
+                        SvgIcon(
+                            resId = KurdishTvIcons.Tv,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
                                 text = channel.name,
-                                color = Color.White,
+                                color = TextPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,

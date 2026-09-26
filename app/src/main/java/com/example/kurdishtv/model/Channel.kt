@@ -13,17 +13,3 @@ data class Channel(
     val isFavorite: Boolean = false,
     val isHd: Boolean = true
 )
-
-enum class CategoryFilter(val displayName: String) {
-    ALL("All Channels"),
-    NEWS("News"),
-    KURDISH("Kurdish"),
-    SPORT("Sports"),
-    KIDS("Kids"),
-    DOCUMENTARY("Documentary"),
-    QURAN("Quran"),
-    MUSIC("Music"),
-    GENERAL("General"),
-    FAVORITES("Favorites"),
-    HD("HD")
-}
