@@ -51,6 +51,7 @@ import com.example.ui.theme.KurdishRed
 import com.example.ui.theme.KurdishSunGold
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import kotlinx.coroutines.delay
 
 @Composable
 fun PlayerScreen(
@@ -107,6 +108,14 @@ fun PlayerScreen(
 
     BackHandler {
         onBackClick()
+    }
+
+    // Auto-hide the controls while playing so the video stays unobstructed.
+    LaunchedEffect(isControlsVisible, shouldPlay) {
+        if (isControlsVisible && shouldPlay) {
+            delay(4500L)
+            isControlsVisible = false
+        }
     }
 
     if (showSleepDialog) {

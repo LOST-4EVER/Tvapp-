@@ -194,6 +194,13 @@ fun MainTvScreen(
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
+
+                            CategoryBar(
+                                selectedCategory = uiState.selectedCategory,
+                                onCategorySelected = onCategorySelected
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
                         }
                     },
                     modifier = Modifier.weight(1f)

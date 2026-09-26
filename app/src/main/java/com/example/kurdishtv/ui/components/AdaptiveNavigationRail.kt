@@ -126,10 +126,7 @@ fun AdaptiveNavigationRail(
                         indicatorColor = KurdishSunGold,
                         selectedTextColor = KurdishSunGold,
                         unselectedTextColor = TextSecondary
-                    ),
-                    modifier = Modifier.bouncyClickable(scaleDown = 0.90f) {
-                        onCategorySelected(category)
-                    }
+                    )
                 )
             }
 

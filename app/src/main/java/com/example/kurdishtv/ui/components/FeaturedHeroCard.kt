@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +55,18 @@ fun FeaturedHeroCard(
     onFavoriteToggle: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Build the image request once per logo URL instead of on every recomposition.
+    val context = LocalContext.current
+    val logoUrl = channel.logoUrl
+    val logoModel = remember(logoUrl) {
+        logoUrl?.takeIf { it.isNotBlank() }?.let {
+            ImageRequest.Builder(context)
+                .data(it)
+                .crossfade(true)
+                .build()
+        }
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -132,12 +145,9 @@ fun FeaturedHeroCard(
                             .border(1.dp, DarkCardBorder, M3ExpressiveShapes.MediumCard)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            if (!channel.logoUrl.isNullOrBlank()) {
+                            if (logoModel != null) {
                                 AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(channel.logoUrl)
-                                        .crossfade(true)
-                                        .build(),
+                                    model = logoModel,
                                     contentDescription = channel.name,
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier.padding(8.dp)
