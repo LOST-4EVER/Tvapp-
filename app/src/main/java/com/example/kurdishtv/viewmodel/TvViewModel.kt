@@ -6,8 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.model.ChannelFilterEngine
+import com.example.kurdishtv.model.KurdishChannelCatalog
 import com.example.kurdishtv.network.NetworkMonitor
 import com.example.kurdishtv.repository.TvRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 class TvViewModel(
@@ -22,10 +25,13 @@ class TvViewModel(
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {
 
+    // Start from the in-memory curated catalog (zero disk/network cost) and hydrate from
+    // cache + preferences on a background dispatcher below. This keeps the main thread free
+    // during cold start instead of reading files/prefs synchronously.
     private val _uiState = MutableStateFlow(
         TvUiState(
-            channels = repository.getInstantInitialChannels(),
-            filteredChannels = repository.getInstantInitialChannels()
+            channels = KurdishChannelCatalog.getDefaultChannels(),
+            filteredChannels = KurdishChannelCatalog.getDefaultChannels()
         )
     )
     val uiState: StateFlow<TvUiState> = _uiState.asStateFlow()
@@ -33,9 +39,41 @@ class TvViewModel(
     private var sleepTimerJob: Job? = null
 
     init {
-        loadSavedRecentsAndPlaylists()
         observeNetwork()
-        loadChannels()
+        viewModelScope.launch {
+            loadInstantState()
+            loadChannels()
+        }
+    }
+
+    /**
+     * Hydrates the UI from the on-disk cache and saved preferences. Runs on [Dispatchers.IO]
+     * because it touches the file system and SharedPreferences.
+     */
+    private suspend fun loadInstantState() {
+        try {
+            val instant = withContext(Dispatchers.IO) { repository.getInstantInitialChannels() }
+            if (instant.isEmpty()) return
+
+            val customUrls = withContext(Dispatchers.IO) { repository.getCustomPlaylistUrls() }
+            val recentIds = withContext(Dispatchers.IO) { repository.getRecentChannelIds() }
+            val recents = recentIds.mapNotNull { id -> instant.find { it.id == id } }
+
+            _uiState.update { state ->
+                val filtered = ChannelFilterEngine.filter(
+                    channels = instant,
+                    category = state.selectedCategory,
+                    query = state.searchQuery
+                )
+                state.copy(
+                    channels = instant,
+                    filteredChannels = filtered,
+                    recentChannels = recents,
+                    customPlaylistUrls = customUrls,
+                    selectedChannel = state.selectedChannel ?: instant.firstOrNull()
+                )
+            }
+        } catch (_: Exception) {}
     }
 
     private fun observeNetwork() {
@@ -50,56 +88,37 @@ class TvViewModel(
         }
     }
 
-    private fun loadSavedRecentsAndPlaylists() {
-        try {
-            val customUrls = repository.getCustomPlaylistUrls()
-            val recentIds = repository.getRecentChannelIds()
-            val currentChannels = _uiState.value.channels
-            val recents = recentIds.mapNotNull { id -> currentChannels.find { it.id == id } }
-
-            _uiState.update { state ->
-                val filtered = ChannelFilterEngine.filter(
-                    channels = state.channels,
-                    category = state.selectedCategory,
-                    query = state.searchQuery
-                )
-                state.copy(
-                    customPlaylistUrls = customUrls,
-                    recentChannels = recents,
-                    filteredChannels = filtered,
-                    selectedChannel = state.selectedChannel ?: currentChannels.firstOrNull()
-                )
-            }
-        } catch (_: Exception) {}
-    }
-
     fun loadChannels() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
                 val result = repository.fetchChannels()
-                result.onSuccess { list ->
-                    val customUrls = repository.getCustomPlaylistUrls()
-                    val recentIds = repository.getRecentChannelIds()
-                    val recents = recentIds.mapNotNull { id -> list.find { it.id == id } }
-
-                    _uiState.update { state ->
-                        val filtered = ChannelFilterEngine.filter(
-                            channels = list,
-                            category = state.selectedCategory,
-                            query = state.searchQuery
-                        )
-                        state.copy(
-                            isLoading = false,
-                            channels = list,
-                            filteredChannels = filtered,
-                            recentChannels = recents,
-                            customPlaylistUrls = customUrls,
-                            selectedChannel = state.selectedChannel ?: list.firstOrNull()
-                        )
+                val list = result.getOrNull()
+                if (list == null) {
+                    _uiState.update {
+                        it.copy(isLoading = false, errorMessage = result.exceptionOrNull()?.message)
                     }
-                }.onFailure { err ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = err.message) }
+                    return@launch
+                }
+
+                val customUrls = withContext(Dispatchers.IO) { repository.getCustomPlaylistUrls() }
+                val recentIds = withContext(Dispatchers.IO) { repository.getRecentChannelIds() }
+                val recents = recentIds.mapNotNull { id -> list.find { it.id == id } }
+
+                _uiState.update { state ->
+                    val filtered = ChannelFilterEngine.filter(
+                        channels = list,
+                        category = state.selectedCategory,
+                        query = state.searchQuery
+                    )
+                    state.copy(
+                        isLoading = false,
+                        channels = list,
+                        filteredChannels = filtered,
+                        recentChannels = recents,
+                        customPlaylistUrls = customUrls,
+                        selectedChannel = state.selectedChannel ?: list.firstOrNull()
+                    )
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }

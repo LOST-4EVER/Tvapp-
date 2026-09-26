@@ -9,6 +9,7 @@ import kotlin.math.abs
 object KurdishTvParser {
 
     private val nonAlphaNumericRegex = "[^a-z0-9]".toRegex()
+    private val whitespaceRegex = "\\s+".toRegex()
     private val tvgLogoRegex = """tvg-logo="([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
     private val groupTitleRegex = """group-title="([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
 
@@ -28,7 +29,9 @@ object KurdishTvParser {
                     val category = mapCategory(rawCategory, formattedName)
                     val isHd = formattedName.contains("HD", ignoreCase = true) || url.contains("1080", ignoreCase = true)
                     val quality = if (isHd) "HLS / 1080p" else "HLS / 720p"
-                    val uniqueId = "${sourceTag}_${cleanId(formattedName)}_${abs(url.hashCode())}_$i"
+                    // Stable id derived from the source, name and stream URL (no index) so
+                    // favourites/recents survive source reordering between refreshes.
+                    val uniqueId = "${sourceTag}_${cleanId(formattedName)}_${abs(url.hashCode())}"
 
                     channels.add(
                         Channel(
@@ -69,19 +72,24 @@ object KurdishTvParser {
                     currentLogo = parseTvgLogo(line)
                     currentGroup = parseGroupTitle(line)
                 }
-                line.contains(";") && !line.startsWith("#") -> {
+                // "name;url" line format. Only treat a line as such when it is not a raw
+                // stream URL itself (URLs may legitimately contain ';' in query params).
+                line.contains(";") && !line.startsWith("#") &&
+                        !line.startsWith("http://") && !line.startsWith("https://") -> {
                     val parts = line.split(";", limit = 2)
                     if (parts.size == 2) {
                         val rawName = parts[0].trim()
                         val url = parts[1].trim()
                         if (url.startsWith("http://") || url.startsWith("https://")) {
-                            channels.add(buildChannel(rawName, url, null, null, sourceTag, count++))
+                            channels.add(buildChannel(rawName, url, null, null, sourceTag))
+                            count++
                         }
                     }
                 }
                 (line.startsWith("http://") || line.startsWith("https://")) && !line.startsWith("#") -> {
                     val name = currentExtName ?: "Kurdish Channel ${count + 1}"
-                    channels.add(buildChannel(name, line, currentLogo, currentGroup, sourceTag, count++))
+                    channels.add(buildChannel(name, line, currentLogo, currentGroup, sourceTag))
+                    count++
                     currentExtName = null
                     currentLogo = null
                     currentGroup = null
@@ -97,7 +105,7 @@ object KurdishTvParser {
         var clean = rawName
             .replace("-", " ")
             .replace("_", " ")
-            .replace("  ", " ")
+            .replace(whitespaceRegex, " ")
             .trim()
 
         clean = clean.split(" ").filter { it.isNotBlank() }.joinToString(" ") { word ->
@@ -124,14 +132,14 @@ object KurdishTvParser {
         url: String,
         logoUrl: String?,
         groupTitle: String?,
-        sourceTag: String,
-        index: Int
+        sourceTag: String
     ): Channel {
         val formattedName = formatChannelName(rawName)
         val category = mapCategory(groupTitle ?: "", formattedName)
         val isHd = formattedName.contains("HD", ignoreCase = true) || url.contains("1080", ignoreCase = true)
         val quality = if (isHd) "HLS / 1080p" else "HLS / 720p"
-        val uniqueId = "${sourceTag}_${cleanId(formattedName)}_${abs(url.hashCode())}_$index"
+        // Stable id: no positional index, so the same stream keeps its identity across fetches.
+        val uniqueId = "${sourceTag}_${cleanId(formattedName)}_${abs(url.hashCode())}"
 
         return Channel(
             id = uniqueId,

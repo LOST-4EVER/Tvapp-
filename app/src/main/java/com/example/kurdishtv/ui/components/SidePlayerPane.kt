@@ -136,7 +136,7 @@ fun SidePlayerPane(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Stream Connecting...",
+                                text = "Stream unavailable — pick another channel",
                                 color = TextSecondary,
                                 fontSize = 12.sp
                             )
