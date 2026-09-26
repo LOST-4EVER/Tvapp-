@@ -23,7 +23,8 @@ class SettingsStorage(context: Context) {
                 autoplay = prefs.getBoolean(KEY_AUTOPLAY, true),
                 showLogos = prefs.getBoolean(KEY_SHOW_LOGOS, true),
                 autoHideControls = prefs.getBoolean(KEY_AUTO_HIDE, true),
-                livePulse = prefs.getBoolean(KEY_LIVE_PULSE, true)
+                livePulse = prefs.getBoolean(KEY_LIVE_PULSE, true),
+                dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
             )
         } catch (_: Exception) {
             AppSettings()
@@ -41,6 +42,7 @@ class SettingsStorage(context: Context) {
                 .putBoolean(KEY_SHOW_LOGOS, settings.showLogos)
                 .putBoolean(KEY_AUTO_HIDE, settings.autoHideControls)
                 .putBoolean(KEY_LIVE_PULSE, settings.livePulse)
+                .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColor)
                 .apply()
         } catch (_: Exception) {}
     }
@@ -57,5 +59,6 @@ class SettingsStorage(context: Context) {
         private const val KEY_SHOW_LOGOS = "show_logos"
         private const val KEY_AUTO_HIDE = "auto_hide_controls"
         private const val KEY_LIVE_PULSE = "live_pulse"
+        private const val KEY_DYNAMIC_COLOR = "dynamic_color"
     }
 }

@@ -31,7 +31,12 @@ data class AppSettings(
     val autoplay: Boolean = true,
     val showLogos: Boolean = true,
     val autoHideControls: Boolean = true,
-    val livePulse: Boolean = true
+    val livePulse: Boolean = true,
+    /**
+     * Material You: derive accent colors from the device wallpaper palette.
+     * Requires Android 12+ (API 31); ignored on older releases.
+     */
+    val dynamicColor: Boolean = true
 ) {
     val reduceMotion: Boolean get() = motion == MotionLevel.REDUCED
     val isAmoled: Boolean get() = themeMode == ThemeMode.AMOLED

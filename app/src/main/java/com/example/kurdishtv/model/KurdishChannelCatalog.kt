@@ -30,7 +30,7 @@ object KurdishChannelCatalog {
         Channel(
             id = "kurdistan24_tv_hd",
             name = "Kurdistan 24",
-            streamUrl = "https://hlspackager.akamaized.net/live/DB/K24/HLS/K24-avc1_2500000=10002,mp4a_128000=20000.m3u8",
+            streamUrl = "https://hlspackager.akamaized.net/live/DB/K24/HLS/K24.m3u8",
             logoUrl = "https://www.kurdistan24.net/assets/images/logo.png",
             category = "News",
             quality = "HLS / 1080p",
@@ -133,27 +133,9 @@ object KurdishChannelCatalog {
             isHd = true
         ),
         Channel(
-            id = "kurdmax_show_hd",
-            name = "Kurdmax Show",
-            streamUrl = "https://6476e46b58f91.streamlock.net/liveTrans/SHOW1/playlist.m3u8",
-            logoUrl = "https://kurdmax.tv/logo.png",
-            category = "General",
-            quality = "HLS / 1080p",
-            isHd = true
-        ),
-        Channel(
-            id = "kurdmax_sorani_hd",
-            name = "Kurdmax Sorani",
-            streamUrl = "https://6476e46b58f91.streamlock.net/liveTrans/KurdmaxS0rani!/playlist.m3u8",
-            logoUrl = "https://kurdmax.tv/logo.png",
-            category = "General",
-            quality = "HLS / 1080p",
-            isHd = true
-        ),
-        Channel(
             id = "trt_kurdi_hd",
             name = "TRT Kurdi",
-            streamUrl = "https://tv-trtkurdi.live.trt.com.tr/master.m3u8",
+            streamUrl = "https://tv-trtkurdi.medya.trt.com.tr/master.m3u8",
             logoUrl = "https://trtkurdi.net/logo.png",
             category = "General",
             quality = "HLS / 1080p",
@@ -169,36 +151,20 @@ object KurdishChannelCatalog {
             isHd = true
         ),
         Channel(
-            id = "ava_entertainment_hd",
-            name = "AVA Entertainment",
-            streamUrl = "https://ava2.store/upload/ava.m3u8",
+            id = "avar_tv_hd",
+            name = "Avar TV",
+            streamUrl = "https://avr.host247.net/live/AvarTv/playlist.m3u8",
             category = "General",
             quality = "HLS / 1080p",
             isHd = true
         ),
         Channel(
-            id = "speda_tv_hd",
-            name = "Speda TV",
-            streamUrl = "http://speda.teradek.live:1935/live/spedahd/playlist.m3u8",
+            id = "ilke_tv_hd",
+            name = "Ilke TV",
+            streamUrl = "https://stream.ilketv.com.tr/hls/ilkecanli.m3u8",
             category = "General",
-            quality = "HLS / 720p",
-            isHd = false
-        ),
-        Channel(
-            id = "kirkuk_tv_hd",
-            name = "Kirkuk TV",
-            streamUrl = "https://live.kirkuklive.live/hls/stream/index.m3u8",
-            category = "General",
-            quality = "HLS / 720p",
-            isHd = false
-        ),
-        Channel(
-            id = "nrt2_tv_hd",
-            name = "NRT 2",
-            streamUrl = "https://ca-rt.onetv.app/NRT2/index-0.m3u8?token=onetv202",
-            category = "General",
-            quality = "HLS / 720p",
-            isHd = false
+            quality = "HLS / 1080p",
+            isHd = true
         ),
 
         // ── Kurdish culture ─────────────────────────────────────────────────────
@@ -258,26 +224,51 @@ object KurdishChannelCatalog {
             quality = "HLS / 720p",
             isHd = false
         ),
-
-        // ── Music ───────────────────────────────────────────────────────────────
         Channel(
-            id = "kurdmax_music_hd",
-            name = "Kurdmax Music",
-            streamUrl = "https://6476e46b58f91.streamlock.net/music/livestream/playlist.m3u8",
-            logoUrl = "https://kurdmax.tv/logo.png",
-            category = "Music",
+            id = "rojava_hd",
+            name = "Rojava HD",
+            streamUrl = "https://hlspackager.akamaized.net/live/DB/ROJAVA_HD/HLS/ROJAVA_HD.m3u8",
+            category = "Kurdish",
             quality = "HLS / 1080p",
             isHd = true
         ),
         Channel(
-            id = "korek_tv_hd",
-            name = "Korek TV",
-            streamUrl = "https://live.korektv.com/music/playlist.m3u8",
-            logoUrl = "https://korektv.com/logo.png",
-            category = "Music",
-            quality = "HLS / 720p",
-            isHd = false
+            id = "ronahi_tv_hd",
+            name = "Ronahi TV",
+            streamUrl = "https://hlspackager.akamaized.net/live/DB/RONAHI_TV/HLS/RONAHI_TV.m3u8",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
         ),
+        Channel(
+            id = "cira_tv_hd",
+            name = "Cira TV",
+            streamUrl = "https://hlspackager.akamaized.net/live/DB/CIRA_TV/HLS/CIRA_TV.m3u8",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "jin_tv_hd",
+            name = "Jin TV",
+            streamUrl = "https://live.jintv.org/medialive/jintv.m3u8",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "sercem_tv_hd",
+            name = "Sercem TV",
+            streamUrl = "https://canli.sercemtv.com.tr/hls/0/stream.m3u8",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+
+        // ── Music ───────────────────────────────────────────────────────────────
+        // No curated music entries: every stable Kurdish music source we could verify
+        // is either dead or cleartext-only. The remote playlists merged at runtime
+        // still populate this category.
 
         // ── Kids ────────────────────────────────────────────────────────────────
         Channel(
@@ -306,6 +297,14 @@ object KurdishChannelCatalog {
         ),
 
         // ── Quran ───────────────────────────────────────────────────────────────
+        Channel(
+            id = "amozhgary_tv_hd",
+            name = "Amozhgary TV",
+            streamUrl = "https://app-live.org/live/3268334b/index.m3u8",
+            category = "Quran",
+            quality = "HLS / 720p",
+            isHd = false
+        ),
         Channel(
             id = "spi_quran_hd",
             name = "SPI Quran HD",
