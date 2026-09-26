@@ -1,19 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
+   Backup / device-transfer rules for Android 12+ (API 31+).
+   Only preferences (settings, favorites, watch history, custom playlists) are
+   carried over. The cached channel list is excluded so a restore always
+   re-downloads a fresh one instead of resurrecting a stale snapshot.
    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <include domain="sharedpref" path="." />
+        <exclude domain="file" path="cached_kurdish_channels.json" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="sharedpref" path="." />
+        <exclude domain="file" path="cached_kurdish_channels.json" />
     </device-transfer>
-    -->
 </data-extraction-rules>

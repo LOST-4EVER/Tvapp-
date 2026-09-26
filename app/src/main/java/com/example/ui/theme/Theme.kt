@@ -1,11 +1,14 @@
 package com.example.ui.theme
 
+import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.theme.AppShapes
@@ -15,7 +18,19 @@ fun KurdishTvTheme(
     settings: AppSettings,
     content: @Composable () -> Unit
 ) {
-    val colors = remember(settings) { appColorsFor(settings) }
+    val context = LocalContext.current
+
+    // Material You (Android 12+): pull the accent from the user's wallpaper palette.
+    // Falls back to the bundled accent on older releases or if extraction fails.
+    val dynamicScheme = remember(settings, context) {
+        if (settings.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching { dynamicDarkColorScheme(context) }.getOrNull()
+        } else {
+            null
+        }
+    }
+
+    val colors = remember(settings, dynamicScheme) { appColorsFor(settings, dynamicScheme) }
     val colorScheme = remember(colors) {
         darkColorScheme(
             primary = colors.primary,

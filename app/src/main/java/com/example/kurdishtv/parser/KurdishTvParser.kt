@@ -97,8 +97,11 @@ object KurdishTvParser {
             }
         }
 
-        val deduplicated = deduplicate(channels)
-        return if (deduplicated.isNotEmpty()) deduplicated else KurdishChannelCatalog.getDefaultChannels()
+        // Note: deliberately no fallback to the bundled catalog here. A source that
+        // returns nothing usable is a problem with that source, not a reason to inject
+        // 35 unrelated channels into the results. TvRepository seeds the catalog once
+        // at the top level, before any source is parsed.
+        return deduplicate(channels)
     }
 
     fun formatChannelName(rawName: String): String {

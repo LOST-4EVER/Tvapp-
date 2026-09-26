@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.os.Build
 import com.example.BuildConfig
 import com.example.kurdishtv.model.AccentColor
 import com.example.kurdishtv.model.AppSettings
@@ -72,6 +73,7 @@ fun SettingsScreen(
 ) {
     val colors = LocalAppColors.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val supportsDynamicColor = remember { Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
     var pendingAction by remember { mutableStateOf<PendingAction?>(null) }
 
     LaunchedEffect(message) {
@@ -108,6 +110,20 @@ fun SettingsScreen(
                     AccentSwatchRow(
                         selected = settings.accent,
                         onSelect = { accent -> onUpdate { it.copy(accent = accent) } }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SettingsSwitchRow(
+                        iconRes = KurdishTvIcons.Palette,
+                        title = "Material You colors",
+                        subtitle = if (supportsDynamicColor) {
+                            "Match your wallpaper (Android 12+)"
+                        } else {
+                            "Requires Android 12 or newer"
+                        },
+                        checked = settings.dynamicColor && supportsDynamicColor,
+                        enabled = supportsDynamicColor,
+                        onCheckedChange = { value -> onUpdate { it.copy(dynamicColor = value) } }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -510,40 +526,43 @@ private fun SettingsSwitchRow(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    showDivider: Boolean = true
+    showDivider: Boolean = true,
+    enabled: Boolean = true
 ) {
     val colors = LocalAppColors.current
+    val contentAlpha = if (enabled) 1f else 0.45f
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .bouncyClickable(scaleDown = 0.98f) { onCheckedChange(!checked) }
+                .bouncyClickable(scaleDown = 0.98f, enabled = enabled) { onCheckedChange(!checked) }
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             SvgIcon(
                 resId = iconRes,
                 contentDescription = null,
-                tint = colors.textSecondary,
+                tint = colors.textSecondary.copy(alpha = contentAlpha),
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    color = colors.textPrimary,
+                    color = colors.textPrimary.copy(alpha = contentAlpha),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = subtitle,
-                    color = colors.textSecondary,
+                    color = colors.textSecondary.copy(alpha = contentAlpha),
                     fontSize = 12.sp
                 )
             }
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
+                enabled = enabled,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = colors.onPrimary,
                     checkedTrackColor = colors.primary,

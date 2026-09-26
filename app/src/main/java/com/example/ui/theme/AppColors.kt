@@ -1,5 +1,6 @@
 package com.example.ui.theme
 
+import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -45,25 +46,34 @@ private fun AccentColor.tone(): AccentTone = when (this) {
     AccentColor.AZURE -> AccentTone(AccentAzure, AzureContainer, OnAzureContainer)
 }
 
-fun appColorsFor(settings: AppSettings): AppColors {
+/**
+ * Resolves the semantic color set for the current settings.
+ *
+ * [dynamicScheme] is the wallpaper-derived Material You palette (Android 12+).
+ * When present it replaces the accent/tertiary tones only: the dark surfaces stay
+ * fixed so the TV UI keeps its contrast and AMOLED behavior regardless of what
+ * color the user's wallpaper happens to be.
+ */
+fun appColorsFor(settings: AppSettings, dynamicScheme: ColorScheme? = null): AppColors {
     val tone = settings.accent.tone()
     val amoled = settings.isAmoled
+    val primary = dynamicScheme?.primary ?: tone.primary
     return AppColors(
         background = if (amoled) AmoledBackground else DarkBackground,
         surface = if (amoled) AmoledSurface else DarkSurface,
         surfaceVariant = if (amoled) AmoledSurfaceVariant else DarkSurfaceVariant,
         surfaceElevated = if (amoled) AmoledSurfaceElevated else DarkSurfaceElevated,
         border = if (amoled) AmoledCardBorder else DarkCardBorder,
-        borderGlow = tone.primary.copy(alpha = 0.20f),
+        borderGlow = primary.copy(alpha = 0.20f),
         glass = if (amoled) Color(0xCC000000) else GlassOverlay,
         textPrimary = TextPrimary,
         textSecondary = TextSecondary,
         textTertiary = TextTertiary,
-        primary = tone.primary,
-        onPrimary = Color.Black,
-        primaryContainer = tone.container,
-        onPrimaryContainer = tone.onContainer,
-        tertiary = KurdishGreen,
+        primary = primary,
+        onPrimary = dynamicScheme?.onPrimary ?: Color.Black,
+        primaryContainer = dynamicScheme?.primaryContainer ?: tone.container,
+        onPrimaryContainer = dynamicScheme?.onPrimaryContainer ?: tone.onContainer,
+        tertiary = dynamicScheme?.tertiary ?: KurdishGreen,
         liveRed = LiveRed,
         isAmoled = amoled
     )

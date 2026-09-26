@@ -141,8 +141,11 @@ class TvViewModel(
     }
 
     fun onFavoriteToggled(channelId: String) {
-        try {
-            val isFav = repository.toggleFavorite(channelId)
+        viewModelScope.launch {
+            // SharedPreferences write: keep it off the main thread.
+            val isFav = withContext(Dispatchers.IO) {
+                runCatching { repository.toggleFavorite(channelId) }.getOrNull()
+            } ?: return@launch
             _uiState.update { state ->
                 val updatedChannels = state.channels.map {
                     if (it.id == channelId) it.copy(isFavorite = isFav) else it
@@ -166,38 +169,52 @@ class TvViewModel(
                     recentChannels = updatedRecents
                 )
             }
-        } catch (_: Exception) {}
+        }
     }
 
     fun onChannelSelected(channel: Channel) {
-        try {
-            repository.addRecentChannel(channel.id)
-            val recentIds = repository.getRecentChannelIds()
-            val recents = recentIds.mapNotNull { id -> _uiState.value.channels.find { it.id == id } }
-
-            _uiState.update {
-                it.copy(
+        // Selecting the channel should feel instant, so update the selection first and
+        // refresh the "recently watched" row once the write has completed.
+        _uiState.update { it.copy(selectedChannel = channel, isPlaybackPaused = false) }
+        viewModelScope.launch {
+            val recents = withContext(Dispatchers.IO) {
+                runCatching {
+                    repository.addRecentChannel(channel.id)
+                    repository.getRecentChannelIds()
+                }.getOrNull()
+            } ?: return@launch
+            val channels = _uiState.value.channels
+            _uiState.update { state ->
+                state.copy(
                     selectedChannel = channel,
-                    recentChannels = recents,
-                    isPlaybackPaused = false
+                    recentChannels = recents.mapNotNull { id -> channels.find { it.id == id } }
                 )
             }
-        } catch (_: Exception) {}
+        }
     }
 
     fun addCustomPlaylist(url: String) {
-        val cleanUrl = url.trim()
-        if (repository.addCustomPlaylistUrl(cleanUrl)) {
-            _uiState.update { it.copy(importMessage = "Playlist added successfully! Syncing channels...") }
-            loadChannels()
-        } else {
-            _uiState.update { it.copy(importMessage = "Invalid stream link or already added.") }
+        viewModelScope.launch {
+            val added = withContext(Dispatchers.IO) {
+                runCatching { repository.addCustomPlaylistUrl(url.trim()) }.getOrDefault(false)
+            }
+            if (added) {
+                _uiState.update { it.copy(importMessage = "Playlist added successfully! Syncing channels...") }
+                loadChannels()
+            } else {
+                _uiState.update { it.copy(importMessage = "Invalid stream link or already added.") }
+            }
         }
     }
 
     fun removeCustomPlaylist(url: String) {
-        if (repository.removeCustomPlaylistUrl(url)) {
-            loadChannels()
+        viewModelScope.launch {
+            val removed = withContext(Dispatchers.IO) {
+                runCatching { repository.removeCustomPlaylistUrl(url) }.getOrDefault(false)
+            }
+            if (removed) {
+                loadChannels()
+            }
         }
     }
 
@@ -210,42 +227,50 @@ class TvViewModel(
     }
 
     fun clearFavorites() {
-        repository.clearFavorites()
-        _uiState.update { state ->
-            val updatedChannels = state.channels.map { it.copy(isFavorite = false) }
-            val filtered = ChannelFilterEngine.filter(
-                updatedChannels,
-                state.selectedCategory,
-                state.searchQuery
-            )
-            state.copy(
-                channels = updatedChannels,
-                filteredChannels = filtered,
-                selectedChannel = state.selectedChannel?.copy(isFavorite = false),
-                recentChannels = state.recentChannels.map { it.copy(isFavorite = false) },
-                actionMessage = "Favorites cleared"
-            )
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { repository.clearFavorites() } }
+            _uiState.update { state ->
+                val updatedChannels = state.channels.map { it.copy(isFavorite = false) }
+                val filtered = ChannelFilterEngine.filter(
+                    updatedChannels,
+                    state.selectedCategory,
+                    state.searchQuery
+                )
+                state.copy(
+                    channels = updatedChannels,
+                    filteredChannels = filtered,
+                    selectedChannel = state.selectedChannel?.copy(isFavorite = false),
+                    recentChannels = state.recentChannels.map { it.copy(isFavorite = false) },
+                    actionMessage = "Favorites cleared"
+                )
+            }
         }
     }
 
     fun clearRecents() {
-        repository.clearRecents()
-        _uiState.update { state ->
-            state.copy(recentChannels = emptyList(), actionMessage = "Watch history cleared")
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { repository.clearRecents() } }
+            _uiState.update { state ->
+                state.copy(recentChannels = emptyList(), actionMessage = "Watch history cleared")
+            }
         }
     }
 
     fun clearCustomPlaylists() {
-        repository.clearCustomPlaylists()
-        _uiState.update { state ->
-            state.copy(customPlaylistUrls = emptySet(), actionMessage = "Custom playlists removed")
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { repository.clearCustomPlaylists() } }
+            _uiState.update { state ->
+                state.copy(customPlaylistUrls = emptySet(), actionMessage = "Custom playlists removed")
+            }
+            loadChannels()
         }
-        loadChannels()
     }
 
     fun clearChannelCache() {
-        repository.clearChannelCache()
-        _uiState.update { state -> state.copy(actionMessage = "Channel cache cleared") }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { repository.clearChannelCache() } }
+            _uiState.update { state -> state.copy(actionMessage = "Channel cache cleared") }
+        }
     }
 
     fun setSleepTimer(minutes: Int) {
