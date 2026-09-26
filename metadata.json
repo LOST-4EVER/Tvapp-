@@ -1,0 +1,6 @@
+{
+  "name": "Kurdish TV Live",
+  "description": "Stream live Kurdish TV channels with high definition M3U/HLS playback, search, filter categories, and ExoPlayer controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
