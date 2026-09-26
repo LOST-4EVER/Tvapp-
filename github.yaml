@@ -58,11 +58,10 @@ jobs:
 
       - name: Build Release APKs (Universal & ABI Splits)
         run: |
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew assembleRelease -PversionCode=${{ github.run_number }} --stacktrace
 
-      - name: Prepare APK Artifacts (Direct APKs - No ZIP)
+      - name: Prepare APK Artifacts (Normal Names - No Version Suffix in Filenames)
         run: |
-          RUN_NUM="${{ github.run_number }}"
           OUTPUT_DIR="release-artifacts"
           mkdir -p "$OUTPUT_DIR"
 
@@ -76,15 +75,15 @@ jobs:
               if [ -f "$apk" ]; then
                 filename=$(basename "$apk")
                 if [[ "$filename" == *"universal"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-universal-v${RUN_NUM}.apk"
+                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-universal.apk"
                 elif [[ "$filename" == *"arm64-v8a"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-arm64-v8a-v${RUN_NUM}.apk"
+                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-arm64-v8a.apk"
                 elif [[ "$filename" == *"armeabi-v7a"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-armeabi-v7a-v${RUN_NUM}.apk"
+                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-armeabi-v7a.apk"
                 elif [[ "$filename" == *"x86_64"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-x86_64-v${RUN_NUM}.apk"
+                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-x86_64.apk"
                 elif [[ "$filename" == *"x86"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-x86-v${RUN_NUM}.apk"
+                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-x86.apk"
                 else
                   cp "$apk" "$OUTPUT_DIR/$filename"
                 fi
@@ -92,13 +91,13 @@ jobs:
             done
           fi
 
-          echo "Prepared direct APK artifacts in $OUTPUT_DIR:"
+          echo "Prepared normal named direct APK artifacts in $OUTPUT_DIR:"
           ls -la "$OUTPUT_DIR"
 
       - name: Upload Build Artifacts to Workflow Run
         uses: actions/upload-artifact@v4
         with:
-          name: kurdish-tv-apks-build-${{ github.run_number }}
+          name: kurdish-tv-apks
           path: release-artifacts/*.apk
 
       - name: Create or Update GitHub Release
@@ -111,11 +110,11 @@ jobs:
             ## Kurdish TV Live - Automated Release #${{ github.run_number }}
 
             ### 🚀 Direct Release APK Packages:
-            - **Universal Standalone APK**: `kurdish-tv-universal-v${{ github.run_number }}.apk`
-            - **ARM64 (64-bit phones)**: `kurdish-tv-arm64-v8a-v${{ github.run_number }}.apk`
-            - **ARMv7 (32-bit devices)**: `kurdish-tv-armeabi-v7a-v${{ github.run_number }}.apk`
-            - **x86_64 (64-bit Emulators/ChromeOS)**: `kurdish-tv-x86_64-v${{ github.run_number }}.apk`
-            - **x86 (32-bit Emulators)**: `kurdish-tv-x86-v${{ github.run_number }}.apk`
+            - **Universal Standalone APK**: `kurdish-tv-universal.apk`
+            - **ARM64 (64-bit phones)**: `kurdish-tv-arm64-v8a.apk`
+            - **ARMv7 (32-bit devices)**: `kurdish-tv-armeabi-v7a.apk`
+            - **x86_64 (64-bit Emulators/ChromeOS)**: `kurdish-tv-x86_64.apk`
+            - **x86 (32-bit Emulators)**: `kurdish-tv-x86.apk`
 
             *Built using JDK 21, Latest Gradle, and verified by Inlets Bug Analysis.*
           draft: false

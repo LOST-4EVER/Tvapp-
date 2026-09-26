@@ -1,20 +1,10 @@
 # Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
-
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep App Models, ViewModels, Repositories, Data & UI
+-keep class com.example.** { *; }
+-keepclassmembers class com.example.** { *; }
+-keep class com.example.kurdishtv.** { *; }
+-keepclassmembers class com.example.kurdishtv.** { *; }
 
 # Keep Media3 / ExoPlayer classes for video playback
 -keep class androidx.media3.** { *; }

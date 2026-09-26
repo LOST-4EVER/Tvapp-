@@ -1,22 +1,19 @@
-import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
-
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
-  alias(libs.plugins.google.services)
 }
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.example"
+    applicationId = "com.aistudio.kurdishtv.live"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
+    versionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 1
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -57,9 +54,9 @@ android {
 
   buildTypes {
     release {
-      isCrunchPngs = true
-      isMinifyEnabled = true
-      isShrinkResources = true
+      isCrunchPngs = false
+      isMinifyEnabled = false
+      isShrinkResources = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
@@ -92,8 +89,6 @@ secrets {
   defaultPropertiesFileName = ".env.example"
   ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
 }
-
-googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
