@@ -12,9 +12,9 @@ object KurdishChannelCatalog {
      * The list is built lazily once and reused. [Channel] is immutable, so sharing the
      * same instance is safe and avoids rebuilding the catalog on every UI-state default.
      */
-    private val defaultChannels: List<Channel> by lazy { buildDefaultChannels() }
+    private val cachedChannels: List<Channel> by lazy { buildDefaultChannels() }
 
-    fun getDefaultChannels(): List<Channel> = defaultChannels
+    fun getDefaultChannels(): List<Channel> = cachedChannels
 
     private fun buildDefaultChannels(): List<Channel> = listOf(
         // ── News ────────────────────────────────────────────────────────────────

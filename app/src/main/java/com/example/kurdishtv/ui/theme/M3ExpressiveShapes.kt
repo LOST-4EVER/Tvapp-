@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.dp
  *
  * Expressive shapes are not just rounded rectangles: they use deliberately
  * uneven corner radii (cookie / clover / sunny / burst) so containers feel
- * playful. [materialShapes] feeds the standard Material components.
+ * playful. [AppShapes] feeds the standard Material components.
  */
 object M3ExpressiveShapes {
     // Legacy tokens (kept so existing call sites keep working)
@@ -67,8 +67,14 @@ object M3ExpressiveShapes {
     val LogoTile = RoundedCornerShape(22.dp)
 }
 
-/** MaterialTheme shapes mapping (extraSmall → extraLarge). */
-val Shapes = Shapes(
+/**
+ * MaterialTheme shapes mapping (extraSmall → extraLarge).
+ *
+ * Named `AppShapes` rather than `Shapes` so it cannot shadow the
+ * `androidx.compose.material3.Shapes` type it is built from, and so
+ * call sites in other packages have to import it explicitly.
+ */
+val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(14.dp),
     medium = RoundedCornerShape(20.dp),
