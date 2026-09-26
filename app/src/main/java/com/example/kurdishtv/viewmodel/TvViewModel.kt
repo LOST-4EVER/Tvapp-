@@ -205,6 +205,49 @@ class TvViewModel(
         _uiState.update { it.copy(importMessage = null) }
     }
 
+    fun clearActionMessage() {
+        _uiState.update { it.copy(actionMessage = null) }
+    }
+
+    fun clearFavorites() {
+        repository.clearFavorites()
+        _uiState.update { state ->
+            val updatedChannels = state.channels.map { it.copy(isFavorite = false) }
+            val filtered = ChannelFilterEngine.filter(
+                updatedChannels,
+                state.selectedCategory,
+                state.searchQuery
+            )
+            state.copy(
+                channels = updatedChannels,
+                filteredChannels = filtered,
+                selectedChannel = state.selectedChannel?.copy(isFavorite = false),
+                recentChannels = state.recentChannels.map { it.copy(isFavorite = false) },
+                actionMessage = "Favorites cleared"
+            )
+        }
+    }
+
+    fun clearRecents() {
+        repository.clearRecents()
+        _uiState.update { state ->
+            state.copy(recentChannels = emptyList(), actionMessage = "Watch history cleared")
+        }
+    }
+
+    fun clearCustomPlaylists() {
+        repository.clearCustomPlaylists()
+        _uiState.update { state ->
+            state.copy(customPlaylistUrls = emptySet(), actionMessage = "Custom playlists removed")
+        }
+        loadChannels()
+    }
+
+    fun clearChannelCache() {
+        repository.clearChannelCache()
+        _uiState.update { state -> state.copy(actionMessage = "Channel cache cleared") }
+    }
+
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
         if (minutes <= 0) {

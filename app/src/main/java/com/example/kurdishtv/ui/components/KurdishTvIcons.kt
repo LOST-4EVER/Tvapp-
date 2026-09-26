@@ -37,4 +37,5 @@ object KurdishTvIcons {
     val Delete: Int = R.drawable.ic_delete
     val WifiOff: Int = R.drawable.ic_wifi_off
     val Check: Int = R.drawable.ic_check
+    val Settings: Int = R.drawable.ic_settings
 }

@@ -144,4 +144,12 @@ class TvRepository(
     fun getCustomPlaylistUrls(): Set<String> = customPlaylistStorage.getCustomPlaylistUrls()
 
     fun removeCustomPlaylistUrl(url: String): Boolean = customPlaylistStorage.removeCustomPlaylistUrl(url)
+
+    fun clearFavorites() = favoriteStorage.clear()
+
+    fun clearRecents() = recentStorage.clearRecents()
+
+    fun clearCustomPlaylists() = customPlaylistStorage.clear()
+
+    fun clearChannelCache() = channelCacheStorage.clearCache()
 }

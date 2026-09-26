@@ -40,15 +40,7 @@ import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoPlayerView
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.DarkCardBorder
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DarkSurfaceElevated
-import com.example.ui.theme.DarkSurfaceVariant
-import com.example.ui.theme.GlassOverlay
-import com.example.ui.theme.KurdishRed
-import com.example.ui.theme.KurdishSunGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalAppColors
 
 @Composable
 fun SidePlayerPane(
@@ -58,17 +50,18 @@ fun SidePlayerPane(
     modifier: Modifier = Modifier
 ) {
     if (channel == null) return
+    val colors = LocalAppColors.current
 
     var isPlaying by remember(channel.id) { mutableStateOf(true) }
     var errorMessage by remember(channel.id) { mutableStateOf<String?>(null) }
 
     Surface(
-        color = DarkSurface,
-        shape = M3ExpressiveShapes.LargeCard,
+        color = colors.surface,
+        shape = M3ExpressiveShapes.Clover,
         modifier = modifier
             .fillMaxHeight()
             .padding(16.dp)
-            .border(1.dp, DarkCardBorder, M3ExpressiveShapes.LargeCard)
+            .border(1.dp, colors.border, M3ExpressiveShapes.Clover)
     ) {
         Column(
             modifier = Modifier
@@ -85,23 +78,24 @@ fun SidePlayerPane(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "LIVE PREVIEW",
-                        color = KurdishSunGold,
+                        color = colors.textSecondary,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
                     )
                 }
 
                 Surface(
                     shape = CircleShape,
-                    color = GlassOverlay,
-                    modifier = Modifier.size(34.dp)
+                    color = colors.glass,
+                    modifier = Modifier.size(36.dp)
                 ) {
                     IconButton(onClick = { onFavoriteToggle(channel.id) }) {
                         SvgIcon(
                             resId = if (channel.isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
                             contentDescription = "Favorite",
-                            tint = if (channel.isFavorite) KurdishRed else Color.White,
-                            modifier = Modifier.size(16.dp)
+                            tint = if (channel.isFavorite) colors.liveRed else colors.textPrimary,
+                            modifier = Modifier.size(17.dp)
                         )
                     }
                 }
@@ -109,15 +103,14 @@ fun SidePlayerPane(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Player View Container
             Card(
-                shape = M3ExpressiveShapes.MediumCard,
+                shape = M3ExpressiveShapes.LogoTile,
                 colors = CardDefaults.cardColors(containerColor = Color.Black),
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .clip(M3ExpressiveShapes.MediumCard)
-                    .border(1.dp, DarkCardBorder, M3ExpressiveShapes.MediumCard)
+                    .clip(M3ExpressiveShapes.LogoTile)
+                    .border(1.dp, colors.border, M3ExpressiveShapes.LogoTile)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     VideoPlayerView(
@@ -137,7 +130,7 @@ fun SidePlayerPane(
                         ) {
                             Text(
                                 text = "Stream unavailable — pick another channel",
-                                color = TextSecondary,
+                                color = colors.textSecondary,
                                 fontSize = 12.sp
                             )
                         }
@@ -147,23 +140,21 @@ fun SidePlayerPane(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Channel Title & Details
             Text(
                 text = channel.name,
-                color = TextPrimary,
+                color = colors.textPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "${channel.category} • ${channel.quality}",
-                color = TextSecondary,
+                color = colors.textSecondary,
                 fontSize = 12.sp
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Controls
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -173,8 +164,8 @@ fun SidePlayerPane(
                     onClick = { isPlaying = !isPlaying },
                     shape = M3ExpressiveShapes.Pill,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = DarkSurfaceElevated,
-                        contentColor = TextPrimary
+                        containerColor = colors.surfaceElevated,
+                        contentColor = colors.textPrimary
                     ),
                     modifier = Modifier.weight(1f)
                 ) {
@@ -191,15 +182,15 @@ fun SidePlayerPane(
                     onClick = { onFullscreenClick(channel) },
                     shape = M3ExpressiveShapes.Pill,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = KurdishSunGold,
-                        contentColor = Color.Black
+                        containerColor = colors.primary,
+                        contentColor = colors.onPrimary
                     ),
                     modifier = Modifier.weight(1f)
                 ) {
                     SvgIcon(
                         resId = KurdishTvIcons.Fullscreen,
                         contentDescription = null,
-                        tint = Color.Black,
+                        tint = colors.onPrimary,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))

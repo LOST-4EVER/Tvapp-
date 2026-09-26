@@ -10,19 +10,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.KurdishSunGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalAppColors
 
 @Composable
 fun EmptyChannelState(
@@ -30,6 +28,8 @@ fun EmptyChannelState(
     onReset: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalAppColors.current
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -37,43 +37,58 @@ fun EmptyChannelState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        SvgIcon(
-            resId = KurdishTvIcons.Tv,
-            contentDescription = null,
-            tint = TextSecondary,
-            modifier = Modifier.size(60.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "No Channels Found",
-            color = TextPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = if (searchQuery.isNotBlank())
-                "No channels matching '$searchQuery'. Try another name or clear your search."
-            else
-                "No channels available in this category.",
-            color = TextSecondary,
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center
-        )
+        Surface(
+            shape = M3ExpressiveShapes.Sunny,
+            color = colors.surfaceVariant
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp)
+            ) {
+                SvgIcon(
+                    resId = KurdishTvIcons.Search,
+                    contentDescription = null,
+                    tint = colors.textTertiary,
+                    modifier = Modifier.size(44.dp)
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "No channels found",
+                    color = colors.textPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (searchQuery.isNotBlank())
+                        "Nothing matches \"$searchQuery\". Try another name or clear your search."
+                    else
+                        "This category is empty right now. Try a different one.",
+                    color = colors.textSecondary,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
+
         Button(
             onClick = onReset,
             shape = M3ExpressiveShapes.Pill,
-            colors = ButtonDefaults.buttonColors(containerColor = KurdishSunGold)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colors.primary,
+                contentColor = colors.onPrimary
+            )
         ) {
             SvgIcon(
                 resId = KurdishTvIcons.Refresh,
                 contentDescription = null,
-                tint = Color.Black,
+                tint = colors.onPrimary,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
-            Text("Show All Channels", color = Color.Black, fontWeight = FontWeight.Bold)
+            Text("Show all channels", fontWeight = FontWeight.Bold)
         }
     }
 }

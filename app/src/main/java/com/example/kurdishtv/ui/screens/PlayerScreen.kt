@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,16 +47,14 @@ import com.example.kurdishtv.ui.player.PlayerControlsOverlay
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoPlayerView
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.DarkBackground
-import com.example.ui.theme.KurdishRed
-import com.example.ui.theme.KurdishSunGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalAppColors
 import kotlinx.coroutines.delay
 
 @Composable
 fun PlayerScreen(
     channel: Channel,
+    autoplay: Boolean,
+    autoHideControls: Boolean,
     sleepTimerMinutes: Int,
     sleepTimerFormattedText: String?,
     isPlaybackPaused: Boolean,
@@ -68,10 +67,11 @@ fun PlayerScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalAppColors.current
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
 
-    var isUserPlaying by remember(channel.id) { mutableStateOf(true) }
+    var isUserPlaying by remember(channel.id) { mutableStateOf(autoplay) }
     var isControlsVisible by remember { mutableStateOf(true) }
     var resizeMode by remember { mutableStateOf(ResizeMode.FIT) }
     var isFullscreen by remember { mutableStateOf(true) }
@@ -111,8 +111,8 @@ fun PlayerScreen(
     }
 
     // Auto-hide the controls while playing so the video stays unobstructed.
-    LaunchedEffect(isControlsVisible, shouldPlay) {
-        if (isControlsVisible && shouldPlay) {
+    LaunchedEffect(isControlsVisible, shouldPlay, autoHideControls) {
+        if (autoHideControls && isControlsVisible && shouldPlay) {
             delay(4500L)
             isControlsVisible = false
         }
@@ -129,7 +129,7 @@ fun PlayerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(Color.Black)
     ) {
         VideoPlayerView(
             streamUrl = channel.streamUrl,
@@ -176,63 +176,72 @@ fun PlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.93f))
+                    .background(Color.Black.copy(alpha = 0.94f))
                     .clickable { isControlsVisible = true },
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(28.dp)
+                Surface(
+                    shape = M3ExpressiveShapes.Clover,
+                    color = colors.surface,
+                    modifier = Modifier.padding(24.dp)
                 ) {
-                    SvgIcon(
-                        resId = KurdishTvIcons.Tv,
-                        contentDescription = null,
-                        tint = KurdishRed,
-                        modifier = Modifier.size(54.dp)
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(
-                        text = "Channel Stream Unavailable",
-                        color = TextPrimary,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "The live stream for ${channel.name} is currently offline or unreachable.",
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = {
-                                errorMessage = null
-                                isUserPlaying = true
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = KurdishSunGold),
-                            shape = M3ExpressiveShapes.Pill
-                        ) {
-                            SvgIcon(
-                                resId = KurdishTvIcons.Refresh,
-                                contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Retry", color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(26.dp)
+                    ) {
+                        SvgIcon(
+                            resId = KurdishTvIcons.Tv,
+                            contentDescription = null,
+                            tint = colors.liveRed,
+                            modifier = Modifier.size(52.dp)
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "Channel unavailable",
+                            color = colors.textPrimary,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "The live stream for ${channel.name} is currently offline or unreachable.",
+                            color = colors.textSecondary,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = {
+                                    errorMessage = null
+                                    isUserPlaying = true
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = colors.primary,
+                                    contentColor = colors.onPrimary
+                                ),
+                                shape = M3ExpressiveShapes.Pill
+                            ) {
+                                SvgIcon(
+                                    resId = KurdishTvIcons.Refresh,
+                                    contentDescription = null,
+                                    tint = colors.onPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Retry", fontWeight = FontWeight.Bold)
+                            }
 
-                        OutlinedButton(
-                            onClick = {
-                                errorMessage = null
-                                onNextChannel()
-                            },
-                            shape = M3ExpressiveShapes.Pill
-                        ) {
-                            Text("Next Channel", color = Color.White)
+                            OutlinedButton(
+                                onClick = {
+                                    errorMessage = null
+                                    onNextChannel()
+                                },
+                                shape = M3ExpressiveShapes.Pill
+                            ) {
+                                Text("Next channel", color = colors.textPrimary)
+                            }
                         }
                     }
                 }

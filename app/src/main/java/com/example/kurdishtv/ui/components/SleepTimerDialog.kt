@@ -17,18 +17,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.DarkCardBorder
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DarkSurfaceVariant
-import com.example.ui.theme.KurdishSunGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalAppColors
 
 @Composable
 fun SleepTimerDialog(
@@ -36,24 +31,32 @@ fun SleepTimerDialog(
     onSelectMinutes: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val options = listOf(15, 30, 45, 60, 90)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = M3ExpressiveShapes.LargeCard,
-        containerColor = DarkSurface,
+        shape = M3ExpressiveShapes.Clover,
+        containerColor = colors.surface,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SvgIcon(
-                    resId = KurdishTvIcons.Bedtime,
-                    contentDescription = null,
-                    tint = KurdishSunGold,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
+                Surface(
+                    shape = M3ExpressiveShapes.Burst,
+                    color = colors.primaryContainer
+                ) {
+                    SvgIcon(
+                        resId = KurdishTvIcons.Bedtime,
+                        contentDescription = null,
+                        tint = colors.primary,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Sleep Timer",
-                    color = TextPrimary,
+                    text = "Sleep timer",
+                    color = colors.textPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -62,8 +65,8 @@ fun SleepTimerDialog(
         text = {
             Column {
                 Text(
-                    text = "Playback will automatically stop after the selected duration:",
-                    color = TextSecondary,
+                    text = "Playback stops automatically after the selected duration.",
+                    color = colors.textSecondary,
                     fontSize = 13.sp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
@@ -73,10 +76,9 @@ fun SleepTimerDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     options.take(3).forEach { mins ->
-                        val isSelected = currentMinutes == mins
                         TimerChip(
                             minutes = mins,
-                            isSelected = isSelected,
+                            isSelected = currentMinutes == mins,
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 onSelectMinutes(mins)
@@ -91,10 +93,9 @@ fun SleepTimerDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     options.drop(3).forEach { mins ->
-                        val isSelected = currentMinutes == mins
                         TimerChip(
                             minutes = mins,
-                            isSelected = isSelected,
+                            isSelected = currentMinutes == mins,
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 onSelectMinutes(mins)
@@ -105,7 +106,7 @@ fun SleepTimerDialog(
                     if (currentMinutes > 0) {
                         Surface(
                             shape = M3ExpressiveShapes.Pill,
-                            color = Color.Red.copy(alpha = 0.2f),
+                            color = colors.liveRed.copy(alpha = 0.18f),
                             modifier = Modifier
                                 .weight(1f)
                                 .bouncyClickable {
@@ -115,11 +116,11 @@ fun SleepTimerDialog(
                         ) {
                             Text(
                                 text = "Cancel",
-                                color = Color.Red,
+                                color = colors.liveRed,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(vertical = 10.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -128,7 +129,7 @@ fun SleepTimerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close", color = KurdishSunGold)
+                Text("Close", color = colors.primary)
             }
         }
     )
@@ -141,24 +142,25 @@ private fun TimerChip(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     Surface(
         shape = M3ExpressiveShapes.Pill,
-        color = if (isSelected) KurdishSunGold else DarkSurfaceVariant,
+        color = if (isSelected) colors.primary else colors.surfaceVariant,
         modifier = modifier
             .border(
                 1.dp,
-                if (isSelected) KurdishSunGold else DarkCardBorder,
+                if (isSelected) colors.primary else colors.border,
                 M3ExpressiveShapes.Pill
             )
             .bouncyClickable(scaleDown = 0.90f, onClick = onClick)
     ) {
         Text(
             text = "${minutes}m",
-            color = if (isSelected) Color.Black else TextPrimary,
+            color = if (isSelected) colors.onPrimary else colors.textPrimary,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(vertical = 10.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
     }
 }

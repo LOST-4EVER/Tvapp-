@@ -13,11 +13,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.DarkCardBorder
-import com.example.ui.theme.DarkSurfaceElevated
-import com.example.ui.theme.KurdishSunGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalAppColors
 
 @Composable
 fun SearchBarM3(
@@ -25,13 +21,15 @@ fun SearchBarM3(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalAppColors.current
+
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
         placeholder = {
             Text(
-                text = "Search Kurdish channels (Rudaw, KurdSat...)",
-                color = TextSecondary,
+                text = "Search Kurdish channels…",
+                color = colors.textTertiary,
                 fontSize = 14.sp
             )
         },
@@ -39,7 +37,7 @@ fun SearchBarM3(
             SvgIcon(
                 resId = KurdishTvIcons.Search,
                 contentDescription = "Search channels",
-                tint = KurdishSunGold,
+                tint = colors.primary,
                 modifier = Modifier.size(20.dp)
             )
         },
@@ -49,7 +47,7 @@ fun SearchBarM3(
                     SvgIcon(
                         resId = KurdishTvIcons.Close,
                         contentDescription = "Clear search",
-                        tint = TextSecondary,
+                        tint = colors.textSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -58,13 +56,13 @@ fun SearchBarM3(
         singleLine = true,
         shape = M3ExpressiveShapes.Pill,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = DarkSurfaceElevated,
-            unfocusedContainerColor = DarkSurfaceElevated,
-            focusedBorderColor = KurdishSunGold,
-            unfocusedBorderColor = DarkCardBorder,
-            focusedTextColor = TextPrimary,
-            unfocusedTextColor = TextPrimary,
-            cursorColor = KurdishSunGold
+            focusedContainerColor = colors.surfaceElevated,
+            unfocusedContainerColor = colors.surfaceElevated,
+            focusedBorderColor = colors.primary,
+            unfocusedBorderColor = colors.border,
+            focusedTextColor = colors.textPrimary,
+            unfocusedTextColor = colors.textPrimary,
+            cursorColor = colors.primary
         ),
         modifier = modifier
             .testTag("search_input")
