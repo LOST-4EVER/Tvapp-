@@ -16,6 +16,12 @@
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep Media3 / ExoPlayer classes for video playback
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media3.**
+
+# Keep OkHttp & Coil
+-keep class okhttp3.** { *; }
+-dontwarn okhttp3.**
+-keep class coil.** { *; }
+-dontwarn coil.**

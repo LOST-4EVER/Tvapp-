@@ -1,5 +1,9 @@
 package com.example.kurdishtv.ui.screens
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,10 +33,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.player.PlayerControlsOverlay
@@ -56,11 +65,41 @@ fun PlayerScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+
     var isPlaying by remember(channel.id) { mutableStateOf(true) }
     var isControlsVisible by remember { mutableStateOf(true) }
     var resizeMode by remember { mutableStateOf(ResizeMode.FIT) }
-    var isFullscreen by remember { mutableStateOf(false) }
+    var isFullscreen by remember { mutableStateOf(true) }
     var errorMessage by remember(channel.id) { mutableStateOf<String?>(null) }
+
+    // Fullscreen Immersive Mode System Bars Handler
+    DisposableEffect(isFullscreen, activity) {
+        val window = activity?.window
+        if (window != null) {
+            val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+            windowInsetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
+            if (isFullscreen) {
+                windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            } else {
+                windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+
+        onDispose {
+            val windowObj = activity?.window
+            if (windowObj != null) {
+                val insetsController = WindowCompat.getInsetsController(windowObj, windowObj.decorView)
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+    }
 
     // Sleep Timer countdown effect
     LaunchedEffect(sleepTimerMinutes) {
@@ -195,4 +234,13 @@ fun PlayerScreen(
             }
         }
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
 }

@@ -19,6 +19,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -43,13 +44,25 @@ fun VideoPlayerView(
 
     val exoPlayer = remember(context) {
         val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("KurdishTV-Android/1.0")
+            .setUserAgent("KurdishTV-Android/2.0")
             .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(15000)
+            .setConnectTimeoutMs(10000)
+            .setReadTimeoutMs(10000)
+
+        // Optimized load control for instant live stream playback startup & buffering
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                2500, // minBufferMs
+                15000, // maxBufferMs
+                1500,  // bufferForPlaybackMs (instant start)
+                2500   // bufferForPlaybackAfterRebufferMs
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
 
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .setLoadControl(loadControl)
             .build().apply {
                 playWhenReady = true
             }
