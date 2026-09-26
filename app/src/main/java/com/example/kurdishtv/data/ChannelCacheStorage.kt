@@ -41,6 +41,12 @@ class ChannelCacheStorage(context: Context) {
         } catch (_: Exception) {}
     }
 
+    fun clearCache() {
+        try {
+            if (cacheFile.exists()) cacheFile.delete()
+        } catch (_: Exception) {}
+    }
+
     private fun parseChannels(jsonString: String): List<Channel> {
         val list = mutableListOf<Channel>()
         val array = JSONArray(jsonString)

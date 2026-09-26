@@ -34,6 +34,12 @@ class FavoriteStorage(context: Context) {
         return isFavNow
     }
 
+    fun clear() {
+        try {
+            prefs.edit().remove(KEY_FAVORITES).apply()
+        } catch (_: Exception) {}
+    }
+
     companion object {
         private const val KEY_FAVORITES = "fav_channel_ids"
     }

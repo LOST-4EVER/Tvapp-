@@ -22,8 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.KurdishRed
-import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.LocalAppColors
 
 @Composable
 fun OfflineBanner(
@@ -31,6 +30,8 @@ fun OfflineBanner(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalAppColors.current
+
     AnimatedVisibility(
         visible = isOffline,
         enter = expandVertically(),
@@ -40,7 +41,7 @@ fun OfflineBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(KurdishRed)
+                .background(colors.liveRed)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -57,7 +58,7 @@ fun OfflineBanner(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "No Internet Connection • Streams paused",
+                    text = "No internet connection • streams unavailable",
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
@@ -67,7 +68,7 @@ fun OfflineBanner(
             Surface(
                 shape = M3ExpressiveShapes.Pill,
                 color = Color.White.copy(alpha = 0.25f),
-                modifier = Modifier.bouncyClickable(onClick = onRetry)
+                modifier = Modifier.bouncyClickable { onRetry() }
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

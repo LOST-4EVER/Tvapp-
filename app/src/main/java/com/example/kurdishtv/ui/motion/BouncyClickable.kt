@@ -1,8 +1,6 @@
 package com.example.kurdishtv.ui.motion
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -13,23 +11,22 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
 
 /**
- * Material 3 Physics-based Spring Bounciness Modifier.
- * Scales down smoothly on press and bounces back using spring dynamics.
+ * Material 3 Expressive press feedback: the element springs down on press and
+ * bounces back on release. Honours the user's reduced-motion preference.
  */
 fun Modifier.bouncyClickable(
     enabled: Boolean = true,
     scaleDown: Float = 0.93f,
     onClick: () -> Unit
 ): Modifier = composed {
+    val reduceMotion = LocalReduceMotion.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
+    val targetScale = if (isPressed && enabled && !reduceMotion) scaleDown else 1f
     val scale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) scaleDown else 1.0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
+        targetValue = targetScale,
+        animationSpec = ExpressiveMotion.pressSpring,
         label = "BouncyScaleAnimation"
     )
 

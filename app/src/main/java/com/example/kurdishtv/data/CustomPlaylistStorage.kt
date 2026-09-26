@@ -42,6 +42,12 @@ class CustomPlaylistStorage(context: Context) {
         return removed
     }
 
+    fun clear() {
+        try {
+            prefs.edit().remove(KEY_CUSTOM_URLS).apply()
+        } catch (_: Exception) {}
+    }
+
     companion object {
         private const val KEY_CUSTOM_URLS = "custom_playlist_urls"
     }

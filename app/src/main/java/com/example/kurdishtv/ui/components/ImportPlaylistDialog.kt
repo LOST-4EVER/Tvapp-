@@ -26,19 +26,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.DarkCardBorder
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DarkSurfaceElevated
-import com.example.ui.theme.DarkSurfaceVariant
-import com.example.ui.theme.KurdishSunGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalAppColors
 
 @Composable
 fun ImportPlaylistDialog(
@@ -47,25 +40,33 @@ fun ImportPlaylistDialog(
     onRemoveUrl: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     var urlInput by remember { mutableStateOf("") }
     var inputError by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = M3ExpressiveShapes.LargeCard,
-        containerColor = DarkSurface,
+        shape = M3ExpressiveShapes.Clover,
+        containerColor = colors.surface,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SvgIcon(
-                    resId = KurdishTvIcons.AddLink,
-                    contentDescription = null,
-                    tint = KurdishSunGold,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
+                Surface(
+                    shape = M3ExpressiveShapes.Burst,
+                    color = colors.primaryContainer
+                ) {
+                    SvgIcon(
+                        resId = KurdishTvIcons.AddLink,
+                        contentDescription = null,
+                        tint = colors.primary,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Add Custom IPTV Playlist",
-                    color = TextPrimary,
+                    text = "Add IPTV playlist",
+                    color = colors.textPrimary,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -74,8 +75,8 @@ fun ImportPlaylistDialog(
         text = {
             Column {
                 Text(
-                    text = "Enter any direct .m3u, .m3u8, or JSON Kurdish channel stream link:",
-                    color = TextSecondary,
+                    text = "Paste any direct .m3u, .m3u8 or JSON channel list link:",
+                    color = colors.textSecondary,
                     fontSize = 13.sp
                 )
 
@@ -90,28 +91,29 @@ fun ImportPlaylistDialog(
                     placeholder = {
                         Text(
                             text = "https://example.com/playlist.m3u8",
-                            color = TextSecondary,
+                            color = colors.textTertiary,
                             fontSize = 13.sp
                         )
                     },
                     singleLine = true,
                     shape = M3ExpressiveShapes.MediumCard,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = DarkSurfaceElevated,
-                        unfocusedContainerColor = DarkSurfaceElevated,
-                        focusedBorderColor = KurdishSunGold,
-                        unfocusedBorderColor = DarkCardBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        focusedContainerColor = colors.surfaceElevated,
+                        unfocusedContainerColor = colors.surfaceElevated,
+                        focusedBorderColor = colors.primary,
+                        unfocusedBorderColor = colors.border,
+                        focusedTextColor = colors.textPrimary,
+                        unfocusedTextColor = colors.textPrimary,
+                        cursorColor = colors.primary
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 if (inputError != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = inputError ?: "",
-                        color = Color.Red,
+                        color = colors.liveRed,
                         fontSize = 12.sp
                     )
                 }
@@ -125,24 +127,24 @@ fun ImportPlaylistDialog(
                             onAddUrl(clean)
                             urlInput = ""
                         } else {
-                            inputError = "Must start with http:// or https://"
+                            inputError = "Link must start with http:// or https://"
                         }
                     },
                     shape = M3ExpressiveShapes.Pill,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = KurdishSunGold,
-                        contentColor = Color.Black
+                        containerColor = colors.primary,
+                        contentColor = colors.onPrimary
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Add Playlist", fontWeight = FontWeight.Bold)
+                    Text("Add playlist", fontWeight = FontWeight.Bold)
                 }
 
                 if (customUrls.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Saved Playlists (${customUrls.size}):",
-                        color = TextPrimary,
+                        text = "Saved playlists (${customUrls.size})",
+                        color = colors.textPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -151,8 +153,8 @@ fun ImportPlaylistDialog(
                     LazyColumn(modifier = Modifier.height(120.dp)) {
                         items(customUrls.toList()) { url ->
                             Surface(
-                                shape = M3ExpressiveShapes.SmallCard,
-                                color = DarkSurfaceVariant,
+                                shape = M3ExpressiveShapes.Cookie,
+                                color = colors.surfaceVariant,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 3.dp)
@@ -163,7 +165,7 @@ fun ImportPlaylistDialog(
                                 ) {
                                     Text(
                                         text = url,
-                                        color = TextSecondary,
+                                        color = colors.textSecondary,
                                         fontSize = 11.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -176,7 +178,7 @@ fun ImportPlaylistDialog(
                                         SvgIcon(
                                             resId = KurdishTvIcons.Delete,
                                             contentDescription = "Remove",
-                                            tint = Color.Red,
+                                            tint = colors.liveRed,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -189,7 +191,7 @@ fun ImportPlaylistDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Done", color = KurdishSunGold)
+                Text("Done", color = colors.primary)
             }
         }
     )

@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -39,28 +38,24 @@ import coil.request.ImageRequest
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.DarkCardBorder
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DarkSurfaceElevated
-import com.example.ui.theme.DarkSurfaceVariant
-import com.example.ui.theme.GlassOverlay
-import com.example.ui.theme.KurdishRed
-import com.example.ui.theme.KurdishSunGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalAppColors
 
 @Composable
 fun ChannelCard(
     channel: Channel,
+    showLogos: Boolean = true,
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalAppColors.current
+
     // Build the image request once per logo URL instead of on every recomposition.
     val context = LocalContext.current
     val logoUrl = channel.logoUrl
-    val logoModel = remember(logoUrl) {
-        logoUrl?.takeIf { it.isNotBlank() }?.let {
+    val logoModel = remember(logoUrl, showLogos) {
+        if (!showLogos) null
+        else logoUrl?.takeIf { it.isNotBlank() }?.let {
             ImageRequest.Builder(context)
                 .data(it)
                 .crossfade(true)
@@ -72,25 +67,21 @@ fun ChannelCard(
         modifier = modifier
             .testTag("channel_card_${channel.id}")
             .fillMaxWidth()
-            .clip(M3ExpressiveShapes.LargeCard)
-            .border(1.dp, DarkCardBorder, M3ExpressiveShapes.LargeCard)
-            .bouncyClickable(scaleDown = 0.93f, onClick = onClick),
-        shape = M3ExpressiveShapes.LargeCard,
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            .clip(M3ExpressiveShapes.LogoTile)
+            .border(1.dp, colors.border, M3ExpressiveShapes.LogoTile)
+            .bouncyClickable(scaleDown = 0.94f) { onClick() },
+        shape = M3ExpressiveShapes.LogoTile,
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            // Header with Logo and Overlay Controls
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(110.dp)
+                    .height(112.dp)
                     .background(
                         Brush.verticalGradient(
-                            colors = listOf(
-                                DarkSurfaceElevated,
-                                DarkSurfaceVariant
-                            )
+                            colors = listOf(colors.surfaceVariant, colors.surface)
                         )
                     )
             ) {
@@ -101,7 +92,7 @@ fun ChannelCard(
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(16.dp)
+                            .padding(18.dp)
                     )
                 } else {
                     Box(
@@ -111,8 +102,8 @@ fun ChannelCard(
                         SvgIcon(
                             resId = KurdishTvIcons.Tv,
                             contentDescription = null,
-                            tint = KurdishSunGold.copy(alpha = 0.6f),
-                            modifier = Modifier.size(44.dp)
+                            tint = colors.primary.copy(alpha = 0.55f),
+                            modifier = Modifier.size(42.dp)
                         )
                     }
                 }
@@ -126,42 +117,28 @@ fun ChannelCard(
                 ) {
                     LiveBadge()
 
-                    Surface(
-                        shape = CircleShape,
-                        color = GlassOverlay,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        IconButton(
-                            onClick = onFavoriteToggle,
-                            modifier = Modifier.testTag("fav_btn_${channel.id}")
-                        ) {
-                            SvgIcon(
-                                resId = if (channel.isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
-                                contentDescription = "Favorite",
-                                tint = if (channel.isFavorite) KurdishRed else Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
+                    CardFavoriteButton(
+                        isFavorite = channel.isFavorite,
+                        onClick = onFavoriteToggle
+                    )
                 }
             }
 
-            // Info Section
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .padding(horizontal = 12.dp, vertical = 11.dp)
             ) {
                 Text(
                     text = channel.name,
-                    color = TextPrimary,
+                    color = colors.textPrimary,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(7.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -170,14 +147,14 @@ fun ChannelCard(
                 ) {
                     Surface(
                         shape = M3ExpressiveShapes.BadgePill,
-                        color = DarkSurfaceVariant
+                        color = colors.surfaceVariant
                     ) {
                         Text(
                             text = channel.category,
-                            color = TextSecondary,
+                            color = colors.textSecondary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                         )
                     }
 
@@ -185,19 +162,41 @@ fun ChannelCard(
                         SvgIcon(
                             resId = KurdishTvIcons.Signal,
                             contentDescription = null,
-                            tint = KurdishSunGold,
+                            tint = colors.primary,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = if (channel.isHd) "1080p" else "720p",
-                            color = KurdishSunGold,
+                            color = colors.primary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun CardFavoriteButton(
+    isFavorite: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = LocalAppColors.current
+    Surface(
+        shape = CircleShape,
+        color = colors.glass,
+        modifier = Modifier.size(34.dp)
+    ) {
+        IconButton(onClick = onClick) {
+            SvgIcon(
+                resId = if (isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
+                contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                tint = if (isFavorite) colors.liveRed else colors.textPrimary,
+                modifier = Modifier.size(17.dp)
+            )
         }
     }
 }

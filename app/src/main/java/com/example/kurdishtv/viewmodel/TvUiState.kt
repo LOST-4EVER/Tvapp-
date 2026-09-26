@@ -20,5 +20,6 @@ data class TvUiState(
     val sleepTimerFormattedText: String? = null,
     val isPlaybackPaused: Boolean = false,
     val isMuted: Boolean = false,
-    val importMessage: String? = null
+    val importMessage: String? = null,
+    val actionMessage: String? = null
 )

@@ -1,5 +1,6 @@
 package com.example.kurdishtv.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,17 +8,18 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,11 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.DarkCardBorder
-import com.example.ui.theme.DarkSurfaceVariant
-import com.example.ui.theme.KurdishSunGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalAppColors
 
 @Composable
 fun RecentChannelsRow(
@@ -38,6 +36,7 @@ fun RecentChannelsRow(
     modifier: Modifier = Modifier
 ) {
     if (recentChannels.isEmpty()) return
+    val colors = LocalAppColors.current
 
     Column(
         modifier = modifier
@@ -45,19 +44,26 @@ fun RecentChannelsRow(
             .padding(vertical = 4.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SvgIcon(
-                resId = KurdishTvIcons.History,
-                contentDescription = null,
-                tint = KurdishSunGold,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
+            Surface(
+                shape = CircleShape,
+                color = colors.primaryContainer
+            ) {
+                SvgIcon(
+                    resId = KurdishTvIcons.History,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier
+                        .padding(6.dp)
+                        .size(14.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "RECENTLY WATCHED",
-                color = KurdishSunGold,
+                color = colors.textSecondary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
@@ -73,35 +79,37 @@ fun RecentChannelsRow(
                 key = { idx, item -> "recent_${item.id}_$idx" }
             ) { _, channel ->
                 Surface(
-                    shape = M3ExpressiveShapes.MediumCard,
-                    color = DarkSurfaceVariant,
+                    shape = M3ExpressiveShapes.Cookie,
+                    color = colors.surfaceVariant,
                     modifier = Modifier
-                        .border(1.dp, DarkCardBorder, M3ExpressiveShapes.MediumCard)
+                        .background(colors.surfaceVariant, M3ExpressiveShapes.Cookie)
+                        .border(1.dp, colors.border, M3ExpressiveShapes.Cookie)
                         .bouncyClickable(scaleDown = 0.92f) { onChannelClick(channel) }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         SvgIcon(
                             resId = KurdishTvIcons.Tv,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = colors.primary,
                             modifier = Modifier.size(15.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
                                 text = channel.name,
-                                color = TextPrimary,
+                                color = colors.textPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            Spacer(modifier = Modifier.height(1.dp))
                             Text(
                                 text = channel.category,
-                                color = TextSecondary,
+                                color = colors.textSecondary,
                                 fontSize = 10.sp
                             )
                         }

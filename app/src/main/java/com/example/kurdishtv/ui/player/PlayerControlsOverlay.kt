@@ -35,12 +35,7 @@ import com.example.kurdishtv.ui.components.LiveBadge
 import com.example.kurdishtv.ui.components.SvgIcon
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
-import com.example.ui.theme.DarkCardBorder
-import com.example.ui.theme.GlassOverlay
-import com.example.ui.theme.KurdishRed
-import com.example.ui.theme.KurdishSunGold
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalAppColors
 
 @Composable
 fun PlayerControlsOverlay(
@@ -63,6 +58,7 @@ fun PlayerControlsOverlay(
     onToggleMute: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = LocalAppColors.current
     val interactionSource = remember { MutableInteractionSource() }
 
     Box(
@@ -83,16 +79,16 @@ fun PlayerControlsOverlay(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
+                    .background(Color.Black.copy(alpha = 0.45f))
             ) {
-                // Top Action Bar
+                // ── Top action bar ────────────────────────────────────────────
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopCenter)
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Black.copy(alpha = 0.82f), Color.Transparent)
+                                colors = listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent)
                             )
                         )
                         .padding(horizontal = 16.dp, vertical = 20.dp),
@@ -102,10 +98,10 @@ fun PlayerControlsOverlay(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = CircleShape,
-                            color = GlassOverlay,
+                            color = colors.glass,
                             modifier = Modifier
-                                .size(42.dp)
-                                .bouncyClickable(onClick = onBackClick)
+                                .size(44.dp)
+                                .bouncyClickable { onBackClick() }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 SvgIcon(
@@ -122,13 +118,13 @@ fun PlayerControlsOverlay(
                         Column {
                             Text(
                                 text = channel.name,
-                                color = TextPrimary,
+                                color = colors.textPrimary,
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "${channel.category} • ${channel.quality}",
-                                color = TextSecondary,
+                                color = colors.textSecondary,
                                 fontSize = 12.sp
                             )
                         }
@@ -138,74 +134,39 @@ fun PlayerControlsOverlay(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Quick Mute / Unmute Button
-                        Surface(
-                            shape = CircleShape,
-                            color = if (isMuted) KurdishRed.copy(alpha = 0.3f) else GlassOverlay,
-                            modifier = Modifier
-                                .size(42.dp)
-                                .bouncyClickable(onClick = onToggleMute)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                SvgIcon(
-                                    resId = if (isMuted) KurdishTvIcons.VolumeOff else KurdishTvIcons.VolumeUp,
-                                    contentDescription = if (isMuted) "Unmute" else "Mute",
-                                    tint = if (isMuted) KurdishRed else Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-
-                        // Sleep timer button
-                        Surface(
-                            shape = CircleShape,
-                            color = if (!sleepTimerRemainingText.isNullOrEmpty()) KurdishSunGold.copy(alpha = 0.25f) else GlassOverlay,
-                            modifier = Modifier
-                                .size(42.dp)
-                                .bouncyClickable(onClick = onOpenSleepTimer)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                SvgIcon(
-                                    resId = KurdishTvIcons.Bedtime,
-                                    contentDescription = "Sleep timer",
-                                    tint = if (!sleepTimerRemainingText.isNullOrEmpty()) KurdishSunGold else Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-
-                        // Favorite toggle button
-                        Surface(
-                            shape = CircleShape,
-                            color = GlassOverlay,
-                            modifier = Modifier
-                                .size(42.dp)
-                                .bouncyClickable(onClick = onFavoriteToggle)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                SvgIcon(
-                                    resId = if (channel.isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
-                                    contentDescription = "Favorite",
-                                    tint = if (channel.isFavorite) KurdishRed else Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
+                        OverlayIconButton(
+                            iconRes = if (isMuted) KurdishTvIcons.VolumeOff else KurdishTvIcons.VolumeUp,
+                            description = if (isMuted) "Unmute" else "Mute",
+                            active = isMuted,
+                            onClick = onToggleMute
+                        )
+                        OverlayIconButton(
+                            iconRes = KurdishTvIcons.Bedtime,
+                            description = "Sleep timer",
+                            active = !sleepTimerRemainingText.isNullOrEmpty(),
+                            onClick = onOpenSleepTimer
+                        )
+                        OverlayIconButton(
+                            iconRes = if (channel.isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
+                            description = "Favorite",
+                            active = channel.isFavorite,
+                            onClick = onFavoriteToggle
+                        )
                     }
                 }
 
-                // Center Play/Pause & Channel Skip Controls
+                // ── Center transport controls ─────────────────────────────────
                 Row(
                     modifier = Modifier.align(Alignment.Center),
                     horizontalArrangement = Arrangement.spacedBy(28.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        shape = CircleShape,
-                        color = GlassOverlay,
+                        shape = M3ExpressiveShapes.Burst,
+                        color = colors.glass,
                         modifier = Modifier
-                            .size(54.dp)
-                            .border(1.dp, DarkCardBorder, CircleShape)
+                            .size(56.dp)
+                            .border(1.dp, colors.border, M3ExpressiveShapes.Burst)
                             .bouncyClickable(scaleDown = 0.86f, onClick = onPreviousChannel)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -220,27 +181,27 @@ fun PlayerControlsOverlay(
 
                     Surface(
                         shape = CircleShape,
-                        color = KurdishSunGold,
+                        color = colors.primary,
                         modifier = Modifier
-                            .size(72.dp)
+                            .size(74.dp)
                             .bouncyClickable(scaleDown = 0.88f, onClick = onPlayPauseToggle)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             SvgIcon(
                                 resId = if (isPlaying) KurdishTvIcons.Pause else KurdishTvIcons.PlayRes,
                                 contentDescription = if (isPlaying) "Pause" else "Play",
-                                tint = Color.Black,
+                                tint = colors.onPrimary,
                                 modifier = Modifier.size(36.dp)
                             )
                         }
                     }
 
                     Surface(
-                        shape = CircleShape,
-                        color = GlassOverlay,
+                        shape = M3ExpressiveShapes.Burst,
+                        color = colors.glass,
                         modifier = Modifier
-                            .size(54.dp)
-                            .border(1.dp, DarkCardBorder, CircleShape)
+                            .size(56.dp)
+                            .border(1.dp, colors.border, M3ExpressiveShapes.Burst)
                             .bouncyClickable(scaleDown = 0.86f, onClick = onNextChannel)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -254,7 +215,7 @@ fun PlayerControlsOverlay(
                     }
                 }
 
-                // Bottom Action Bar
+                // ── Bottom action bar ─────────────────────────────────────────
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -274,14 +235,14 @@ fun PlayerControlsOverlay(
                             Spacer(modifier = Modifier.width(10.dp))
                             Surface(
                                 shape = M3ExpressiveShapes.BadgePill,
-                                color = KurdishSunGold.copy(alpha = 0.2f)
+                                color = colors.primaryContainer
                             ) {
                                 Text(
-                                    text = "Timer: $sleepTimerRemainingText",
-                                    color = KurdishSunGold,
+                                    text = "Timer $sleepTimerRemainingText",
+                                    color = colors.onPrimaryContainer,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                         }
@@ -293,17 +254,17 @@ fun PlayerControlsOverlay(
                     ) {
                         Surface(
                             shape = M3ExpressiveShapes.Pill,
-                            color = GlassOverlay,
+                            color = colors.glass,
                             modifier = Modifier.bouncyClickable(onClick = onResizeModeToggle)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 SvgIcon(
                                     resId = KurdishTvIcons.AspectRatio,
                                     contentDescription = null,
-                                    tint = KurdishSunGold,
+                                    tint = colors.primary,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
@@ -318,9 +279,9 @@ fun PlayerControlsOverlay(
 
                         Surface(
                             shape = CircleShape,
-                            color = GlassOverlay,
+                            color = colors.glass,
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(40.dp)
                                 .bouncyClickable(onClick = onFullscreenToggle)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -335,6 +296,32 @@ fun PlayerControlsOverlay(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OverlayIconButton(
+    iconRes: Int,
+    description: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = LocalAppColors.current
+    Surface(
+        shape = CircleShape,
+        color = if (active) colors.primary.copy(alpha = 0.28f) else colors.glass,
+        modifier = Modifier
+            .size(44.dp)
+            .bouncyClickable(onClick = onClick)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            SvgIcon(
+                resId = iconRes,
+                contentDescription = description,
+                tint = if (active) colors.primary else Color.White,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
