@@ -67,7 +67,13 @@ object M3ExpressiveShapes {
     val LogoTile = RoundedCornerShape(22.dp)
 }
 
-/** MaterialTheme shapes mapping (extraSmall → extraLarge). */
+/**
+ * MaterialTheme shapes mapping (extraSmall → extraLarge).
+ *
+ * Named `AppShapes` rather than `Shapes` so it cannot shadow the
+ * `androidx.compose.material3.Shapes` type it is built from, and so
+ * call sites in other packages have to import it explicitly.
+ */
 val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(14.dp),
