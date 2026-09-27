@@ -88,7 +88,10 @@ fun ChannelCard(
                     channelName = channel.name,
                     logoUrl = channel.logoUrl,
                     showLogos = showLogos,
-                    contentPadding = 18.dp,
+                    contentPadding = 12.dp,
+                    // Reserve the strip the LIVE badge and heart button occupy,
+                    // so a wide logo is not drawn underneath them.
+                    topContentPadding = 22.dp,
                     // Decode for the tile this is drawn in, not at source resolution.
                     size = 112.dp
                 )

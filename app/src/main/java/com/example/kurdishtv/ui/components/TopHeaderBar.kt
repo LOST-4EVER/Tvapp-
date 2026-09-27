@@ -2,6 +2,7 @@ package com.example.kurdishtv.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.bouncyClickable
-import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -66,7 +66,9 @@ fun TopHeaderBar(
                 modifier = Modifier.weight(1f, fill = false)
             ) {
                 Surface(
-                    shape = M3ExpressiveShapes.Sunny,
+                    // The 8-lobed Sunny silhouette pushed the TV glyph out of
+                    // centre and out of the safe area on small screens.
+                    shape = CircleShape,
                     color = colors.primary,
                     modifier = Modifier
                         .size(if (isNarrow) 40.dp else 46.dp)
@@ -148,12 +150,15 @@ fun TopHeaderBar(
         onClick: () -> Unit
     ) {
         val colors = LocalAppColors.current
+        // A circle, not Burst. The 12-lobed spiked shape rendered as a star that
+        // overlapped the neighbouring buttons and read as a gear/cog, which is
+        // exactly what the Settings icon inside it looked like it was.
         Surface(
-            shape = M3ExpressiveShapes.Burst,
+            shape = CircleShape,
             color = colors.surfaceElevated,
             modifier = Modifier
                 .size(40.dp)
-                .border(1.dp, colors.border, M3ExpressiveShapes.Burst)
+                .border(1.dp, colors.border, CircleShape)
                 .bouncyClickable { onClick() }
         ) {
             Box(contentAlignment = Alignment.Center) {

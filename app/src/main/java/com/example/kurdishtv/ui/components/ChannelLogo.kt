@@ -74,7 +74,16 @@ fun ChannelLogo(
     showLogos: Boolean,
     modifier: Modifier = Modifier,
     contentPadding: Dp = 18.dp,
-    size: Dp = 96.dp
+    size: Dp = 96.dp,
+    /**
+     * Extra inset on the leading edge of the logo box.
+     *
+     * The LIVE badge and favourite button float over the top of the tile. With
+     * a uniform padding the logo was centred in the full box and the badge sat
+     * on top of it, so a wide logo was visibly cut. Reserving this much at the
+     * top keeps the artwork clear of both controls.
+     */
+    topContentPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
     val colors = LocalAppColors.current
@@ -124,7 +133,14 @@ fun ChannelLogo(
             model = request,
             contentDescription = channelName,
             contentScale = ContentScale.Fit,
-            modifier = modifier.fillMaxSize().padding(contentPadding),
+            modifier = modifier
+                .fillMaxSize()
+                .padding(
+                    start = contentPadding,
+                    end = contentPadding,
+                    top = contentPadding + topContentPadding,
+                    bottom = contentPadding
+                ),
             imageLoader = loader,
             loading = { fallback() },
             error = { fallback() }

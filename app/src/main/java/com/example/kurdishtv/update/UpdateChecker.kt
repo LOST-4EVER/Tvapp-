@@ -29,31 +29,57 @@ import java.io.IOException
 class UpdateChecker(
     private val okHttpClient: OkHttpClient,
     private val releasesApiUrl: String = RELEASES_API_URL,
-    private val fallbackManifestUrl: String = FALLBACK_MANIFEST_URL
+    private val manifestUrl: String = MANIFEST_URL
 ) {
 
     /**
      * Fetches the newest release, or null when the app is already current.
      *
-     * Tries the releases API first, then falls back to the static manifest. The
-     * fallback matters because the API returns 403 once an unauthenticated
-     * client exhausts its hourly quota, and that must not be reported as
-     * "you are up to date".
+     * The static manifest is read **first**, deliberately.
+     *
+     * The releases API only carries the tag (`v1.0.22`), so a build number has to
+     * be recovered from it. This project stamps `VERSION_CODE` with the CI run
+     * number, so the tag's patch number is on a completely different scale: a tag
+     * of `v1.0.22` guesses 22 while the installed build is 36. The comparison
+     * then reads 22 > 36 as false and the app reports itself current forever,
+     * even with a newer release sitting right there.
+     *
+     * The manifest is written by the build job, which is the only place that
+     * actually knows the run number, so it is authoritative.
+     *
+     * The API is still consulted when the manifest is unreachable. The release
+     * body does record the run number, so that is preferred over the tag guess;
+     * only when neither is available does the entry report itself as unknown
+     * rather than offering an update it cannot prove is newer.
      */
     suspend fun checkForUpdate(currentVersionCode: Int): Result<AppUpdate?> =
         withContext(Dispatchers.IO) {
-            val fromApi = runCatching { fetchUpdateFrom(releasesApiUrl) }
-                .onFailure { NetworkClient.logDebug("Update check via API failed", it) }
+            val fromManifest = runCatching { fetchUpdateFrom(manifestUrl) }
+                .onFailure { NetworkClient.logDebug("Update check via manifest failed", it) }
                 .getOrNull()
 
-            val update = fromApi ?: runCatching { fetchUpdateFrom(fallbackManifestUrl) }
-                .onFailure { NetworkClient.logDebug("Update check via manifest failed", it) }
+            if (fromManifest != null) {
+                return@withContext Result.success(
+                    fromManifest.takeIf { it.isNewerThan(currentVersionCode) }
+                )
+            }
+
+            val fromApi = runCatching { fetchUpdateFrom(releasesApiUrl) }
+                .onFailure { NetworkClient.logDebug("Update check via API failed", it) }
                 .getOrNull()
                 ?: return@withContext Result.failure(
                     IOException("Could not reach the update server")
                 )
 
-            Result.success(update.takeIf { it.isNewerThan(currentVersionCode) })
+            // A build number recovered from the release body is on the same
+            // scale as VERSION_CODE and can be compared directly. Anything else
+            // is unverified, so the app stays quiet rather than prompting for an
+            // update that may not exist.
+            val verified = fromApi.takeIf { it.versionCode > 0 }
+                ?.takeIf { RUN_NUMBER_IN_BODY.containsMatchIn(it.notes.orEmpty()) }
+                ?: return@withContext Result.success(null)
+
+            Result.success(verified.takeIf { it.isNewerThan(currentVersionCode) })
         }
 
     private fun fetchUpdateFrom(url: String): AppUpdate? {
@@ -175,22 +201,35 @@ class UpdateChecker(
         const val APK_FILE_NAME = "kurdish-tv-update.apk"
 
         /**
-         * The repository is public, so the releases API is reachable without a
-         * token and is always in step with what was actually published — there
-         * is no separate manifest file to keep in sync or to go stale.
+         * The primary feed. Written by the release job from the same run number
+         * that is compiled into the APK's `VERSION_CODE`, so the two are always
+         * directly comparable. Served from raw.githubusercontent with no API
+         * rate limit, which is why it is tried before the releases API rather
+         * than after it.
+         */
+        const val MANIFEST_URL =
+            "https://raw.githubusercontent.com/LOST-4EVER/Tvapp-/main/update.json"
+
+        /**
+         * Secondary feed, used only when the manifest cannot be fetched.
          *
-         * The static manifest (update.json) is kept as a fallback because the
-         * API rate-limits unauthenticated callers, and a rate-limited response
-         * should not be reported to the user as "you are up to date".
+         * Kept because the manifest is a single point of failure: if that
+         * commit is reverted or the branch is renamed, the app falls back to the
+         * releases API. Note that the API exposes only a tag name, so the build
+         * number derived from it is approximate — see [checkForUpdate].
          */
         const val RELEASES_API_URL =
             "https://api.github.com/repos/LOST-4EVER/Tvapp-/releases/latest"
 
-        const val FALLBACK_MANIFEST_URL =
-            "https://raw.githubusercontent.com/LOST-4EVER/Tvapp-/main/update.json"
-
         private const val DOWNLOAD_CHUNK_BYTES = 64 * 1024
         private const val PROGRESS_STEP_BYTES = 256 * 1024L
+
+        /**
+         * The release body records the CI run number, e.g.
+         * `*on run* \`36\`.`. Recovering it is what makes an API-sourced update
+         * comparable with the installed `VERSION_CODE`.
+         */
+        internal val RUN_NUMBER_IN_BODY = Regex("""on run\*?\s*`?(\d+)`?""")
     }
 }
 
@@ -222,14 +261,19 @@ object UpdateManifestParser {
                 }
             }
             best ?: return null
+            val body = root.optString("body").takeIf { it.isNotBlank() }
+            val tag = root.optString("tag_name")
             return AppUpdate(
-                versionName = root.optString("tag_name").removePrefix("v").ifBlank { "—" },
-                versionCode = parseVersionCode(root.optString("tag_name")),
+                versionName = tag.removePrefix("v").ifBlank { "—" },
+                // Prefer the run number recorded in the body: it is the same
+                // value compiled into the APK as VERSION_CODE. The tag's patch
+                // number is not comparable with it.
+                versionCode = runNumberFrom(body) ?: parseVersionCode(tag),
                 releaseUrl = root.optString("html_url"),
                 downloadUrl = best.optString("browser_download_url"),
                 sizeBytes = best.optLong("size"),
                 publishedAt = root.optString("published_at").takeIf { it.isNotBlank() },
-                notes = root.optString("body").takeIf { it.isNotBlank() }
+                notes = body
             )
         }
         return null
@@ -251,10 +295,22 @@ object UpdateManifestParser {
     }
 
     /**
-     * Extracts a comparable build number from a tag such as `v1.0.21`.
+     * Recovers the CI run number from a release body, or null when absent.
      *
-     * Falls back to the patch number, which is monotonic for this project's
-     * release scheme, and to 0 when nothing numeric is present.
+     * This is the only build-number source on the same scale as the APK's
+     * `VERSION_CODE`, so it takes priority over the tag.
+     */
+    fun runNumberFrom(body: String?): Int? {
+        val match = body?.let { UpdateChecker.RUN_NUMBER_IN_BODY.find(it) } ?: return null
+        return match.groupValues.getOrNull(1)?.toIntOrNull()
+    }
+
+    /**
+     * Extracts a build number from a tag such as `v1.0.21`.
+     *
+     * NOTE: this returns the tag's patch number, which for this project is *not*
+     * the value compiled into the APK as `VERSION_CODE` (that is the CI run
+     * number). It is only a last-resort guess; prefer [runNumberFrom].
      */
     fun parseVersionCode(tag: String): Int {
         val digits = tag.trim().removePrefix("v")
