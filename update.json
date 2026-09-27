@@ -1,9 +1,9 @@
 {
-  "version": "1.0.21",
-  "version_code": 21,
+  "version": "1.0.22",
+  "version_code": 100,
   "release_url": "https://github.com/LOST-4EVER/Tvapp-/releases/tag/v1.0.21",
   "download_url": "https://github.com/LOST-4EVER/Tvapp-/releases/download/v1.0.21/app-release.apk",
   "size_bytes": 3958606,
   "published_at": "",
-  "notes": "Manifest for the published v1.0.21 build."
+  "notes": "Local-development floor. The release workflow overwrites this file with the real published build on every successful main run, where version_code is the CI run number that the APK is actually built with."
 }
