@@ -31,6 +31,8 @@ object KurdishTvIcons {
     val Music: Int = R.drawable.ic_music
     val Kids: Int = R.drawable.ic_kids
     val Sports: Int = R.drawable.ic_sports
+    val Quran: Int = R.drawable.ic_quran
+    val Religious: Int = R.drawable.ic_religious
     val Globe: Int = R.drawable.ic_globe
     val Refresh: Int = R.drawable.ic_refresh
     val Search: Int = R.drawable.ic_search

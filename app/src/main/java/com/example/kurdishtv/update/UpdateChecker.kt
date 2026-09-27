@@ -1,6 +1,5 @@
 package com.example.kurdishtv.update
 
-import android.content.Context
 import com.example.kurdishtv.network.NetworkClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,39 +27,53 @@ import java.io.IOException
  * fields. [UpdateManifestParser] handles both shapes.
  */
 class UpdateChecker(
-    private val context: Context,
     private val okHttpClient: OkHttpClient,
-    private val manifestUrl: String = DEFAULT_MANIFEST_URL
+    private val releasesApiUrl: String = RELEASES_API_URL,
+    private val fallbackManifestUrl: String = FALLBACK_MANIFEST_URL
 ) {
 
     /**
      * Fetches the newest release, or null when the app is already current.
      *
-     * Returns null both for "no newer version" and for "could not check", so
-     * callers should surface a generic message rather than claiming up-to-date
-     * on a network error.
+     * Tries the releases API first, then falls back to the static manifest. The
+     * fallback matters because the API returns 403 once an unauthenticated
+     * client exhausts its hourly quota, and that must not be reported as
+     * "you are up to date".
      */
     suspend fun checkForUpdate(currentVersionCode: Int): Result<AppUpdate?> =
         withContext(Dispatchers.IO) {
-            runCatching {
-                val request = Request.Builder()
-                    .url(manifestUrl)
-                    .header("Accept", "application/vnd.github+json, application/json")
-                    .header("User-Agent", NetworkClient.USER_AGENT)
-                    // Always revalidate: a stale manifest means missing a release.
-                    .header("Cache-Control", "no-cache")
-                    .build()
+            val fromApi = runCatching { fetchUpdateFrom(releasesApiUrl) }
+                .onFailure { NetworkClient.logDebug("Update check via API failed", it) }
+                .getOrNull()
 
-                okHttpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        throw IOException("Update check failed (HTTP ${response.code})")
-                    }
-                    val body = response.body?.string().orEmpty()
-                    if (body.isBlank()) throw IOException("Update check returned an empty response")
-                    UpdateManifestParser.parse(body)
-                }?.takeIf { it.isNewerThan(currentVersionCode) }
-            }
+            val update = fromApi ?: runCatching { fetchUpdateFrom(fallbackManifestUrl) }
+                .onFailure { NetworkClient.logDebug("Update check via manifest failed", it) }
+                .getOrNull()
+                ?: return@withContext Result.failure(
+                    IOException("Could not reach the update server")
+                )
+
+            Result.success(update.takeIf { it.isNewerThan(currentVersionCode) })
         }
+
+    private fun fetchUpdateFrom(url: String): AppUpdate? {
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/vnd.github+json, application/json")
+            .header("User-Agent", NetworkClient.USER_AGENT)
+            // Always revalidate: a stale response means missing a release.
+            .header("Cache-Control", "no-cache")
+            .build()
+
+        okHttpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("Update check failed (HTTP ${response.code})")
+            }
+            val body = response.body?.string().orEmpty()
+            if (body.isBlank()) throw IOException("Update check returned an empty response")
+            return UpdateManifestParser.parse(body)
+        }
+    }
 
     /**
      * Downloads the APK to [downloadDir], reporting progress as it goes.
@@ -162,10 +175,18 @@ class UpdateChecker(
         const val APK_FILE_NAME = "kurdish-tv-update.apk"
 
         /**
-         * A static manifest describing the newest build. Point this at GitHub
-         * Pages, a raw file host or any static JSON endpoint.
+         * The repository is public, so the releases API is reachable without a
+         * token and is always in step with what was actually published — there
+         * is no separate manifest file to keep in sync or to go stale.
+         *
+         * The static manifest (update.json) is kept as a fallback because the
+         * API rate-limits unauthenticated callers, and a rate-limited response
+         * should not be reported to the user as "you are up to date".
          */
-        const val DEFAULT_MANIFEST_URL =
+        const val RELEASES_API_URL =
+            "https://api.github.com/repos/LOST-4EVER/Tvapp-/releases/latest"
+
+        const val FALLBACK_MANIFEST_URL =
             "https://raw.githubusercontent.com/LOST-4EVER/Tvapp-/main/update.json"
 
         private const val DOWNLOAD_CHUNK_BYTES = 64 * 1024

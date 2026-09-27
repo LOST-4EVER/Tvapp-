@@ -7,14 +7,21 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
 
 /**
  * Material 3 Expressive motion tokens.
@@ -65,14 +72,82 @@ object ExpressiveMotion {
     val emphasizedAccelerate: Easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
     val standard: Easing = FastOutSlowInEasing
 
+    /**
+     * Entrance spring for content that appears in a list or grid.
+     *
+     * Softer than [pressSpring]: an entrance should settle rather than wobble,
+     * and it runs on many items at once so overshoot reads as jitter.
+     */
+    val entranceSpring: SpringSpec<Float> = spring(
+        dampingRatio = 0.82f,
+        stiffness = 420f
+    )
+
     /** Durations for non-spring animations. */
     const val DURATION_SHORT = 200
     const val DURATION_MEDIUM = 350
     const val DURATION_LONG = 600
+
+    /**
+     * Per-item delay for a staggered grid entrance.
+     *
+     * Small on purpose: with dozens of cards on screen a large stagger makes the
+     * last row feel broken rather than choreographed.
+     */
+    const val STAGGER_STEP_MS = 26L
+    const val STAGGER_MAX_ITEMS = 14
 }
 
 /** True when the user asked for reduced motion; press/scale feedback becomes instant. */
 val LocalReduceMotion = staticCompositionLocalOf { false }
+
+/**
+ * A staggered entrance for grid and list items.
+ *
+ * Items fade and rise into place one after another, which is the M3 Expressive
+ * pattern for content that arrives as a set. The stagger is capped at
+ * [ExpressiveMotion.STAGGER_MAX_ITEMS] so a long list does not leave its last
+ * rows waiting, and under reduced motion it collapses to a plain fade.
+ *
+ * Pass the item's index **within the currently visible set**, not its absolute
+ * index in the data, otherwise scrolling would replay the whole animation as
+ * rows recycle.
+ */
+@Composable
+fun Modifier.staggeredEntrance(
+    index: Int,
+    maxStaggeredItems: Int = ExpressiveMotion.STAGGER_MAX_ITEMS
+): Modifier {
+    val reduceMotion = LocalReduceMotion.current
+    val step = index.coerceIn(0, maxStaggeredItems) * ExpressiveMotion.STAGGER_STEP_MS
+
+    // The delayed start is a one-shot effect, not an animation input, so the value
+    // is flipped once and then left to the spring.
+    val started = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(step) {
+        if (reduceMotion) {
+            started.floatValue = 1f
+        } else {
+            delay(step)
+            started.floatValue = 1f
+        }
+    }
+
+    val progress by animateFloatAsState(
+        targetValue = started.floatValue,
+        animationSpec = ExpressiveMotion.entranceSpring,
+        label = "StaggerEntrance"
+    )
+
+    return this.graphicsLayer {
+        alpha = progress
+        // A short rise plus a slight scale reads as "settling into place"
+        // without the wobble a bouncier spring would produce at this volume.
+        translationY = (1f - progress) * 18f * this.density
+        scaleX = 0.97f + 0.03f * progress
+        scaleY = 0.97f + 0.03f * progress
+    }
+}
 
 /**
  * A single shared pulse value for every LIVE badge in the app. Running one

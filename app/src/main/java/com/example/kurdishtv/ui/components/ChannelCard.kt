@@ -20,6 +20,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.motion.tvFocusable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -44,13 +49,26 @@ fun ChannelCard(
 ) {
     val colors = LocalAppColors.current
 
+    var isFocused by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier
             .testTag("channel_card_${channel.id}")
             .fillMaxWidth()
             .clip(M3ExpressiveShapes.LogoTile)
-            .border(1.dp, colors.border, M3ExpressiveShapes.LogoTile)
-            .bouncyClickable(scaleDown = 0.94f) { onClick() },
+            .bouncyClickable(scaleDown = 0.94f) { onClick() }
+            .tvFocusable(
+                ringColor = colors.primary,
+                shape = M3ExpressiveShapes.LogoTile,
+                onFocusChanged = { isFocused = it }
+            )
+            .then(
+                if (isFocused) {
+                    Modifier.border(2.dp, colors.primary, M3ExpressiveShapes.LogoTile)
+                } else {
+                    Modifier.border(1.dp, colors.border, M3ExpressiveShapes.LogoTile)
+                }
+            ),
         shape = M3ExpressiveShapes.LogoTile,
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)

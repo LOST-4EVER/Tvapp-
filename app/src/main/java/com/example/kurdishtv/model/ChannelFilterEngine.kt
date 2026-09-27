@@ -23,6 +23,7 @@ object ChannelFilterEngine {
                 CategoryFilter.SPORT -> channel.category.contains("Sport", ignoreCase = true)
                 CategoryFilter.DOCUMENTARY -> channel.category.contains("Docu", ignoreCase = true)
                 CategoryFilter.QURAN -> channel.category.contains("Quran", ignoreCase = true)
+                CategoryFilter.RELIGIOUS -> channel.category.contains("Relig", ignoreCase = true)
                 CategoryFilter.FAVORITES -> channel.isFavorite
                 CategoryFilter.HD -> channel.isHd
             }
