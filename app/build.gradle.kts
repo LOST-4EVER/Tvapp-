@@ -93,7 +93,13 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      signingConfig = signingConfigs.getByName("debugConfig")
+      // Keep debug iteration fast: R8 and resource shrinking are the slowest parts of
+      // the release build and buy nothing while developing.
+      isMinifyEnabled = false
+      isShrinkResources = false
+    }
   }
   packaging {
     resources {
@@ -145,7 +151,9 @@ dependencies {
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
-  implementation(libs.androidx.compose.ui.tooling.preview)
+  // ui-tooling-preview only supplies @Preview annotations at compile time. It was on
+  // the release runtime classpath, so move it to debug where it belongs.
+  debugImplementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
   // implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)

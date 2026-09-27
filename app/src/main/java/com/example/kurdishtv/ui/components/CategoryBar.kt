@@ -23,8 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.CategoryFilter
+import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.motion.bouncyClickable
-import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
+import com.example.kurdishtv.ui.motion.rememberMorphingPillShape
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -34,6 +35,7 @@ fun CategoryBar(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
+    val reduceMotion = LocalReduceMotion.current
 
     LazyRow(
         modifier = modifier,
@@ -59,15 +61,22 @@ fun CategoryBar(
                 label = "CategoryPillElevation"
             )
 
+            // The pill's silhouette animates on selection, so the change is
+            // legible without relying on colour alone.
+            val pillShape = rememberMorphingPillShape(
+                selected = isSelected,
+                reduceMotion = reduceMotion
+            )
+
             Surface(
-                shape = M3ExpressiveShapes.Pill,
+                shape = pillShape,
                 color = backgroundColor,
                 shadowElevation = elevation,
                 modifier = Modifier
                     .border(
                         width = 1.dp,
                         color = if (isSelected) colors.primary else colors.border,
-                        shape = M3ExpressiveShapes.Pill
+                        shape = pillShape
                     )
                     .bouncyClickable(scaleDown = 0.90f) {
                         onCategorySelected(category)
