@@ -75,11 +75,11 @@ class UpdateChecker(
             // scale as VERSION_CODE and can be compared directly. Anything else
             // is unverified, so the app stays quiet rather than prompting for an
             // update that may not exist.
-            val fromApi = fromApi.takeIf { it.versionCode > 0 }
+            val verified = fromApi.takeIf { it.versionCode > 0 }
                 ?.takeIf { RUN_NUMBER_IN_BODY.containsMatchIn(it.notes.orEmpty()) }
                 ?: return@withContext Result.success(null)
 
-            Result.success(fromApi.takeIf { it.isNewerThan(currentVersionCode) })
+            Result.success(verified.takeIf { it.isNewerThan(currentVersionCode) })
         }
 
     private fun fetchUpdateFrom(url: String): AppUpdate? {

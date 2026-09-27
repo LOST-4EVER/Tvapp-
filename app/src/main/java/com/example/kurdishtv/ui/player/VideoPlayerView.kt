@@ -48,6 +48,11 @@ fun VideoPlayerView(
     val context = LocalContext.current
     var isBuffering by remember { mutableStateOf(true) }
 
+    // Resolved outside the graphicsLayer block on purpose: inside it, the
+    // lambda receiver (GraphicsLayerScope) has its own `colorFilter` property,
+    // which shadows this parameter and made the assignment a type error.
+    val frameColorFilter = colorFilter.toColorFilter()
+
     val exoPlayer = remember(context) {
         val httpDataSourceFactory = NetworkClient.createMediaDataSourceFactory(context)
         val defaultDataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
@@ -158,7 +163,7 @@ fun VideoPlayerView(
                 .graphicsLayer {
                     // Applied to the decoded frame, so a colour correction costs no
                     // additional rendering pass beyond the layer.
-                    colorFilter = colorFilter.toColorFilter()
+                    this.colorFilter = frameColorFilter
                 }
         )
 
