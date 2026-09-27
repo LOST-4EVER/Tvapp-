@@ -55,7 +55,17 @@ jobs:
           # readable error.
           curl -sSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
             | tar xz actionlint
-          ./actionlint .github/workflows/*.yml .github/workflows/*.yaml
+
+          # actionlint exits non-zero when a glob matches nothing, so build the file
+          # list explicitly and skip the step if the directory is somehow empty.
+          FILES=$(find .github/workflows -name '*.yml' -o -name '*.yaml' | sort)
+          if [ -z "$FILES" ]; then
+            echo "No workflow files found; nothing to lint."
+            exit 0
+          fi
+          echo "Linting:"
+          echo "$FILES"
+          ./actionlint $FILES
 
       - name: Restore the committed release signing key
         run: |
