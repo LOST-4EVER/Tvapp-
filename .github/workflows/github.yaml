@@ -93,6 +93,51 @@ jobs:
           # shipping an APK signed with the wrong key.
           keytool -list -keystore release-key.jks -storepass android -alias upload
 
+      - name: Resolve the release version
+        id: version
+        if: github.event_name != 'pull_request'
+        env:
+          # Required by the `gh release view` probe below. Without a token that
+          # call exits non-zero on auth, which made the probe report "tag is
+          # free" for a tag that already existed — so every build silently
+          # overwrote the same release and its APK asset instead of adding one.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The tag is derived from the app's own versionName so the release, the
+          # Settings > About version and the update manifest all agree.
+          VERSION_NAME=$(grep '^kurdishTvVersionName=' gradle.properties | cut -d= -f2 | tr -d ' \r')
+          VERSION_NAME=${VERSION_NAME:-1.0.0}
+
+          if [ "${GITHUB_REF}" = "refs/tags/${GITHUB_REF_NAME}" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            # Advance the patch number past the newest published release.
+            #
+            # This used to be a fixed value in gradle.properties, so once a
+            # versionName shipped it stayed taken forever: every build resolved
+            # to the same tag and overwrote the same release and APK asset. The
+            # APK replaced itself in place, so a release that reported 1.0.22
+            # kept changing contents underneath anyone who had already
+            # downloaded it, and the release history stayed frozen at 1.0.22.
+            #
+            # Deriving it from the latest published tag means each green build
+            # gets its own version, its own tag and its own immutable asset.
+            LATEST=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo '')
+            LATEST_PATCH=$(echo "${LATEST:-}" | sed -E 's/^v?([0-9]+)\.([0-9]+)\.([0-9]+).*$/\3/')
+            if echo "${LATEST:-}" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+'; then
+              BASE_PATCH=$(echo "$VERSION_NAME" | cut -d. -f3)
+              NEXT_PATCH=$(( LATEST_PATCH > BASE_PATCH ? LATEST_PATCH : BASE_PATCH ))
+              NEXT_PATCH=$(( NEXT_PATCH + 1 ))
+              VERSION_NAME="1.0.${NEXT_PATCH}"
+            fi
+
+            TAG="v${VERSION_NAME}"
+          fi
+
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Releasing as ${TAG}"
+
       - name: Inlets Bug & Code Quality Scanner (Android Lint)
         run: |
           echo "::group::Running Inlets Bug & Lint Analysis"
@@ -104,7 +149,15 @@ jobs:
 
       - name: Build Release APKs (Universal & ABI Splits)
         run: |
-          ./gradlew assembleRelease -PversionCode=${{ github.run_number }} --stacktrace
+          # The version name is resolved before the build and passed in, so the
+          # version compiled into the APK (shown in Settings -> About) is the
+          # same one the release tag and update manifest use. Resolving it after
+          # the build left the APK advertising a version that was not the one it
+          # was published under.
+          ./gradlew assembleRelease \
+            -PversionCode="${{ github.run_number }}" \
+            -PkurdishTvVersionName="${{ steps.version.outputs.version_name }}" \
+            --stacktrace
 
       - name: Prepare APK Artifacts (Normal Names - No Version Suffix in Filenames)
         run: |
@@ -145,30 +198,6 @@ jobs:
         with:
           name: kurdish-tv-apks
           path: release-artifacts/*.apk
-
-      - name: Resolve the release version
-        id: version
-        if: github.event_name != 'pull_request'
-        run: |
-          # The tag is derived from the app's own versionName so the release, the
-          # Settings > About version and the update manifest all agree.
-          VERSION_NAME=$(grep '^kurdishTvVersionName=' gradle.properties | cut -d= -f2 | tr -d ' \r')
-          VERSION_NAME=${VERSION_NAME:-1.0.0}
-
-          if [ "${GITHUB_REF}" = "refs/tags/${GITHUB_REF_NAME}" ]; then
-            TAG="${GITHUB_REF_NAME}"
-          else
-            TAG="v${VERSION_NAME}"
-            # The tag is taken (a build already shipped this versionName), so keep
-            # the release history intact and disambiguate with the run number.
-            if gh release view "$TAG" >/dev/null 2>&1; then
-              TAG="v${VERSION_NAME}.${GITHUB_RUN_NUMBER}"
-            fi
-          fi
-
-          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Releasing as ${TAG}"
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
