@@ -18,8 +18,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.AudioAttributes
@@ -48,10 +52,18 @@ fun VideoPlayerView(
     val context = LocalContext.current
     var isBuffering by remember { mutableStateOf(true) }
 
-    // Resolved outside the graphicsLayer block on purpose: inside it, the
-    // lambda receiver (GraphicsLayerScope) has its own `colorFilter` property,
-    // which shadows this parameter and made the assignment a type error.
-    val frameColorFilter = colorFilter.toColorFilter()
+    // Applied with drawWithContent rather than graphicsLayer: in Compose 1.7
+    // GraphicsLayerScope has no colorFilter property, so graphicsLayer cannot
+    // carry the matrix. Drawing the content into a saveLayer whose Paint owns
+    // the filter applies it to the decoded frame itself, with no extra decode.
+    //
+    // Returns null for the Normal preset, in which case no layer is created at
+    // all and rendering takes the unmodified path.
+    val filterPaint = remember(colorFilter) {
+        colorFilter.toColorFilter()?.let { filter ->
+            Paint().apply { colorFilter = filter }
+        }
+    }
 
     val exoPlayer = remember(context) {
         val httpDataSourceFactory = NetworkClient.createMediaDataSourceFactory(context)
@@ -160,10 +172,20 @@ fun VideoPlayerView(
             },
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer {
-                    // Applied to the decoded frame, so a colour correction costs no
-                    // additional rendering pass beyond the layer.
-                    this.colorFilter = frameColorFilter
+                .drawWithContent {
+                    val paint = filterPaint
+                    if (paint == null) {
+                        drawContent()
+                    } else {
+                        drawIntoCanvas { canvas ->
+                            canvas.saveLayer(
+                                Rect(Offset.Zero, size),
+                                paint
+                            )
+                            drawContent()
+                            canvas.restore()
+                        }
+                    }
                 }
         )
 
