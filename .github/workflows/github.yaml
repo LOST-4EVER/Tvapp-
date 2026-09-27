@@ -47,6 +47,25 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x gradlew
 
+      - name: Validate the workflow files
+        run: |
+          # A duplicate YAML key makes the whole workflow file invalid, and the
+          # failure surfaces only as "this run likely failed because of a workflow
+          # file issue" with no useful log. Catching it here turns that into a
+          # readable error.
+          curl -sSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
+            | tar xz actionlint
+
+          # actionlint exits non-zero when a glob matches nothing, so build the file
+          # list explicitly and skip the step if the directory is somehow empty.
+          mapfile -t FILES < <(find .github/workflows \( -name '*.yml' -o -name '*.yaml' \) | sort)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "No workflow files found; nothing to lint."
+            exit 0
+          fi
+          printf 'Linting: %s\n' "${FILES[@]}"
+          ./actionlint "${FILES[@]}"
+
       - name: Restore the committed release signing key
         run: |
           # Every published APK must share one signing key or Android refuses to
@@ -127,24 +146,50 @@ jobs:
           name: kurdish-tv-apks
           path: release-artifacts/*.apk
 
+      - name: Resolve the release version
+        id: version
+        if: github.event_name != 'pull_request'
+        run: |
+          # The tag is derived from the app's own versionName so the release, the
+          # Settings > About version and the update manifest all agree.
+          VERSION_NAME=$(grep '^kurdishTvVersionName=' gradle.properties | cut -d= -f2 | tr -d ' \r')
+          VERSION_NAME=${VERSION_NAME:-1.0.0}
+
+          if [ "${GITHUB_REF}" = "refs/tags/${GITHUB_REF_NAME}" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v${VERSION_NAME}"
+            # The tag is taken (a build already shipped this versionName), so keep
+            # the release history intact and disambiguate with the run number.
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              TAG="v${VERSION_NAME}.${GITHUB_RUN_NUMBER}"
+            fi
+          fi
+
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Releasing as ${TAG}"
+
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
-        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        # Publish on every green main build, on tags, and on manual dispatch.
+        # Pull requests are excluded: they must not create releases.
+        if: github.event_name != 'pull_request'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', github.run_number) }}
-          name: "Kurdish TV Live ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', github.run_number) }}"
+          tag_name: ${{ env.TAG }}
+          name: "Kurdish TV Live ${{ env.TAG }} (${{ env.VERSION_NAME }})"
           body: |
             ## Kurdish TV Live
 
-            ### 📦 APK packages
-            Pick the one that matches your device. If you are unsure, use the
-            **universal** build — it runs everywhere.
+            ### 📦 APK package
+            **kurdish-tv-universal.apk** runs on every device — phone, tablet and
+            TV. There is only one build, so there is nothing to choose between.
 
-            - **Universal (recommended)**: `kurdish-tv-universal.apk`
-            - **ARM64 — most modern phones**: `kurdish-tv-arm64-v8a.apk`
-            - **ARMv7 — older 32-bit phones**: `kurdish-tv-armeabi-v7a.apk`
-            - **x86_64 — emulators / ChromeOS**: `kurdish-tv-x86_64.apk`
-            - **x86 — older emulators**: `kurdish-tv-x86.apk`
+            *Built from commit* `${{ github.sha }}` *on run* `${{ github.run_number }}`.
 
             ### ⚠️ Installing over an older build
             Every release is signed with the same key, so you can install this over
@@ -165,5 +210,41 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: release-artifacts/*.apk
+
+      - name: Publish the update manifest
+        if: github.event_name != 'pull_request'
         env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Written here rather than in a separate release-triggered workflow
+          # because only the build job knows the run number, and the run number
+          # is the APK's real VERSION_CODE (it is passed as -PversionCode).
+          #
+          # The app compares this version_code against BuildConfig.VERSION_CODE,
+          # so publishing anything else here makes every comparison false and the
+          # updater silently never offers an update.
+          ASSET_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kurdish-tv-universal.apk"
+          SIZE=$(stat -c%s release-artifacts/kurdish-tv-universal.apk)
+
+          cat > update.json <<JSON
+          {
+            "version": "${VERSION_NAME}",
+            "version_code": ${GITHUB_RUN_NUMBER},
+            "release_url": "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}",
+            "download_url": "${ASSET_URL}",
+            "size_bytes": ${SIZE},
+            "published_at": "",
+            "notes": "Build ${GITHUB_RUN_NUMBER} from ${GITHUB_SHA::8}."
+          }
+          JSON
+
+          cat update.json
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add update.json
+          # --quiet: this runs on every main build, and a no-op commit must not
+          # produce an empty commit that would loop the workflow.
+          git commit --quiet -m "Update manifest for ${TAG}" || echo "Manifest already current."
+          git push --quiet || echo "Nothing to push."
