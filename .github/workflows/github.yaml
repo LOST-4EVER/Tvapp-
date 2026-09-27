@@ -112,7 +112,7 @@ jobs:
                 elif [[ "$filename" == *"x86"* ]]; then
                   cp "$apk" "$OUTPUT_DIR/kurdish-tv-x86.apk"
                 else
-                  cp "$apk" "$OUTPUT_DIR/$filename"
+                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-universal.apk"
                 fi
               fi
             done

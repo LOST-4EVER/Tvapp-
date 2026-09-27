@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon foreground.
+
+  The art is kept inside the centre 72dp of the 108dp canvas, which is the region
+  Android guarantees is visible once the launcher applies its mask. Art that spills
+  outside that safe zone gets clipped by round, squircle and squircle-shaped masks,
+  which is what made the previous icon look cut off.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/kurdish_tv_launcher_icon_1790402834499"
+        android:width="72dp"
+        android:height="72dp"
+        android:drawable="@drawable/ic_launcher_art"
         android:gravity="center" />
 </layer-list>

@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -105,7 +106,12 @@ fun MainTvScreen(
         // there keeps two comfortable columns instead of squeezing one very wide one,
         // and keeps the header actions from colliding with the title on small screens.
         val isCompactWidth = maxWidth < 600.dp
+        // A phone in landscape is wide but short. Judging on width alone put it in
+        // the two-pane tablet layout, where the grid was squeezed into a narrow,
+        // very tall column. Height has to be part of the decision.
+        val isShortLandscape = maxHeight < 480.dp
         val gridMinCellSize = when {
+            isShortLandscape -> 168.dp
             isCompactWidth -> 132.dp
             maxWidth >= 900.dp -> 172.dp
             else -> 150.dp
@@ -115,6 +121,26 @@ fun MainTvScreen(
             uiState.searchQuery.isBlank() && uiState.selectedCategory == CategoryFilter.ALL
 
         when {
+            // Short landscape (phone on its side) gets the compact single-pane
+            // layout even though it is wide, because vertical space is the scarce
+            // resource there.
+            isShortLandscape -> {
+                LandscapeCompactLayout(
+                    uiState = uiState,
+                    settings = settings,
+                    filtered = filtered,
+                    isBrowsingHome = isBrowsingHome,
+                    gridMinCellSize = gridMinCellSize,
+                    onSearchQueryChanged = onSearchQueryChanged,
+                    onCategorySelected = onCategorySelected,
+                    onChannelClick = onChannelClick,
+                    onFavoriteToggle = onFavoriteToggle,
+                    onRetryClick = onRetryClick,
+                    onOpenSettings = onOpenSettings,
+                    onOpenImport = { showImportDialog = true }
+                )
+            }
+
             isTabletLandscape -> {
                 Row(modifier = Modifier.fillMaxSize()) {
                     AdaptiveNavigationRail(
@@ -300,6 +326,91 @@ fun MainTvScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Single-pane layout for short landscape windows (a phone held sideways).
+ *
+ * The header, search and category chips share one row so the grid gets the full
+ * height of the screen. Losing a whole row to chrome matters here because vertical
+ * space is exactly what is scarce in landscape.
+ */
+@Composable
+private fun LandscapeCompactLayout(
+    uiState: TvUiState,
+    settings: AppSettings,
+    filtered: List<Channel>,
+    isBrowsingHome: Boolean,
+    gridMinCellSize: Dp,
+    onSearchQueryChanged: (String) -> Unit,
+    onCategorySelected: (CategoryFilter) -> Unit,
+    onChannelClick: (Channel) -> Unit,
+    onFavoriteToggle: (String) -> Unit,
+    onRetryClick: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenImport: () -> Unit
+) {
+    val colors = LocalAppColors.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    Scaffold(
+        containerColor = colors.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            Column {
+                OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TopHeaderBar(
+                        channelCount = filtered.size,
+                        isLoading = uiState.isLoading,
+                        onOpenImport = onOpenImport,
+                        onRefresh = onRetryClick,
+                        onOpenSettings = onOpenSettings,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                SearchBarM3(
+                    query = uiState.searchQuery,
+                    onQueryChange = onSearchQueryChanged
+                )
+                CategoryBar(
+                    selectedCategory = uiState.selectedCategory,
+                    onCategorySelected = onCategorySelected
+                )
+            }
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (filtered.isEmpty()) {
+                EmptyChannelState(
+                    searchQuery = uiState.searchQuery,
+                    onReset = {
+                        onSearchQueryChanged("")
+                        onCategorySelected(CategoryFilter.ALL)
+                    }
+                )
+            } else {
+                ChannelGrid(
+                    filtered = filtered,
+                    uiState = uiState,
+                    showLogos = settings.showLogos,
+                    isHome = isBrowsingHome,
+                    minCellSize = gridMinCellSize,
+                    onChannelClick = onChannelClick,
+                    onFavoriteToggle = onFavoriteToggle
+                )
             }
         }
     }

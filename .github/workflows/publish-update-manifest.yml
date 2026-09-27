@@ -33,14 +33,24 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
-            const apk = data.assets.find(a => a.name.endsWith('.apk'));
+
+            // Prefer the universal build: it is the one asset that runs on every
+            // device, so it is the only correct answer for an in-app update.
+            const assets = data.assets.filter(a => a.name.endsWith('.apk'));
+            const apk =
+              assets.find(a => a.name === 'kurdish-tv-universal.apk') ||
+              assets.find(a => a.name.includes('universal')) ||
+              assets[0];
+
             if (!apk) {
               core.setFailed('The release has no .apk asset to point at.');
               return;
             }
+
             const version = data.tag_name.replace(/^v/, '');
             const parts = version.split('.');
             const patch = parseInt(parts[parts.length - 1], 10) || 0;
+
             core.setOutput('version', version);
             core.setOutput('version_code', String(patch));
             core.setOutput('download_url', apk.browser_download_url);

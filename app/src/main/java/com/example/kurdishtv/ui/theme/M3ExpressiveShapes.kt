@@ -51,6 +51,18 @@ object M3ExpressiveShapes {
     val Oval: Shape = RoundedCornerShape(percent = 50)
     val Pill: Shape = RoundedCornerShape(percent = 50)
 
+    /**
+     * A pill whose corner radius differs between the two ends.
+     *
+     * Morphing between [Pill] and this shape gives a filter or chip a subtle
+     * squeeze on selection, which is the shape-based counterpart to the scale
+     * bounce already used for press feedback.
+     */
+    val MorphingPill: Shape = RoundedCornerShape(
+        topStart = CornerSize(50), topEnd = CornerSize(50),
+        bottomEnd = CornerSize(34), bottomStart = CornerSize(34)
+    )
+
     // ── Directional / pointed ────────────────────────────────────────────────
     val Triangle: Shape = RoundedCornerShape(
         topStart = CornerSize(50), topEnd = CornerSize(50),
