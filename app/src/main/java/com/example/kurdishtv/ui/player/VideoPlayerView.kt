@@ -60,8 +60,14 @@ fun VideoPlayerView(
     // Returns null for the Normal preset, in which case no layer is created at
     // all and rendering takes the unmodified path.
     val filterPaint = remember(colorFilter) {
-        colorFilter.toColorFilter()?.let { filter ->
-            Paint().apply { colorFilter = filter }
+        val filter = colorFilter.toColorFilter()
+        if (filter == null) {
+            null
+        } else {
+            // Built by hand rather than with `Paint().apply { colorFilter = ... }`:
+            // inside apply, the composable's own `colorFilter` parameter shadows
+            // Paint.colorFilter, so the assignment targets a val of the wrong type.
+            Paint().also { it.colorFilter = filter }
         }
     }
 
