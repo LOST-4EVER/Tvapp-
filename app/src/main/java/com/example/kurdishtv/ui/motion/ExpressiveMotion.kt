@@ -198,7 +198,7 @@ fun rememberLivePulse(enabled: Boolean): Float {
         ),
         label = "LivePulseScale"
     )
-    return if (enabled) scale else RESTING_PULSE
+    return if (enabled) scale else ExpressiveMotion.RESTING_PULSE
 }
 
 /**
@@ -228,5 +228,5 @@ fun rememberBounceProgress(enabled: Boolean): Float {
         ),
         label = "BounceProgressValue"
     )
-    return if (enabled) progress else RESTING_BOUNCE
+    return if (enabled) progress else ExpressiveMotion.RESTING_BOUNCE
 }
