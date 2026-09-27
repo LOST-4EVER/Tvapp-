@@ -52,6 +52,9 @@ import com.example.kurdishtv.model.MotionLevel
 import com.example.kurdishtv.model.ThemeMode
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.SvgIcon
+import com.example.kurdishtv.ui.components.UpdateCard
+import com.example.kurdishtv.update.AppUpdate
+import com.example.kurdishtv.update.UpdateState
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -69,6 +72,11 @@ fun SettingsScreen(
     message: String?,
     onMessageShown: () -> Unit,
     onBack: () -> Unit,
+    updateState: UpdateState = UpdateState.Idle,
+    onCheckForUpdate: () -> Unit = {},
+    onDownloadUpdate: (AppUpdate) -> Unit = {},
+    onInstallUpdate: (AppUpdate, String) -> Unit = { _, _ -> },
+    onDismissUpdate: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
@@ -246,6 +254,15 @@ fun SettingsScreen(
             }
 
             // ── About ─────────────────────────────────────────────────────────
+            item(key = "update") {
+                UpdateCard(
+                    state = updateState,
+                    onCheck = onCheckForUpdate,
+                    onDownload = onDownloadUpdate,
+                    onInstall = onInstallUpdate,
+                    onDismiss = onDismissUpdate
+                )
+            }
             item(key = "about") {
                 SettingsSection(
                     title = "About",

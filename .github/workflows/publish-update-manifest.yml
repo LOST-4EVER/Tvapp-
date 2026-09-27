@@ -1,0 +1,96 @@
+name: Publish Update Manifest
+
+# Keeps update.json in step with the latest GitHub release so the in-app updater
+# has a stable, unauthenticated endpoint to poll.
+#
+# The app deliberately does not call api.github.com: that API 404s for a private
+# repository and rate-limits aggressively, so a static manifest served from the
+# repository is far more reliable for end users.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-manifest:
+    name: Sync update.json with the latest release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Read the published release
+        id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.getLatestRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const apk = data.assets.find(a => a.name.endsWith('.apk'));
+            if (!apk) {
+              core.setFailed('The release has no .apk asset to point at.');
+              return;
+            }
+            const version = data.tag_name.replace(/^v/, '');
+            const parts = version.split('.');
+            const patch = parseInt(parts[parts.length - 1], 10) || 0;
+            core.setOutput('version', version);
+            core.setOutput('version_code', String(patch));
+            core.setOutput('download_url', apk.browser_download_url);
+            core.setOutput('size_bytes', String(apk.size));
+            core.setOutput('release_url', data.html_url);
+            core.setOutput('published_at', data.published_at || '');
+            core.setOutput('notes', (data.body || '').slice(0, 2000));
+
+      - name: Update update.json
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+          DOWNLOAD_URL: ${{ steps.release.outputs.download_url }}
+          SIZE_BYTES: ${{ steps.release.outputs.size_bytes }}
+          RELEASE_URL: ${{ steps.release.outputs.release_url }}
+          PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
+          NOTES: ${{ steps.release.outputs.notes }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+
+          manifest = {
+              "version": os.environ["VERSION"],
+              "version_code": int(os.environ["VERSION_CODE"]),
+              "release_url": os.environ["RELEASE_URL"],
+              "download_url": os.environ["DOWNLOAD_URL"],
+              "size_bytes": int(os.environ["SIZE_BYTES"]),
+              "published_at": os.environ["PUBLISHED_AT"],
+              "notes": os.environ["NOTES"],
+          }
+
+          with open("update.json", "w", encoding="utf-8") as handle:
+              json.dump(manifest, handle, indent=2, ensure_ascii=False)
+              handle.write("\n")
+
+          print("Wrote update.json for version", manifest["version"])
+          PY
+
+          cat update.json
+
+      - name: Commit the manifest
+        run: |
+          # Only commit when the release actually changed the manifest, so routine
+          # releases do not produce a pointless "update manifest" commit.
+          if git diff --quiet -- update.json; then
+            echo "Manifest already current; nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add update.json
+          git commit -m "Update manifest for v${VERSION}"
+          git push

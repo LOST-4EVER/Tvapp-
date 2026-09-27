@@ -7,6 +7,11 @@ on:
       - master
     tags:
       - 'v*'
+    # The manifest-sync workflow commits update.json back to main; skip the full
+    # APK build for that commit so publishing a release cannot loop.
+    paths-ignore:
+      - 'update.json'
+      - '**.md'
   pull_request:
     branches:
       - main

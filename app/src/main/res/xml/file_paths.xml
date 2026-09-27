@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+      Downloaded update APKs live in the app's cache directory and are shared with
+      the system package installer through a content:// URI. cache-path is used
+      rather than files-path so the installer can never be pointed at arbitrary
+      app data.
+    -->
+    <cache-path
+        name="updates"
+        path="updates/" />
+</paths>

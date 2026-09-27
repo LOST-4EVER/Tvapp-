@@ -53,7 +53,7 @@ object NetworkClient {
     private fun buildClient(appContext: Context): OkHttpClient {
         val executorService = ThreadPoolExecutor(
             0,
-            64,
+            32,
             60L,
             TimeUnit.SECONDS,
             SynchronousQueue()
@@ -67,11 +67,13 @@ object NetworkClient {
         }
 
         val dispatcher = Dispatcher(executorService).apply {
-            maxRequests = 32
-            maxRequestsPerHost = 10
+            maxRequests = 24
+            maxRequestsPerHost = 6
         }
 
-        val connectionPool = ConnectionPool(10, 5, TimeUnit.MINUTES)
+        // Keeping connections alive longer avoids a fresh TLS handshake per
+        // request. Channel logos alone can mean dozens of requests per screen.
+        val connectionPool = ConnectionPool(16, 10, TimeUnit.MINUTES)
 
         // Safe DNS lookup preventing SecurityException / EPERM crashes
         val safeDns = object : Dns {
@@ -97,13 +99,29 @@ object NetworkClient {
             .retryOnConnectionFailure(true)
             .followRedirects(true)
             .followSslRedirects(true)
+            // Transparently gzip the playlist and manifest responses. These are
+            // text payloads that compress roughly 10:1, which matters a lot on the
+            // slow links these streams are often fetched over.
+            .addInterceptor { chain ->
+                val request = chain.request()
+                if (request.header("Accept-Encoding") == null) {
+                    val compressed = request.newBuilder()
+                        .header("Accept-Encoding", "gzip")
+                        .build()
+                    chain.proceed(compressed)
+                } else {
+                    chain.proceed(request)
+                }
+            }
 
         try {
             val cacheDir = File(appContext.cacheDir, "kurdish_tv_http_cache")
             if (!cacheDir.exists()) {
                 cacheDir.mkdirs()
             }
-            builder.cache(Cache(cacheDir, 25L * 1024L * 1024L))
+            // Raised from 25 MB: the HTTP cache now also holds the update manifest
+            // and the image requests Coil makes through a shared client.
+            builder.cache(Cache(cacheDir, 64L * 1024L * 1024L))
         } catch (_: Exception) {
             // Graceful fallback if cache dir not accessible
         }
