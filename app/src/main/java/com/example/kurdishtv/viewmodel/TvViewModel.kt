@@ -37,12 +37,20 @@ class TvViewModel(
     val uiState: StateFlow<TvUiState> = _uiState.asStateFlow()
 
     private var sleepTimerJob: Job? = null
+    private var searchJob: Job? = null
+    private var loadJob: Job? = null
+
+    private companion object {
+        /** Long enough to coalesce a burst of keystrokes, short enough to feel live. */
+        const val SEARCH_DEBOUNCE_MS = 220L
+    }
 
     init {
         observeNetwork()
         viewModelScope.launch {
             loadInstantState()
-            loadChannels()
+            // Cold start: a still-fresh cache short-circuits the network fetch.
+            loadChannels(forceRefresh = false)
         }
     }
 
@@ -54,10 +62,11 @@ class TvViewModel(
         try {
             val instant = withContext(Dispatchers.IO) { repository.getInstantInitialChannels() }
             if (instant.isEmpty()) return
+            val byId = instant.associateBy { it.id }
 
             val customUrls = withContext(Dispatchers.IO) { repository.getCustomPlaylistUrls() }
             val recentIds = withContext(Dispatchers.IO) { repository.getRecentChannelIds() }
-            val recents = recentIds.mapNotNull { id -> instant.find { it.id == id } }
+            val recents = recentIds.mapNotNull { id -> byId[id] }
 
             _uiState.update { state ->
                 val filtered = ChannelFilterEngine.filter(
@@ -82,17 +91,30 @@ class TvViewModel(
                 val wasOffline = _uiState.value.isOffline
                 _uiState.update { it.copy(isOffline = !isOnline) }
                 if (wasOffline && isOnline) {
-                    loadChannels()
+                    // Coming back online is exactly when stale data should be replaced.
+                    loadChannels(forceRefresh = true)
                 }
             }
         }
     }
 
-    fun loadChannels() {
-        viewModelScope.launch {
+    /**
+     * Loads the merged channel list.
+     *
+     * @param forceRefresh when true, bypasses the fresh-cache short circuit. User-driven
+     * refreshes and playlist changes must pass true so they actually see new data.
+     */
+    fun loadChannels(forceRefresh: Boolean = true) {
+        // A refresh can be triggered by init, a reconnect, and a playlist edit in quick
+        // succession. Each one fans out to every remote source, so overlapping calls only
+        // waste bandwidth and fight over the UI state. An explicit user refresh still
+        // preempts an in-flight automatic load.
+        if (loadJob?.isActive == true && !forceRefresh) return
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
-                val result = repository.fetchChannels()
+                val result = repository.fetchChannels(forceRefresh)
                 val list = result.getOrNull()
                 if (list == null) {
                     _uiState.update {
@@ -103,7 +125,8 @@ class TvViewModel(
 
                 val customUrls = withContext(Dispatchers.IO) { repository.getCustomPlaylistUrls() }
                 val recentIds = withContext(Dispatchers.IO) { repository.getRecentChannelIds() }
-                val recents = recentIds.mapNotNull { id -> list.find { it.id == id } }
+                val byId = list.associateBy { it.id }
+                val recents = recentIds.mapNotNull { id -> byId[id] }
 
                 _uiState.update { state ->
                     val filtered = ChannelFilterEngine.filter(
@@ -127,13 +150,25 @@ class TvViewModel(
     }
 
     fun onSearchQueryChanged(query: String) {
-        _uiState.update { state ->
-            val filtered = ChannelFilterEngine.filter(state.channels, state.selectedCategory, query)
-            state.copy(searchQuery = query, filteredChannels = filtered)
+        // Store the query immediately so the text field stays responsive, but debounce the
+        // actual filtering. Re-filtering every channel on every keystroke was the main cause
+        // of jank while typing, since the merged remote playlists can hold thousands of
+        // entries.
+        _uiState.update { it.copy(searchQuery = query) }
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            _uiState.update { state ->
+                if (state.searchQuery != query) return@update state
+                val filtered = ChannelFilterEngine.filter(state.channels, state.selectedCategory, query)
+                state.copy(filteredChannels = filtered)
+            }
         }
     }
 
     fun onCategorySelected(category: CategoryFilter) {
+        // A category switch supersedes any in-flight search debounce.
+        searchJob?.cancel()
         _uiState.update { state ->
             val filtered = ChannelFilterEngine.filter(state.channels, category, state.searchQuery)
             state.copy(selectedCategory = category, filteredChannels = filtered)
@@ -184,10 +219,11 @@ class TvViewModel(
                 }.getOrNull()
             } ?: return@launch
             val channels = _uiState.value.channels
+            val byId = channels.associateBy { it.id }
             _uiState.update { state ->
                 state.copy(
                     selectedChannel = channel,
-                    recentChannels = recents.mapNotNull { id -> channels.find { it.id == id } }
+                    recentChannels = recents.mapNotNull { id -> byId[id] }
                 )
             }
         }
