@@ -1,5 +1,6 @@
 package com.example.kurdishtv.ui.theme
 
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.ui.geometry.Size
@@ -39,39 +40,43 @@ object M3ExpressiveShapes {
         topStart = 4.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp
     )
     val Arch: Shape = RoundedCornerShape(
-        topStartPercent = 50, topEndPercent = 50, bottomEnd = 16.dp, bottomStart = 16.dp
+        topStart = CornerSize(50), topEnd = CornerSize(50),
+        bottomEnd = 16.dp, bottomStart = 16.dp
     )
     val Semicircle: Shape = RoundedCornerShape(
-        topStartPercent = 50, topEndPercent = 50, bottomEnd = 0.dp, bottomStart = 0.dp
+        topStart = CornerSize(50), topEnd = CornerSize(50),
+        bottomEnd = 0.dp, bottomStart = 0.dp
     )
-    val Oval: Shape = RoundedCornerShape(
-        topStartPercent = 50, topEndPercent = 50, bottomEndPercent = 50, bottomStartPercent = 50
-    )
+    val Oval: Shape = RoundedCornerShape(percent = 50)
     val Pill: Shape = RoundedCornerShape(percent = 50)
 
     // ── Directional / pointed ────────────────────────────────────────────────
     val Triangle: Shape = RoundedCornerShape(
-        topStartPercent = 50, topEndPercent = 50, bottomEnd = 0.dp, bottomStart = 0.dp
+        topStart = CornerSize(50), topEnd = CornerSize(50),
+        bottomEnd = 0.dp, bottomStart = 0.dp
     )
     val Arrow: Shape = RoundedCornerShape(
-        topStart = 0.dp, topEnd = 40.dp, bottomEndPercent = 50, bottomStartPercent = 50
+        topStart = 0.dp, topEnd = 40.dp,
+        bottomEnd = CornerSize(50), bottomStart = CornerSize(50)
     )
     val Fan: Shape = RoundedCornerShape(
-        topStartPercent = 50, topEnd = 12.dp, bottomEnd = 12.dp, bottomStart = 12.dp
+        topStart = CornerSize(50), topEnd = 12.dp,
+        bottomEnd = 12.dp, bottomStart = 12.dp
     )
 
     // ── Faceted ──────────────────────────────────────────────────────────────
-    val Diamond: Shape = RoundedCornerShape(
-        topStartPercent = 50, topEndPercent = 50, bottomEndPercent = 50, bottomStartPercent = 50
-    )
+    val Diamond: Shape = RoundedCornerShape(percent = 50)
     val Clamshell: Shape = RoundedCornerShape(
-        topStartPercent = 50, topEndPercent = 50, bottomEnd = 24.dp, bottomStart = 24.dp
+        topStart = CornerSize(50), topEnd = CornerSize(50),
+        bottomEnd = 24.dp, bottomStart = 24.dp
     )
     val Pentagon: Shape = RoundedCornerShape(
-        topStart = 24.dp, topEnd = 24.dp, bottomEndPercent = 50, bottomStartPercent = 50
+        topStart = 24.dp, topEnd = 24.dp,
+        bottomEnd = CornerSize(50), bottomStart = CornerSize(50)
     )
     val Gem: Shape = RoundedCornerShape(
-        topStart = 20.dp, topEnd = 20.dp, bottomEndPercent = 50, bottomStartPercent = 50
+        topStart = 20.dp, topEnd = 20.dp,
+        bottomEnd = CornerSize(50), bottomStart = CornerSize(50)
     )
 
     // ── Lobed / radial ───────────────────────────────────────────────────────
@@ -227,13 +232,15 @@ object M3ExpressiveShapes {
  * `androidx.compose.material3.Shapes` type it is built from, and so
  * call sites in other packages have to import it explicitly.
  *
- * The scale now leans on the expressive family: rounded at the top, a distinctly
- * lobed cookie at the bottom, so ordinary Material components pick up character.
+ * [Shapes] requires `CornerBasedShape`, so the scale is built from the corner-based
+ * expressive tokens; the fully procedural lobed shapes are applied directly at the
+ * call sites where a plain [Shape] is accepted. The scale leans expressive so
+ * ordinary Material components pick up character without per-call-site changes.
  */
 val AppShapes = Shapes(
-    extraSmall = M3ExpressiveShapes.SixSidedCookie,
-    small = M3ExpressiveShapes.FourSidedCookie,
-    medium = M3ExpressiveShapes.Chip,
-    large = M3ExpressiveShapes.MediumCard,
-    extraLarge = M3ExpressiveShapes.LargeCard
+    extraSmall = M3ExpressiveShapes.SmallCard,
+    small = M3ExpressiveShapes.Chip,
+    medium = M3ExpressiveShapes.MediumCard,
+    large = M3ExpressiveShapes.LargeCard,
+    extraLarge = M3ExpressiveShapes.ExtraLargeRounded
 )

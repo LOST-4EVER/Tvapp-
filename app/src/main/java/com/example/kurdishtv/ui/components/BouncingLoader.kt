@@ -53,6 +53,7 @@ private fun Shape.toPath(size: Size, layoutDirection: LayoutDirection, density: 
     when (val outline = createOutline(size, layoutDirection, density)) {
         is Outline.Generic -> outline.path
         is Outline.Rounded -> Path().apply { addRoundRect(outline.roundRect) }
+        is Outline.Rectangle -> Path().apply { addRect(outline.rect) }
     }
 
 /**
