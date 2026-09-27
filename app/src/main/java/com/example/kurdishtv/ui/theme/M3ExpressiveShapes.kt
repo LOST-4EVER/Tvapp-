@@ -233,15 +233,15 @@ object M3ExpressiveShapes {
  * `androidx.compose.material3.Shapes` type it is built from, and so
  * call sites in other packages have to import it explicitly.
  *
- * [Shapes] requires `CornerBasedShape`, so the scale is built from the corner-based
- * expressive tokens; the fully procedural lobed shapes are applied directly at the
- * call sites where a plain [Shape] is accepted. The scale leans expressive so
- * ordinary Material components pick up character without per-call-site changes.
+ * [Shapes] requires `CornerBasedShape`, so the scale is constructed from
+ * `RoundedCornerShape` directly rather than from the [Shape]-typed tokens above
+ * (a `Shape` is too wide to satisfy it). The fully procedural lobed shapes are
+ * applied at the call sites that accept a plain [Shape].
  */
 val AppShapes = Shapes(
-    extraSmall = M3ExpressiveShapes.SmallCard,
-    small = M3ExpressiveShapes.Chip,
-    medium = M3ExpressiveShapes.MediumCard,
-    large = M3ExpressiveShapes.LargeCard,
-    extraLarge = M3ExpressiveShapes.ExtraLargeRounded
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(32.dp)
 )
