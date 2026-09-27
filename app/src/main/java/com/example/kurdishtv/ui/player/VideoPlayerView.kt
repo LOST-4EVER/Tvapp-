@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.AudioAttributes
@@ -41,6 +42,7 @@ fun VideoPlayerView(
     isPlaying: Boolean,
     resizeMode: ResizeMode,
     onPlaybackError: (String) -> Unit,
+    colorFilter: VideoColorFilter = VideoColorFilter.None,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -151,7 +153,13 @@ fun VideoPlayerView(
                 playerView.resizeMode = resizeMode.mode
                 playerView.keepScreenOn = isPlaying
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    // Applied to the decoded frame, so a colour correction costs no
+                    // additional rendering pass beyond the layer.
+                    colorFilter = colorFilter.toColorFilter()
+                }
         )
 
         AnimatedVisibility(

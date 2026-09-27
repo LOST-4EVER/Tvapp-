@@ -389,7 +389,9 @@ private fun SettingsSection(
         Column(modifier = Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    shape = M3ExpressiveShapes.Burst,
+                    // A soft cookie rather than the spiked Burst, which made every
+                    // section header look like a cog instead of an icon tile.
+                    shape = M3ExpressiveShapes.FourSidedCookie,
                     color = colors.primaryContainer
                 ) {
                     Box(

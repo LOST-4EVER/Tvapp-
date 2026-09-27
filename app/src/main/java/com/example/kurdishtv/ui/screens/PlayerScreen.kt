@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +46,7 @@ import com.example.kurdishtv.ui.components.SleepTimerDialog
 import com.example.kurdishtv.ui.components.SvgIcon
 import com.example.kurdishtv.ui.player.PlayerControlsOverlay
 import com.example.kurdishtv.ui.player.ResizeMode
+import com.example.kurdishtv.ui.player.VideoColorFilter
 import com.example.kurdishtv.ui.player.VideoPlayerView
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -75,6 +77,10 @@ fun PlayerScreen(
     var isControlsVisible by remember { mutableStateOf(true) }
     var resizeMode by remember { mutableStateOf(ResizeMode.FIT) }
     var isFullscreen by remember { mutableStateOf(true) }
+    // Not rememberSaveable: enum entries are not a Bundle-supported type, so
+    // persisting it across process death would throw on restore. Recomputing
+    // from Normal on a cold start costs nothing.
+    var colorFilter by remember { mutableStateOf(VideoColorFilter.None) }
     var errorMessage by remember(channel.id) { mutableStateOf<String?>(null) }
     var showSleepDialog by remember { mutableStateOf(false) }
 
@@ -136,6 +142,7 @@ fun PlayerScreen(
             isPlaying = shouldPlay,
             resizeMode = resizeMode,
             onPlaybackError = { err -> errorMessage = err },
+            colorFilter = colorFilter,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -169,6 +176,8 @@ fun PlayerScreen(
             onFullscreenToggle = { isFullscreen = !isFullscreen },
             isMuted = isMuted,
             onToggleMute = onToggleMute,
+            colorFilter = colorFilter,
+            onCycleColorFilter = { colorFilter = colorFilter.next() },
             modifier = Modifier.fillMaxSize()
         )
 

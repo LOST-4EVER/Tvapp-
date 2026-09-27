@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,7 +32,7 @@ fun LiveBadge(modifier: Modifier = Modifier) {
     val pulseScale = LocalLivePulse.current
 
     Surface(
-        shape = M3ExpressiveShapes.BadgePill,
+        shape = M3ExpressiveShapes.Pill,
         color = colors.liveRed.copy(alpha = 0.20f),
         modifier = modifier
     ) {
@@ -43,7 +44,9 @@ fun LiveBadge(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .size(7.dp)
                     .scale(pulseScale)
-                    .background(colors.liveRed, M3ExpressiveShapes.Sunny)
+                    // Circle, not the 8-lobed Sunny shape: the lobes made the live
+                // dot read as a blob and clipped the glow on small tiles.
+                .background(colors.liveRed, CircleShape)
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(

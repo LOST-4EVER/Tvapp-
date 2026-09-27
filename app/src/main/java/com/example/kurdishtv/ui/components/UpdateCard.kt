@@ -56,7 +56,10 @@ fun UpdateCard(
     val colors = LocalAppColors.current
 
     Surface(
-        shape = M3ExpressiveShapes.SixSidedCookie,
+        // A lobed shape clips its content, which cut this card's title and
+        // status line off mid-word. Text-bearing surfaces need a shape whose
+        // silhouette stays clear of the padding box.
+        shape = M3ExpressiveShapes.LargeCard,
         color = colors.surfaceElevated,
         modifier = modifier.fillMaxWidth()
     ) {

@@ -56,6 +56,8 @@ fun PlayerControlsOverlay(
     onFullscreenToggle: () -> Unit,
     isMuted: Boolean,
     onToggleMute: () -> Unit,
+    colorFilter: VideoColorFilter = VideoColorFilter.None,
+    onCycleColorFilter: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
@@ -162,11 +164,13 @@ fun PlayerControlsOverlay(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        shape = M3ExpressiveShapes.Burst,
+                        // Circle, not Burst: a spiked silhouette over live video
+                        // reads as a glitch and its points straddle the frame edge.
+                        shape = CircleShape,
                         color = colors.glass,
                         modifier = Modifier
                             .size(56.dp)
-                            .border(1.dp, colors.border, M3ExpressiveShapes.Burst)
+                            .border(1.dp, colors.border, CircleShape)
                             .bouncyClickable(scaleDown = 0.86f, onClick = onPreviousChannel)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -197,11 +201,11 @@ fun PlayerControlsOverlay(
                     }
 
                     Surface(
-                        shape = M3ExpressiveShapes.Burst,
+                        shape = CircleShape,
                         color = colors.glass,
                         modifier = Modifier
                             .size(56.dp)
-                            .border(1.dp, colors.border, M3ExpressiveShapes.Burst)
+                            .border(1.dp, colors.border, CircleShape)
                             .bouncyClickable(scaleDown = 0.86f, onClick = onNextChannel)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -274,6 +278,40 @@ fun PlayerControlsOverlay(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium
                                 )
+                            }
+                        }
+
+                        // Colour correction. Cycles through the presets and is
+                        // highlighted while one is active, so the current
+                        // treatment is visible without opening a menu.
+                        Surface(
+                            shape = M3ExpressiveShapes.Pill,
+                            color = if (colorFilter.isActive) {
+                                colors.primary
+                            } else {
+                                colors.glass
+                            },
+                            modifier = Modifier.bouncyClickable(onClick = onCycleColorFilter)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SvgIcon(
+                                    resId = KurdishTvIcons.Palette,
+                                    contentDescription = "Video colour filter",
+                                    tint = if (colorFilter.isActive) colors.onPrimary else Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                if (colorFilter.isActive) {
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = colorFilter.label,
+                                        color = colors.onPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
 
