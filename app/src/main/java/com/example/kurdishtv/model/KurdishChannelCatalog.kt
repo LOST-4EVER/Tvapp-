@@ -331,5 +331,318 @@ object KurdishChannelCatalog {
         // The previous "Iraqia Sports" entry was removed: every sports path on
         // imn-live.esite-lab.com now 404s, so it could never start. Sports is
         // still a valid filter and will repopulate from the remote playlists.
+
+        // ── Iraq & Kurdistan expansion ────────────────────────────────────────
+        // Added after sweeping three public GitHub sources (iptv-org languages/kur.m3u,
+        // iptv-org countries/iq.m3u and BotanAtomic/Kurdistan-TV canal.txt). Every
+        // stream below was probed over HTTP and returned a valid HLS manifest, and
+        // every logo was confirmed to return an image, so these are not aspirational
+        // entries that would fail on first play.
+        Channel(
+            id = "afarin_baxcha",
+            name = "Afarin Baxcha",
+            streamUrl = "https://5dcabf026b188.streamlock.net/afarinTV/livestream/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/4xRkBDRx/Afarin-Baxcha-200.png",
+            category = "Kids",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "channel8",
+            name = "Channel8",
+            streamUrl = "https://live.channel8.com/Channel8-Kurdish/index.fmp4.m3u8",
+            logoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Channel8corp.png/960px-Channel8corp.png",
+            category = "General",
+            quality = "HLS / 720p",
+            isHd = false
+        ),
+        Channel(
+            id = "emantv",
+            name = "EmanTv",
+            streamUrl = "https://avr.host247.net/live/emantv/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/QmgaPSi.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "farmodatv",
+            name = "FarmodaTV",
+            streamUrl = "https://avr.host247.net/live/FarmodaTV/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/x4KCQlH.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "med_muzik",
+            name = "Med Muzik",
+            streamUrl = "http://54.36.110.140/live3/live3.m3u8",
+            logoUrl = "https://i.imgur.com/gtUFmCD.png",
+            category = "Music",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "mixkurdy",
+            name = "Mixkurdy",
+            streamUrl = "https://avr.host247.net/live/Mix-kurdy/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/WHeH5i7.png",
+            category = "Music",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "abnsat",
+            name = "ABNsat",
+            streamUrl = "https://mediaserver.abnvideos.com/streams/abnsat.m3u8",
+            logoUrl = "https://i.imgur.com/WhPlJzh.jpeg",
+            category = "General",
+            quality = "HLS / 720p",
+            isHd = false
+        ),
+        Channel(
+            id = "al_iraqia",
+            name = "Al Iraqia",
+            streamUrl = "https://imn-live.esite-lab.com/hls/iraqia-general.m3u8",
+            logoUrl = "https://i.imgur.com/8qQouTW.jpg",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "al_janoub_tv",
+            name = "Al Janoub TV",
+            streamUrl = "https://live.alissahost.net/hls/test.m3u8",
+            logoUrl = "https://i.imgur.com/rxDh6W1.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "al_sharqiya",
+            name = "Al Sharqiya",
+            streamUrl = "http://185.9.2.18/chid_144/index.m3u8",
+            logoUrl = "https://i.imgur.com/mJIG5IV.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "al_sharqiya_news",
+            name = "Al Sharqiya News",
+            streamUrl = "https://5d94523502c2d.streamlock.net/alsharqiyalive/mystream/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/PeAcXB9.png",
+            category = "News",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "al_aimma_tv",
+            name = "Al-Aimma TV",
+            streamUrl = "https://alaimma.tv/live/index.m3u8",
+            logoUrl = "https://alaimma.tv/assets/images/logo.png",
+            category = "Quran",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "al_jawadain_tv",
+            name = "Al-Jawadain TV",
+            streamUrl = "https://live.aljawadain.org/live/aljawadaintv/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/Eo3UYCK.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "alabbassia_tv",
+            name = "Alabbassia TV",
+            streamUrl = "https://stream.alabbassia.com/live/alabbassia/index.m3u8",
+            logoUrl = "https://raw.githubusercontent.com/Alabbassia2026/Alabbassia-TV-Official/main/Logo%20PNG.png",
+            category = "Religious",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "alawla_tv",
+            name = "Alawla TV",
+            streamUrl = "https://live.alawla.tv/hls/stream.m3u8",
+            logoUrl = "https://i.imgur.com/3Kv0t3X.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "alquran",
+            name = "Alquran",
+            streamUrl = "https://ktvlive.online/stream/hls/ch1.m3u8",
+            logoUrl = "https://i.imgur.com/lqVwrAF.png",
+            category = "Quran",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "beitolabbas_tv_channel",
+            name = "BeitolAbbas TV Channel",
+            streamUrl = "https://live.beitolabbas.tv/live/beitolabbastv.m3u8",
+            logoUrl = "https://i.imgur.com/s8PfUQy.png",
+            category = "General",
+            quality = "HLS / 720p",
+            isHd = false
+        ),
+        Channel(
+            id = "dijlah_tv",
+            name = "Dijlah TV",
+            streamUrl = "https://ghaasiflu.online/Dijlah/index.m3u8",
+            logoUrl = "https://i.imgur.com/kyzH3G5.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "i_news",
+            name = "I News",
+            streamUrl = "https://live.i-news.tv/hls/stream.m3u8",
+            logoUrl = "https://i.imgur.com/9lOuzHQ.png",
+            category = "News",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "imam_hussein_tv_1",
+            name = "Imam Hussein TV 1",
+            streamUrl = "http://fa.imamhossaintv.com/live/ih1.m3u8",
+            logoUrl = "https://i.imgur.com/pDdUvz7.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "imam_hussein_tv_2",
+            name = "Imam Hussein TV 2",
+            streamUrl = "http://ar.imamhossaintv.com/live/ih2.m3u8",
+            logoUrl = "https://i.imgur.com/IXVSPdJ.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "imam_hussein_tv_3",
+            name = "Imam Hussein TV 3",
+            streamUrl = "http://en.imamhossaintv.com/live/ih3.m3u8",
+            logoUrl = "https://i.imgur.com/emQRHQZ.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "imam_hussein_tv_4",
+            name = "Imam Hussein TV 4",
+            streamUrl = "http://ur.imamhossaintv.com/live/ih4.m3u8",
+            logoUrl = "https://i.imgur.com/0UYcylY.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "imam_hussein_tv_5",
+            name = "Imam Hussein TV 5",
+            streamUrl = "http://live.al-zahratv.com/live/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/Oq2Ve7C.png",
+            category = "General",
+            quality = "HLS / 720p",
+            isHd = false
+        ),
+        Channel(
+            id = "imam_hussein_tv_6",
+            name = "Imam Hussein TV 6",
+            streamUrl = "http://live.imamhossaintv.com/live/ih6.m3u8",
+            logoUrl = "https://i.imgur.com/lqhU0PY.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "iraq_future",
+            name = "Iraq Future",
+            streamUrl = "https://viewmedia7219.bozztv.com/wmedia/viewmedia100/web_040/Stream/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/Z7woTe5.png",
+            category = "General",
+            quality = "HLS / 720p",
+            isHd = false
+        ),
+        Channel(
+            id = "ishtar_tv_sd",
+            name = "Ishtar TV SD",
+            streamUrl = "https://stream.ishtartv.com/live/iShtarHD/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/qzApokm.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "karbala_documentary",
+            name = "Karbala Documentary",
+            streamUrl = "https://ktvlive.online/stream/hls/ch3.m3u8",
+            logoUrl = "https://www.karbala-tv.iq/icons/karbala.png",
+            category = "Documentary",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "manu_chat",
+            name = "Manu Chat",
+            streamUrl = "https://vmi747311.contaboserver.net/hls/livetv.m3u8",
+            logoUrl = "https://i.imgur.com/voyoljW.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "marjaeyat_tv_arabic",
+            name = "Marjaeyat TV Arabic",
+            streamUrl = "https://livefa.marjaeyattv.com/mtv_ar/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/LsYYkUI.png",
+            category = "Religious",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "marjaeyat_tv_english",
+            name = "Marjaeyat TV English",
+            streamUrl = "https://livefa.marjaeyattv.com/mtv_en/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/Dvf61Jp.png",
+            category = "Religious",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "marjaeyat_tv_persian",
+            name = "Marjaeyat TV Persian",
+            streamUrl = "https://livefa.marjaeyattv.com/mtv_fa/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/fCj05f0.png",
+            category = "Religious",
+            quality = "HLS / 720p",
+            isHd = false
+        ),
+        Channel(
+            id = "mbc_iraq",
+            name = "MBC Iraq",
+            streamUrl = "https://shd-gcp-live.edgenextcdn.net/live/bitmovin-mbc-iraq/e38c44b1b43474e1c39cb5b90203691e/index.m3u8",
+            logoUrl = "https://i.imgur.com/D0LxiPE.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "samarra_tv",
+            name = "Samarra TV",
+            streamUrl = "https://live.bradosti.net/live/samaraweb_playlist.m3u8",
+            logoUrl = "https://i.imgur.com/7uQoIXi.png",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        )
     )
 }

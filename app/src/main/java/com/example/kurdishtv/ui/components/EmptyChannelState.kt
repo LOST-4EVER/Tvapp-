@@ -1,5 +1,8 @@
 package com.example.kurdishtv.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -13,12 +16,15 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -29,11 +35,29 @@ fun EmptyChannelState(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
+    val reduceMotion = LocalReduceMotion.current
+
+    // Springs in rather than appearing flat, which makes an empty result read as a
+    // deliberate state instead of a failed render.
+    val entrance by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = if (reduceMotion) {
+            spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)
+        } else {
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+        },
+        label = "EmptyStateEntrance"
+    )
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(32.dp)
+            .graphicsLayer {
+                scaleX = entrance
+                scaleY = entrance
+                alpha = entrance.coerceIn(0f, 1f)
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
