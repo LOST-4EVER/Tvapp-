@@ -39,13 +39,14 @@ object M3ExpressiveShapes {
     val Slanted: Shape = RoundedCornerShape(
         topStart = 4.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp
     )
+
     val Arch: Shape = RoundedCornerShape(
         topStart = CornerSize(50), topEnd = CornerSize(50),
-        bottomEnd = 16.dp, bottomStart = 16.dp
+        bottomEnd = CornerSize(16.dp), bottomStart = CornerSize(16.dp)
     )
     val Semicircle: Shape = RoundedCornerShape(
         topStart = CornerSize(50), topEnd = CornerSize(50),
-        bottomEnd = 0.dp, bottomStart = 0.dp
+        bottomEnd = CornerSize(0.dp), bottomStart = CornerSize(0.dp)
     )
     val Oval: Shape = RoundedCornerShape(percent = 50)
     val Pill: Shape = RoundedCornerShape(percent = 50)
@@ -53,29 +54,29 @@ object M3ExpressiveShapes {
     // ── Directional / pointed ────────────────────────────────────────────────
     val Triangle: Shape = RoundedCornerShape(
         topStart = CornerSize(50), topEnd = CornerSize(50),
-        bottomEnd = 0.dp, bottomStart = 0.dp
+        bottomEnd = CornerSize(0.dp), bottomStart = CornerSize(0.dp)
     )
     val Arrow: Shape = RoundedCornerShape(
-        topStart = 0.dp, topEnd = 40.dp,
+        topStart = CornerSize(0.dp), topEnd = CornerSize(40.dp),
         bottomEnd = CornerSize(50), bottomStart = CornerSize(50)
     )
     val Fan: Shape = RoundedCornerShape(
-        topStart = CornerSize(50), topEnd = 12.dp,
-        bottomEnd = 12.dp, bottomStart = 12.dp
+        topStart = CornerSize(50), topEnd = CornerSize(12.dp),
+        bottomEnd = CornerSize(12.dp), bottomStart = CornerSize(12.dp)
     )
 
     // ── Faceted ──────────────────────────────────────────────────────────────
     val Diamond: Shape = RoundedCornerShape(percent = 50)
     val Clamshell: Shape = RoundedCornerShape(
         topStart = CornerSize(50), topEnd = CornerSize(50),
-        bottomEnd = 24.dp, bottomStart = 24.dp
+        bottomEnd = CornerSize(24.dp), bottomStart = CornerSize(24.dp)
     )
     val Pentagon: Shape = RoundedCornerShape(
-        topStart = 24.dp, topEnd = 24.dp,
+        topStart = CornerSize(24.dp), topEnd = CornerSize(24.dp),
         bottomEnd = CornerSize(50), bottomStart = CornerSize(50)
     )
     val Gem: Shape = RoundedCornerShape(
-        topStart = 20.dp, topEnd = 20.dp,
+        topStart = CornerSize(20.dp), topEnd = CornerSize(20.dp),
         bottomEnd = CornerSize(50), bottomStart = CornerSize(50)
     )
 
