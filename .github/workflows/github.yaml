@@ -58,14 +58,13 @@ jobs:
 
           # actionlint exits non-zero when a glob matches nothing, so build the file
           # list explicitly and skip the step if the directory is somehow empty.
-          FILES=$(find .github/workflows -name '*.yml' -o -name '*.yaml' | sort)
-          if [ -z "$FILES" ]; then
+          mapfile -t FILES < <(find .github/workflows \( -name '*.yml' -o -name '*.yaml' \) | sort)
+          if [ ${#FILES[@]} -eq 0 ]; then
             echo "No workflow files found; nothing to lint."
             exit 0
           fi
-          echo "Linting:"
-          echo "$FILES"
-          ./actionlint $FILES
+          printf 'Linting: %s\n' "${FILES[@]}"
+          ./actionlint "${FILES[@]}"
 
       - name: Restore the committed release signing key
         run: |
