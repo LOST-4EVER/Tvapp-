@@ -10,7 +10,7 @@ import com.example.kurdishtv.network.NetworkClient.fetchString
 import com.example.kurdishtv.parser.KurdishTvParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
@@ -42,84 +42,108 @@ class TvRepository(
         return channels.map { it.copy(isFavorite = favIds.contains(it.id)) }
     }
 
-    suspend fun fetchChannels(): Result<List<Channel>> = withContext(Dispatchers.IO) {
-        val allChannels = mutableListOf<Channel>()
-        // Initialize with default fast catalog
-        allChannels.addAll(KurdishChannelCatalog.getDefaultChannels())
-
-        try {
-            coroutineScope {
-                val gistDeferred = async {
-                    fetchUrlContent(gistChannelsUrl)?.let {
-                        KurdishTvParser.parseJson(it, "gist")
-                    } ?: emptyList()
-                }
-
-                val primaryDeferred = async {
-                    fetchUrlContent(primaryEndpointUrl)?.let {
-                        KurdishTvParser.parse(it, "krd")
-                    } ?: emptyList()
-                }
-
-                val secondaryDeferred = async {
-                    fetchUrlContent(secondaryEndpointUrl)?.let {
-                        KurdishTvParser.parse(it, "iptv")
-                    } ?: emptyList()
-                }
-
-                val fallbackDeferred = async {
-                    fetchUrlContent(fallbackGistUrl)?.let {
-                        KurdishTvParser.parse(it, "fbk")
-                    } ?: emptyList()
-                }
-
-                val customUrls = customPlaylistStorage.getCustomPlaylistUrls()
-                val customDeferreds = customUrls.mapIndexed { idx, url ->
-                    async {
-                        fetchUrlContent(url)?.let {
-                            KurdishTvParser.parse(it, "usr$idx")
-                        } ?: emptyList()
+    /**
+     * Fetches and merges every remote source.
+     *
+     * When [forceRefresh] is false and the on-disk cache is younger than
+     * [CACHE_FRESH_MS], the cached list is returned without touching the network. Cold
+     * starts then render instantly; explicit refreshes pass `true` to bypass the check.
+     */
+    suspend fun fetchChannels(forceRefresh: Boolean = true): Result<List<Channel>> =
+        withContext(Dispatchers.IO) {
+            if (!forceRefresh) {
+                val age = channelCacheStorage.getCacheAgeMs()
+                if (age in 1 until CACHE_FRESH_MS) {
+                    val cached = channelCacheStorage.getCachedChannels()
+                    if (!cached.isNullOrEmpty()) {
+                        val favIds = favoriteStorage.getFavoriteIds()
+                        return@withContext Result.success(
+                            cached.map { it.copy(isFavorite = favIds.contains(it.id)) }
+                        )
                     }
                 }
-
-                allChannels.addAll(gistDeferred.await())
-                allChannels.addAll(primaryDeferred.await())
-                allChannels.addAll(secondaryDeferred.await())
-                allChannels.addAll(fallbackDeferred.await())
-                for (customDef in customDeferreds) {
-                    allChannels.addAll(customDef.await())
-                }
             }
-        } catch (_: Exception) {
-            // Safe fallback to accumulated channels
+
+            val allChannels = mutableListOf<Channel>()
+            // Initialize with default fast catalog
+            allChannels.addAll(KurdishChannelCatalog.getDefaultChannels())
+
+            try {
+                // supervisorScope so a single dead or malformed source cannot cancel the
+                // others. A plain coroutineScope would let one bad playlist throw away the
+                // channels that did load.
+                supervisorScope {
+                    val gistDeferred = async {
+                        fetchUrlContent(gistChannelsUrl)?.let {
+                            KurdishTvParser.parseJson(it, "gist")
+                        } ?: emptyList()
+                    }
+
+                    val primaryDeferred = async {
+                        fetchUrlContent(primaryEndpointUrl)?.let {
+                            KurdishTvParser.parse(it, "krd")
+                        } ?: emptyList()
+                    }
+
+                    val secondaryDeferred = async {
+                        fetchUrlContent(secondaryEndpointUrl)?.let {
+                            KurdishTvParser.parse(it, "iptv")
+                        } ?: emptyList()
+                    }
+
+                    val fallbackDeferred = async {
+                        fetchUrlContent(fallbackGistUrl)?.let {
+                            KurdishTvParser.parse(it, "fbk")
+                        } ?: emptyList()
+                    }
+
+                    val customUrls = customPlaylistStorage.getCustomPlaylistUrls()
+                    val customDeferreds = customUrls.mapIndexed { idx, url ->
+                        async {
+                            fetchUrlContent(url)?.let {
+                                KurdishTvParser.parse(it, "usr$idx")
+                            } ?: emptyList()
+                        }
+                    }
+
+                    allChannels.addAll(gistDeferred.await())
+                    allChannels.addAll(primaryDeferred.await())
+                    allChannels.addAll(secondaryDeferred.await())
+                    allChannels.addAll(fallbackDeferred.await())
+                    for (customDef in customDeferreds) {
+                        allChannels.addAll(customDef.await())
+                    }
+                }
+            } catch (_: Exception) {
+                // Safe fallback to accumulated channels
+            }
+
+            // Deduplicate streams
+            val deduplicated = KurdishTvParser.deduplicate(allChannels)
+
+            // Ensure absolute key uniqueness for Lazy Layouts
+            val uniqueChannels = mutableListOf<Channel>()
+            val seenIds = mutableSetOf<String>()
+            for ((idx, ch) in deduplicated.withIndex()) {
+                val uniqueId = if (seenIds.add(ch.id)) ch.id else "${ch.id}_$idx"
+                seenIds.add(uniqueId)
+                uniqueChannels.add(ch.copy(id = uniqueId))
+            }
+
+            // Apply favorite states
+            val favIds = favoriteStorage.getFavoriteIds()
+            val channelsWithFavs = uniqueChannels.map { channel ->
+                channel.copy(isFavorite = favIds.contains(channel.id))
+            }
+
+            // Persist to disk cache asynchronously
+            channelCacheStorage.saveChannels(channelsWithFavs)
+
+            Result.success(channelsWithFavs)
         }
 
-        // Deduplicate streams
-        val deduplicated = KurdishTvParser.deduplicate(allChannels)
-
-        // Ensure absolute key uniqueness for Lazy Layouts
-        val uniqueChannels = mutableListOf<Channel>()
-        val seenIds = mutableSetOf<String>()
-        for ((idx, ch) in deduplicated.withIndex()) {
-            val uniqueId = if (seenIds.add(ch.id)) ch.id else "${ch.id}_$idx"
-            seenIds.add(uniqueId)
-            uniqueChannels.add(ch.copy(id = uniqueId))
-        }
-
-        // Apply favorite states
-        val favIds = favoriteStorage.getFavoriteIds()
-        val channelsWithFavs = uniqueChannels.map { channel ->
-            channel.copy(isFavorite = favIds.contains(channel.id))
-        }
-
-        // Persist to disk cache asynchronously
-        channelCacheStorage.saveChannels(channelsWithFavs)
-
-        Result.success(channelsWithFavs)
-    }
-
-    suspend fun fetchUrlContent(url: String): String? {
-        return withTimeoutOrNull(8000L) {
+    suspend fun fetchUrlContent(url: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): String? {
+        return withTimeoutOrNull(timeoutMs) {
             try {
                 val request = Request.Builder()
                     .url(url)
@@ -152,4 +176,15 @@ class TvRepository(
     fun clearCustomPlaylists() = customPlaylistStorage.clear()
 
     fun clearChannelCache() = channelCacheStorage.clearCache()
+
+    private companion object {
+        /** Per-source fetch ceiling. A dead source must not stall the whole merge. */
+        const val DEFAULT_TIMEOUT_MS = 8_000L
+
+        /**
+         * A cached list this young is still considered current, so an automatic load
+         * reuses it instead of re-fetching every playlist.
+         */
+        const val CACHE_FRESH_MS = 30 * 60 * 1000L
+    }
 }

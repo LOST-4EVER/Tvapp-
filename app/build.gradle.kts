@@ -13,8 +13,24 @@ android {
     applicationId = "com.aistudio.kurdishtv.live"
     minSdk = 24
     targetSdk = 36
-    versionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 1
-    versionName = "1.0"
+
+    // Android refuses to install a build whose versionCode is not at least the
+    // installed one, and reports it as a broken update. CI overrides this with the
+    // run number; local builds used to fall back to 1, which could never be
+    // installed over a published release. kurdishTvVersionCode in
+    // gradle.properties is the local floor and must be kept at or above the last
+    // published release.
+    val ciVersionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull()
+    val localVersionCode =
+        project.findProperty("kurdishTvVersionCode")?.toString()?.toIntOrNull() ?: 1
+    val resolvedVersionCode = ciVersionCode ?: localVersionCode
+    versionCode = resolvedVersionCode
+
+    // The human-facing version (Settings → About) is kept separate from versionCode
+    // so a CI run number never leaks into the UI as "1.0.36265844407".
+    versionName =
+        project.findProperty("kurdishTvVersionName")?.toString()?.takeIf { it.isNotBlank() }
+            ?: "1.0.$resolvedVersionCode"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -29,6 +45,12 @@ android {
         keyAlias = "upload"
         keyPassword = System.getenv("KEY_PASSWORD")
       } else {
+        rootProject.logger.warn(
+          "WARNING: no upload keystore at $keystorePath. The release APK will be " +
+            "signed with the well-known Android debug key, so anyone can forge an " +
+            "update and the signing fingerprint will not match Play. Install a real " +
+            "keystore (or set KEYSTORE_PATH) before publishing."
+        )
         storeFile = file("${rootDir}/debug.keystore")
         storePassword = "android"
         keyAlias = "androiddebugkey"

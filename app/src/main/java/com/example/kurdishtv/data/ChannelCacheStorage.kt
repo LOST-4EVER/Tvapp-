@@ -9,6 +9,21 @@ import java.io.File
 class ChannelCacheStorage(context: Context) {
     private val cacheFile = File(context.applicationContext.filesDir, "cached_kurdish_channels.json")
 
+    /**
+     * How recently the channel list was last written, or 0 when there is no usable cache.
+     *
+     * Lets a cold start skip the network round-trip entirely when the list is still fresh,
+     * which is the common case when the app is reopened during normal viewing.
+     */
+    fun getCacheAgeMs(): Long {
+        return try {
+            if (!cacheFile.exists() || cacheFile.length() == 0L) return 0L
+            System.currentTimeMillis() - cacheFile.lastModified()
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
     fun getCachedChannels(): List<Channel>? {
         return try {
             if (!cacheFile.exists()) return null

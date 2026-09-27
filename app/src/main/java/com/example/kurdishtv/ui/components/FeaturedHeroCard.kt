@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -20,18 +22,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
@@ -46,18 +43,6 @@ fun FeaturedHeroCard(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
-
-    val context = LocalContext.current
-    val logoUrl = channel.logoUrl
-    val logoModel = remember(logoUrl, showLogos) {
-        if (!showLogos) null
-        else logoUrl?.takeIf { it.isNotBlank() }?.let {
-            ImageRequest.Builder(context)
-                .data(it)
-                .crossfade(true)
-                .build()
-        }
-    }
 
     Card(
         modifier = modifier
@@ -124,21 +109,13 @@ fun FeaturedHeroCard(
                             .border(1.dp, colors.border, M3ExpressiveShapes.LogoTile)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            if (logoModel != null) {
-                                AsyncImage(
-                                    model = logoModel,
-                                    contentDescription = channel.name,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier.padding(10.dp)
-                                )
-                            } else {
-                                SvgIcon(
-                                    resId = KurdishTvIcons.Tv,
-                                    contentDescription = null,
-                                    tint = colors.primary,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                            }
+                            ChannelLogo(
+                                channelName = channel.name,
+                                logoUrl = channel.logoUrl,
+                                showLogos = showLogos,
+                                contentPadding = 10.dp,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
 
