@@ -2,7 +2,7 @@ package com.example.ui.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.example.kurdishtv.model.AccentColor
 import com.example.kurdishtv.model.AppSettings
@@ -82,4 +82,16 @@ fun appColorsFor(settings: AppSettings, dynamicScheme: ColorScheme? = null): App
 /** Default instance used before settings are applied (also the Compose preview default). */
 val DefaultAppColors: AppColors = appColorsFor(AppSettings())
 
-val LocalAppColors = staticCompositionLocalOf { DefaultAppColors }
+/**
+ * The app's semantic colours.
+ *
+ * This is a [compositionLocalOf], not a `staticCompositionLocalOf`, because the
+ * value genuinely changes at runtime: switching accent, toggling AMOLED or
+ * enabling Material You produces a new instance.
+ *
+ * `staticCompositionLocalOf` does not track reads, so a change replaced the value
+ * in the local but skipped recomposition of everything reading it — the new
+ * colours only appeared after some unrelated state change forced the screens to
+ * redraw. The cheaper static variant is only safe for values that never change.
+ */
+val LocalAppColors = compositionLocalOf { DefaultAppColors }

@@ -15,10 +15,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.delay
@@ -96,10 +96,26 @@ object ExpressiveMotion {
      */
     const val STAGGER_STEP_MS = 26L
     const val STAGGER_MAX_ITEMS = 14
+
+    /**
+     * Resting values used when an animation is switched off.
+     *
+     * 1f is the neutral scale, so a disabled pulse leaves the badge at its
+     * normal size rather than freezing it mid-swing at 0.85 or 1.25.
+     */
+    const val RESTING_PULSE = 1f
+    const val RESTING_BOUNCE = 0f
 }
 
-/** True when the user asked for reduced motion; press/scale feedback becomes instant. */
-val LocalReduceMotion = staticCompositionLocalOf { false }
+/**
+ * True when the user asked for reduced motion; press/scale feedback becomes instant.
+ *
+ * `compositionLocalOf` rather than `staticCompositionLocalOf`, because the user can
+ * toggle this in Settings mid-session. A static local does not track its reads, so
+ * toggling the setting left already-composed animations running at full motion
+ * until something else happened to force a redraw.
+ */
+val LocalReduceMotion = compositionLocalOf { false }
 
 /**
  * A staggered entrance for grid and list items.
@@ -153,12 +169,25 @@ fun Modifier.staggeredEntrance(
  * A single shared pulse value for every LIVE badge in the app. Running one
  * infinite transition instead of one per card meaningfully cuts animation work
  * inside the channel grid.
+ *
+ * `compositionLocalOf`, not `staticCompositionLocalOf`: this value changes on
+ * every frame of the pulse animation, and a static local does not track reads.
+ * Every badge would then keep rendering the value it captured at composition
+ * time, so the shared pulse never actually animated — one transition was running
+ * and its result was being thrown away.
  */
-val LocalLivePulse = staticCompositionLocalOf { 1f }
+val LocalLivePulse = compositionLocalOf { 1f }
 
+/**
+ * The shared LIVE-badge pulse, or a constant when disabled.
+ *
+ * The `remember` calls run unconditionally and the animation is simply paused
+ * when disabled. An early `if (!enabled) return` before them would change how
+ * many slots this composable occupies, and toggling the setting in Settings
+ * mid-session would then hit Compose's "slot table changed structure" check.
+ */
 @Composable
 fun rememberLivePulse(enabled: Boolean): Float {
-    if (!enabled) return 1f
     val transition = rememberInfiniteTransition(label = "LivePulse")
     val scale by transition.animateFloat(
         initialValue = 0.85f,
@@ -169,7 +198,7 @@ fun rememberLivePulse(enabled: Boolean): Float {
         ),
         label = "LivePulseScale"
     )
-    return scale
+    return if (enabled) scale else ExpressiveMotion.RESTING_PULSE
 }
 
 /**
@@ -180,9 +209,9 @@ fun rememberLivePulse(enabled: Boolean): Float {
  * transition drives the whole indicator, so its cost does not grow with the
  * number of segments drawn.
  */
+/** See [rememberLivePulse]: the transition is always created, then gated. */
 @Composable
 fun rememberBounceProgress(enabled: Boolean): Float {
-    if (!enabled) return 0f
     val transition = rememberInfiniteTransition(label = "BounceProgress")
     val progress by transition.animateFloat(
         initialValue = 0f,
@@ -199,5 +228,5 @@ fun rememberBounceProgress(enabled: Boolean): Float {
         ),
         label = "BounceProgressValue"
     )
-    return progress
+    return if (enabled) progress else ExpressiveMotion.RESTING_BOUNCE
 }

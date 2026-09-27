@@ -172,7 +172,8 @@ fun MainTvScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                         CategoryBar(
                             selectedCategory = uiState.selectedCategory,
-                            onCategorySelected = onCategorySelected
+                            onCategorySelected = onCategorySelected,
+                            channels = uiState.channels
                         )
                         Spacer(modifier = Modifier.height(6.dp))
 
@@ -238,7 +239,8 @@ fun MainTvScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 CategoryBar(
                                     selectedCategory = uiState.selectedCategory,
-                                    onCategorySelected = onCategorySelected
+                                    onCategorySelected = onCategorySelected,
+                                    channels = uiState.channels
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                             }
@@ -295,7 +297,8 @@ fun MainTvScreen(
                             Spacer(modifier = Modifier.height(10.dp))
                             CategoryBar(
                                 selectedCategory = uiState.selectedCategory,
-                                onCategorySelected = onCategorySelected
+                                onCategorySelected = onCategorySelected,
+                                channels = uiState.channels
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                         }
@@ -384,7 +387,8 @@ private fun LandscapeCompactLayout(
                 )
                 CategoryBar(
                     selectedCategory = uiState.selectedCategory,
-                    onCategorySelected = onCategorySelected
+                    onCategorySelected = onCategorySelected,
+                    channels = uiState.channels
                 )
             }
         }

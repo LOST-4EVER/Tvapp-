@@ -158,18 +158,29 @@ object KurdishTvParser {
     private fun mapCategory(rawGroup: String, channelName: String): String {
         val combined = "$rawGroup $channelName".lowercase(Locale.ROOT)
         return when {
-            combined.contains("news") || combined.contains("rudaw") || combined.contains("kurdistan 24") || combined.contains("nrt") || combined.contains("channel 8") || combined.contains("speda") || combined.contains("payam") -> "News"
-            combined.contains("music") || combined.contains("korek") || combined.contains("vin") -> "Music"
-            combined.contains("kids") || combined.contains("child") || combined.contains("pepule") -> "Kids"
+            // Sports is checked first: several sports channels carry "Kurdistan"
+            // or a news-style group title, and the broad Kurdish/news tests below
+            // would otherwise swallow them, leaving the Sports tab empty.
+            combined.contains("sport") || combined.contains("football") ||
+                combined.contains("soccer") || combined.contains("tennis") ||
+                combined.contains("basket") -> "Sports"
+            // Religious before Kids: several religious channels are grouped under
+            // a kids/family group title in the community playlists, and were being
+            // filed as children's channels.
             combined.contains("quran") || combined.contains("islam") -> "Quran"
-            // Zarok was matched to Kids above, which is wrong: it is a religious
-            // channel and was therefore invisible under the Quran/Islamic filter.
-            combined.contains("zarok") -> "Religious"
-            combined.contains("religious") || combined.contains("hussain") ||
-                combined.contains("marjaeyat") || combined.contains("abbassia") ||
-                combined.contains("mahdi") || combined.contains("sajjad") ||
-                combined.contains("imam") || combined.contains("karbala") -> "Religious"
-            combined.contains("sport") -> "Sports"
+            combined.contains("zarok") || combined.contains("religious") ||
+                combined.contains("hussain") || combined.contains("marjaeyat") ||
+                combined.contains("abbassia") || combined.contains("mahdi") ||
+                combined.contains("sajjad") || combined.contains("imam") ||
+                combined.contains("karbala") -> "Religious"
+            combined.contains("news") || combined.contains("rudaw") ||
+                combined.contains("kurdistan 24") || combined.contains("nrt") ||
+                combined.contains("channel 8") || combined.contains("speda") ||
+                combined.contains("payam") -> "News"
+            combined.contains("music") || combined.contains("korek") ||
+                combined.contains("vin") -> "Music"
+            combined.contains("kids") || combined.contains("child") ||
+                combined.contains("pepule") -> "Kids"
             combined.contains("docu") -> "Documentary"
             combined.contains("kurd") -> "Kurdish"
             else -> "General"

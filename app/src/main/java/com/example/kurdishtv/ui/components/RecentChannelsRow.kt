@@ -76,7 +76,11 @@ fun RecentChannelsRow(
         ) {
             itemsIndexed(
                 items = recentChannels,
-                key = { idx, item -> "recent_${item.id}_$idx" }
+                // Keyed on the channel alone. Including the index meant that
+                // watching a channel shifted every other entry's key, so the whole
+                // row was torn down and rebuilt on each watch instead of just
+                // moving one item. The id is already unique by construction.
+                key = { _, item -> item.id }
             ) { _, channel ->
                 Surface(
                     shape = M3ExpressiveShapes.FourSidedCookie,

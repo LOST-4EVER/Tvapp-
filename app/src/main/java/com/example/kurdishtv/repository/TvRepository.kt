@@ -39,7 +39,9 @@ class TvRepository(
         val cached = channelCacheStorage.getCachedChannels()
         val channels = if (!cached.isNullOrEmpty()) cached else KurdishChannelCatalog.getDefaultChannels()
         val favIds = favoriteStorage.getFavoriteIds()
-        return channels.map { it.copy(isFavorite = favIds.contains(it.id)) }
+        return channels.map {
+            it.copy(isFavorite = favIds.contains(it.id) || favIds.contains(it.originalId))
+        }
     }
 
     /**
@@ -53,12 +55,20 @@ class TvRepository(
         withContext(Dispatchers.IO) {
             if (!forceRefresh) {
                 val age = channelCacheStorage.getCacheAgeMs()
-                if (age in 1 until CACHE_FRESH_MS) {
+                // 0 means "no cache" *or* "clock moved backwards"; both are handled
+                // the same way, by simply not short-circuiting. Reading the cache
+                // is what actually decides, so a 0 here costs one file read.
+                if (age < CACHE_FRESH_MS) {
                     val cached = channelCacheStorage.getCachedChannels()
                     if (!cached.isNullOrEmpty()) {
                         val favIds = favoriteStorage.getFavoriteIds()
                         return@withContext Result.success(
-                            cached.map { it.copy(isFavorite = favIds.contains(it.id)) }
+                            cached.map {
+                                it.copy(
+                                    isFavorite = favIds.contains(it.id) ||
+                                        favIds.contains(it.originalId)
+                                )
+                            }
                         )
                     }
                 }
@@ -121,19 +131,35 @@ class TvRepository(
             // Deduplicate streams
             val deduplicated = KurdishTvParser.deduplicate(allChannels)
 
-            // Ensure absolute key uniqueness for Lazy Layouts
+            // Ensure absolute key uniqueness for Lazy Layouts.
+            //
+            // The suffix counts collisions rather than using the index, so an id is
+            // derived only from the channel itself. Using the list index made the id
+            // depend on position, which broke in two ways: any channel that shifted
+            // position between refreshes was treated as a different channel, and a
+            // favourited channel whose id gained a suffix could never match its
+            // stored favourite id again, so the heart silently reset.
             val uniqueChannels = mutableListOf<Channel>()
             val seenIds = mutableSetOf<String>()
-            for ((idx, ch) in deduplicated.withIndex()) {
-                val uniqueId = if (seenIds.add(ch.id)) ch.id else "${ch.id}_$idx"
-                seenIds.add(uniqueId)
-                uniqueChannels.add(ch.copy(id = uniqueId))
+            for (ch in deduplicated) {
+                var candidate = ch.id
+                var suffix = 2
+                while (!seenIds.add(candidate)) {
+                    candidate = "${ch.id}_$suffix"
+                    suffix++
+                }
+                uniqueChannels.add(ch.copy(id = candidate, originalId = ch.originalId))
             }
 
-            // Apply favorite states
+            // Apply favorite states.
+            //
+            // Matched against the channel's *original* id, not the de-duplicated one.
+            // A channel whose id picked up a collision suffix is still the same
+            // channel, so a stored favourite must still find it.
             val favIds = favoriteStorage.getFavoriteIds()
             val channelsWithFavs = uniqueChannels.map { channel ->
-                channel.copy(isFavorite = favIds.contains(channel.id))
+                val isFav = favIds.contains(channel.id) || favIds.contains(channel.originalId)
+                channel.copy(isFavorite = isFav)
             }
 
             // Persist to disk cache asynchronously
