@@ -253,8 +253,30 @@ fun SettingsScreen(
                     iconRes = KurdishTvIcons.Globe
                 ) {
                     AboutRow("Version", BuildConfig.VERSION_NAME)
+                    AboutRow("Build", BuildConfig.VERSION_CODE.toString())
                     AboutRow("Channels", settings.startCategory.displayName + " start")
                     AboutRow("Sources", "Curated list, IPTV-org, community")
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Play Protect may warn that this app is from an unknown " +
+                            "developer. That is expected for a build that is not on the " +
+                            "Play Store: choose “More details” → “Install anyway”, or turn " +
+                            "off Play Protect in Play Store → Settings.",
+                        color = colors.textTertiary,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "If an update fails with “package conflicts with an " +
+                            "existing package”, an older copy signed with a different " +
+                            "key is still installed. Uninstall this app once, then install " +
+                            "the new version.",
+                        color = colors.textTertiary,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
                 }
             }
         }

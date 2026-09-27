@@ -37,24 +37,42 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      val keystoreFile = file(keystorePath)
-      if (keystoreFile.exists()) {
-        storeFile = keystoreFile
-        storePassword = System.getenv("STORE_PASSWORD")
-        keyAlias = "upload"
-        keyPassword = System.getenv("KEY_PASSWORD")
-      } else {
-        rootProject.logger.warn(
-          "WARNING: no upload keystore at $keystorePath. The release APK will be " +
-            "signed with the well-known Android debug key, so anyone can forge an " +
-            "update and the signing fingerprint will not match Play. Install a real " +
-            "keystore (or set KEYSTORE_PATH) before publishing."
-        )
-        storeFile = file("${rootDir}/debug.keystore")
-        storePassword = "android"
-        keyAlias = "androiddebugkey"
-        keyPassword = "android"
+      // Priority: a real upload keystore from the environment, then the committed
+      // release key, and only then the local debug key.
+      //
+      // Every build in a chain MUST be signed with the same key. Android refuses to
+      // install an update whose signature differs from the installed app
+      // (INSTALL_FAILED_UPDATE_INCOMPATIBLE, which surfaces as "App not installed as
+      // package conflicts with an existing package"). Previously CI generated a
+      // brand-new debug key on every run whenever the base64 key was missing, so
+      // each release was signed differently and updates could never install.
+      val envKeystore = System.getenv("KEYSTORE_PATH")?.let { file(it) }
+      val bundledKeystore = file("${rootDir}/release-key.jks")
+
+      when {
+        envKeystore != null && envKeystore.exists() -> {
+          storeFile = envKeystore
+          storePassword = System.getenv("STORE_PASSWORD")
+          keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
+          keyPassword = System.getenv("KEY_PASSWORD")
+        }
+        bundledKeystore.exists() -> {
+          storeFile = bundledKeystore
+          storePassword = System.getenv("STORE_PASSWORD") ?: "android"
+          keyAlias = "upload"
+          keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+        }
+        else -> {
+          rootProject.logger.warn(
+            "WARNING: no release keystore found. Falling back to the local debug key, " +
+              "which will NOT match previously published builds. Restore " +
+              "release-key.jks (see README) or set KEYSTORE_PATH before publishing."
+          )
+          storeFile = file("${rootDir}/debug.keystore")
+          storePassword = "android"
+          keyAlias = "androiddebugkey"
+          keyPassword = "android"
+        }
       }
     }
     create("debugConfig") {
@@ -67,7 +85,9 @@ android {
 
   buildTypes {
     release {
-      isCrunchPngs = false
+      // Lossless PNG optimisation. Safe here because every image is referenced as a
+      // drawable/mipmap resource rather than loaded by raw file name.
+      isCrunchPngs = true
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -100,6 +100,15 @@ fun MainTvScreen(
     ) {
         val isTabletLandscape = maxWidth >= 900.dp
         val isMediumScreen = maxWidth >= 600.dp
+        // Phones in portrait are the tightest case. Shrinking the grid's minimum cell
+        // there keeps two comfortable columns instead of squeezing one very wide one,
+        // and keeps the header actions from colliding with the title on small screens.
+        val isCompactWidth = maxWidth < 600.dp
+        val gridMinCellSize = when {
+            isCompactWidth -> 132.dp
+            maxWidth >= 900.dp -> 172.dp
+            else -> 150.dp
+        }
         val filtered = uiState.filteredChannels
         val isBrowsingHome =
             uiState.searchQuery.isBlank() && uiState.selectedCategory == CategoryFilter.ALL
@@ -153,7 +162,7 @@ fun MainTvScreen(
                                 uiState = uiState,
                                 showLogos = settings.showLogos,
                                 isHome = isBrowsingHome,
-                                minCellSize = 150.dp,
+                                minCellSize = gridMinCellSize,
                                 onChannelClick = onChannelClick,
                                 onFavoriteToggle = onFavoriteToggle
                             )
@@ -283,7 +292,7 @@ fun MainTvScreen(
                                 uiState = uiState,
                                 showLogos = settings.showLogos,
                                 isHome = isBrowsingHome,
-                                minCellSize = 155.dp,
+                                minCellSize = gridMinCellSize,
                                 onChannelClick = onChannelClick,
                                 onFavoriteToggle = onFavoriteToggle
                             )

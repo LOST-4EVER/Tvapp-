@@ -1,5 +1,9 @@
 package com.example.kurdishtv.ui.navigation
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,10 +35,17 @@ fun KurdishTvNavGraph(
     val settings by settingsViewModel.settings.collectAsState()
     val settingsLoaded by settingsViewModel.loaded.collectAsState()
 
+    // The activity draws edge to edge, so screens must inset themselves out of the
+    // status and navigation bars. The player is deliberately excluded: it hides the
+    // system bars for fullscreen video and would be letterboxed by the padding.
+    val insetModifier = modifier
+        .fillMaxSize()
+        .windowInsetsPadding(WindowInsets.safeDrawing)
+
     NavHost(
         navController = navController,
         startDestination = Screen.Main.route,
-        modifier = modifier
+        modifier = Modifier.fillMaxSize()
     ) {
         composable(Screen.Main.route) {
             MainTvScreen(
@@ -51,7 +62,8 @@ fun KurdishTvNavGraph(
                 onAddCustomPlaylist = { url -> viewModel.addCustomPlaylist(url) },
                 onRemoveCustomPlaylist = { url -> viewModel.removeCustomPlaylist(url) },
                 onRetryClick = { viewModel.loadChannels() },
-                onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                modifier = insetModifier
             )
         }
 
@@ -89,7 +101,8 @@ fun KurdishTvNavGraph(
                 onClearCache = { viewModel.clearChannelCache() },
                 message = uiState.actionMessage,
                 onMessageShown = { viewModel.clearActionMessage() },
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                modifier = insetModifier
             )
         }
     }

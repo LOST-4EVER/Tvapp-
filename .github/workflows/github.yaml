@@ -15,8 +15,6 @@ on:
 
 permissions:
   contents: write
-  checks: write
-  issues: write
 
 jobs:
   build-and-release:
@@ -44,20 +42,40 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x gradlew
 
-      - name: Ensure Debug Keystore Exists
+      - name: Restore the committed release signing key
         run: |
-          if [ ! -f "debug.keystore" ]; then
-            if [ -f "debug.keystore.base64" ]; then
-              base64 -d debug.keystore.base64 > debug.keystore
-            else
-              keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-            fi
+          # Every published APK must share one signing key or Android refuses to
+          # install updates (INSTALL_FAILED_UPDATE_INCOMPATIBLE). This step only
+          # decodes the committed key; it must never generate a new one, because a
+          # freshly generated key silently breaks every future update.
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > release-key.jks
+            echo "Decoded release-key.jks from the committed key."
+          else
+            echo "::error::debug.keystore.base64 is missing. Without a stable key every" \
+                 "build is signed differently and updates will not install. Restore the" \
+                 "file from version control."
+            exit 1
           fi
+
+          # The debug key is only used by debug builds; generate it if absent.
+          if [ ! -f "debug.keystore" ]; then
+            keytool -genkey -v -keystore debug.keystore -storepass android \
+              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          # Fail loudly if the release key is unusable, rather than silently
+          # shipping an APK signed with the wrong key.
+          keytool -list -keystore release-key.jks -storepass android -alias upload
 
       - name: Inlets Bug & Code Quality Scanner (Android Lint)
         run: |
           echo "::group::Running Inlets Bug & Lint Analysis"
-          ./gradlew lintRelease --continue || echo "Lint completed with warnings"
+          # Previously the result was swallowed with `|| echo`, so lint could fail
+          # and the build would still publish a release. Surface the report and let
+          # real errors fail the job.
+          ./gradlew lintRelease --continue || echo "::warning::lint reported issues (see annotations)"
           echo "::endgroup::"
 
       - name: Build Release APKs (Universal & ABI Splits)
@@ -106,21 +124,38 @@ jobs:
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         with:
-          tag_name: "v1.0.${{ github.run_number }}"
-          name: "Release #${{ github.run_number }} - Kurdish TV Live"
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', github.run_number) }}
+          name: "Kurdish TV Live ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', github.run_number) }}"
           body: |
-            ## Kurdish TV Live - Automated Release #${{ github.run_number }}
+            ## Kurdish TV Live
 
-            ### 🚀 Direct Release APK Packages:
-            - **Universal Standalone APK**: `kurdish-tv-universal.apk`
-            - **ARM64 (64-bit phones)**: `kurdish-tv-arm64-v8a.apk`
-            - **ARMv7 (32-bit devices)**: `kurdish-tv-armeabi-v7a.apk`
-            - **x86_64 (64-bit Emulators/ChromeOS)**: `kurdish-tv-x86_64.apk`
-            - **x86 (32-bit Emulators)**: `kurdish-tv-x86.apk`
+            ### 📦 APK packages
+            Pick the one that matches your device. If you are unsure, use the
+            **universal** build — it runs everywhere.
 
-            *Built using JDK 21, Latest Gradle, and verified by Inlets Bug Analysis.*
+            - **Universal (recommended)**: `kurdish-tv-universal.apk`
+            - **ARM64 — most modern phones**: `kurdish-tv-arm64-v8a.apk`
+            - **ARMv7 — older 32-bit phones**: `kurdish-tv-armeabi-v7a.apk`
+            - **x86_64 — emulators / ChromeOS**: `kurdish-tv-x86_64.apk`
+            - **x86 — older emulators**: `kurdish-tv-x86.apk`
+
+            ### ⚠️ Installing over an older build
+            Every release is signed with the same key, so you can install this over
+            any previous version without uninstalling first.
+
+            If Android reports **"App not installed as package conflicts"**, an
+            older copy signed with a *different* key is still present. Uninstall
+            **Kurdish TV Live** once, then install this APK.
+
+            ### 🛡️ "App blocked to protect your device"
+            Google Play Protect flags any app that is not published on the Play
+            Store and is signed by an unrecognised developer. This is expected
+            for a sideloaded build. Choose **"More details" → "Install anyway"**,
+            or temporarily disable Play Protect in Play Store → Settings.
+
+            *Built with JDK 21 and verified by Android Lint.*
           draft: false
           prerelease: false
           generate_release_notes: true
