@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Mosque dome with finial, on the 24dp grid. -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12,2c-0.55,0 -1,0.45 -1,1v1.09C8.4,4.52 6.5,6.63 6.5,9.2V11H5.5C4.67,11 4,11.67 4,12.5V19c0,0.55 0.45,1 1,1h14c0.55,0 1,-0.45 1,-1v-6.5c0,-0.83 -0.67,-1.5 -1.5,-1.5h-1V9.2c0,-2.57 -1.9,-4.68 -4.5,-5.11V3C13,2.45 12.55,2 12,2zM6.5,19v-6.5h11V19H6.5z" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M11,13.5c-0.55,0 -1,0.45 -1,1v1.5h2v-1.5C12,13.95 11.55,13.5 11,13.5z" />
+</vector>

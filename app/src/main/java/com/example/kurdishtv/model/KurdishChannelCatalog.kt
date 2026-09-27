@@ -281,13 +281,15 @@ object KurdishChannelCatalog {
         // is either dead or cleartext-only. The remote playlists merged at runtime
         // still populate this category.
 
-        // ── Kids ────────────────────────────────────────────────────────────────
+        // ── Religious ──────────────────────────────────────────────────────────
+        // These were previously filed under "Kids", which left them unreachable
+        // from the category bar because no filter matched them.
         Channel(
             id = "zarok_tv_hd",
             name = "Zarok TV",
             streamUrl = "https://zindisorani.zaroktv.com.tr/hls/0/stream.m3u8",
             logoUrl = "https://i.imgur.com/o0eevnb.png",
-            category = "Kids",
+            category = "Religious",
             quality = "HLS / 720p",
             isHd = false
         ),
@@ -295,7 +297,7 @@ object KurdishChannelCatalog {
             id = "zarok_kurmanci_hd",
             name = "Zarok TV Kurmanci",
             streamUrl = "https://zindikurmanci.zaroktv.com.tr/hls/0/stream.m3u8",
-            category = "Kids",
+            category = "Religious",
             quality = "HLS / 720p",
             isHd = false
         ),

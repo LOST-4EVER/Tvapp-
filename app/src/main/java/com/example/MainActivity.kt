@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val updateChecker by lazy {
-        UpdateChecker(applicationContext, okHttpClient)
+        UpdateChecker(okHttpClient)
     }
 
     private val viewModel: TvViewModel by viewModels {

@@ -31,7 +31,7 @@ object KurdishTvParser {
                     val quality = if (isHd) "HLS / 1080p" else "HLS / 720p"
                     // Stable id derived from the source, name and stream URL (no index) so
                     // favourites/recents survive source reordering between refreshes.
-                    val uniqueId = "${sourceTag}_${cleanId(formattedName)}_${abs(url.hashCode())}"
+                    val uniqueId = "${sourceTag}_${cleanId(formattedName)}_${stableHash(url)}"
 
                     channels.add(
                         Channel(
@@ -142,7 +142,7 @@ object KurdishTvParser {
         val isHd = formattedName.contains("HD", ignoreCase = true) || url.contains("1080", ignoreCase = true)
         val quality = if (isHd) "HLS / 1080p" else "HLS / 720p"
         // Stable id: no positional index, so the same stream keeps its identity across fetches.
-        val uniqueId = "${sourceTag}_${cleanId(formattedName)}_${abs(url.hashCode())}"
+        val uniqueId = "${sourceTag}_${cleanId(formattedName)}_${stableHash(url)}"
 
         return Channel(
             id = uniqueId,
@@ -160,8 +160,15 @@ object KurdishTvParser {
         return when {
             combined.contains("news") || combined.contains("rudaw") || combined.contains("kurdistan 24") || combined.contains("nrt") || combined.contains("channel 8") || combined.contains("speda") || combined.contains("payam") -> "News"
             combined.contains("music") || combined.contains("korek") || combined.contains("vin") -> "Music"
-            combined.contains("kids") || combined.contains("child") || combined.contains("pepule") || combined.contains("zarok") -> "Kids"
+            combined.contains("kids") || combined.contains("child") || combined.contains("pepule") -> "Kids"
             combined.contains("quran") || combined.contains("islam") -> "Quran"
+            // Zarok was matched to Kids above, which is wrong: it is a religious
+            // channel and was therefore invisible under the Quran/Islamic filter.
+            combined.contains("zarok") -> "Religious"
+            combined.contains("religious") || combined.contains("hussain") ||
+                combined.contains("marjaeyat") || combined.contains("abbassia") ||
+                combined.contains("mahdi") || combined.contains("sajjad") ||
+                combined.contains("imam") || combined.contains("karbala") -> "Religious"
             combined.contains("sport") -> "Sports"
             combined.contains("docu") -> "Documentary"
             combined.contains("kurd") -> "Kurdish"
@@ -171,6 +178,20 @@ object KurdishTvParser {
 
     private fun cleanId(name: String): String =
         name.lowercase(Locale.ROOT).replace(nonAlphaNumericRegex, "").take(16)
+
+    /**
+     * A deterministic hash of the stream URL.
+     *
+     * `String.hashCode()` is specified by the Kotlin/Java API, so it is stable
+     * across runs and devices. This wrapper exists so the id derivation is
+     * obvious at the call sites and so the value is always non-negative, which
+     * keeps ids free of a leading minus sign.
+     */
+    private fun stableHash(value: String): String {
+        val hash = abs(value.hashCode())
+        // Zero is a legal hash but a poor discriminator; fold it to 1.
+        return if (hash == 0) "1" else hash.toString()
+    }
 
     private fun parseExtName(line: String): String {
         val commaIndex = line.lastIndexOf(',')

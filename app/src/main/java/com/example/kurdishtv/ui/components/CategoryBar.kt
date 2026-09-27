@@ -105,7 +105,8 @@ internal fun categoryIcon(category: CategoryFilter): Int = when (category) {
     CategoryFilter.KIDS -> KurdishTvIcons.Kids
     CategoryFilter.SPORT -> KurdishTvIcons.Sports
     CategoryFilter.DOCUMENTARY -> KurdishTvIcons.Tune
-    CategoryFilter.QURAN -> KurdishTvIcons.Globe
+    CategoryFilter.QURAN -> KurdishTvIcons.Quran
+    CategoryFilter.RELIGIOUS -> KurdishTvIcons.Religious
     CategoryFilter.FAVORITES -> KurdishTvIcons.FavoriteFilledRes
     CategoryFilter.HD -> KurdishTvIcons.Signal
 }

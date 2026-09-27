@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Open book, Material "menu_book" geometry on the 24dp grid. -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M21,4.5C19.89,4.15 18.7,4 17.5,4c-1.95,0 -3.95,0.4 -5.5,1.5C10.45,4.4 8.45,4 6.5,4C5.3,4 4.11,4.15 3,4.5v14.65c1.11,-0.35 2.3,-0.5 3.5,-0.5 1.95,0 3.95,0.4 5.5,1.5 1.55,-1.1 3.55,-1.5 5.5,-1.5 1.2,0 2.39,0.15 3.5,0.5V4.5zM12,18.5c-1.89,-1.08 -4.15,-1.5 -6.5,-1.5 -0.65,0 -1.29,0.04 -1.92,0.11V6.26c0.63,-0.13 1.28,-0.2 1.92,-0.2 2.35,0 4.61,0.42 6.5,1.5v10.94zM20.42,17.11C19.79,17.04 19.15,17 18.5,17c-1.89,0 -4.15,0.42 -6.5,1.5V7.56c1.89,-1.08 4.15,-1.5 6.5,-1.5 0.64,0 1.29,0.04 1.92,0.11v10.94z" />
+</vector>

@@ -43,6 +43,7 @@ import com.example.kurdishtv.ui.components.RecentChannelsRow
 import com.example.kurdishtv.ui.components.SearchBarM3
 import com.example.kurdishtv.ui.components.SidePlayerPane
 import com.example.kurdishtv.ui.components.TopHeaderBar
+import com.example.kurdishtv.ui.motion.staggeredEntrance
 import com.example.kurdishtv.viewmodel.TvUiState
 import com.example.ui.theme.LocalAppColors
 
@@ -346,12 +347,13 @@ private fun ChannelGrid(
         itemsIndexed(
             items = filtered,
             key = { _, ch -> ch.id }
-        ) { _, channel ->
+        ) { index, channel ->
             ChannelCard(
                 channel = channel,
                 showLogos = showLogos,
                 onClick = { onChannelClick(channel) },
-                onFavoriteToggle = { onFavoriteToggle(channel.id) }
+                onFavoriteToggle = { onFavoriteToggle(channel.id) },
+                modifier = Modifier.staggeredEntrance(index = index)
             )
         }
     }

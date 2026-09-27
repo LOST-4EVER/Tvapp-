@@ -1,7 +1,9 @@
 package com.example.kurdishtv.network
 
 import android.content.Context
+import android.util.Log
 import androidx.media3.common.util.UnstableApi
+import com.example.BuildConfig
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Cache
@@ -27,6 +29,16 @@ import kotlin.coroutines.resume
 object NetworkClient {
 
     const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
+    /**
+     * Debug logging that is compiled out of release builds by R8, so diagnostics
+     * can be left in place without shipping verbose logs.
+     */
+    fun logDebug(message: String, error: Throwable? = null) {
+        if (BuildConfig.DEBUG) {
+            Log.d("KurdishTv", message, error)
+        }
+    }
 
     /**
      * Hard ceiling on a single playlist/JSON response. Playlists are small; a hostile or

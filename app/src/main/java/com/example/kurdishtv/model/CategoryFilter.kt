@@ -13,6 +13,8 @@ enum class CategoryFilter(
     SPORT("Sports", "وەرزش"),
     DOCUMENTARY("Documentary", "بەڵگەفیلم"),
     QURAN("Quran", "قورئان"),
+    /** Channels the catalog files as "Religious" (Zarok, Marjaeyat, Alabbassia...). */
+    RELIGIOUS("Religious", "ئایینی"),
     FAVORITES("Favorites", "دڵخوازەکان"),
     HD("HD 1080p", "کوالێتی بەرز")
 }
