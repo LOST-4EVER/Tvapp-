@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
@@ -44,101 +47,122 @@ fun TopHeaderBar(
         label = "HeaderLogoScale"
     )
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                shape = M3ExpressiveShapes.Sunny,
-                color = colors.primary,
-                modifier = Modifier
-                    .size(46.dp)
-                    .graphicsLayer {
-                        scaleX = logoScale
-                        scaleY = logoScale
-                    }
-                    .bouncyClickable { onRefresh() }
+    // On narrow screens the title, the action row and the channel count cannot all
+    // fit on one line, so the title is capped and the secondary line is dropped
+    // rather than letting the text slide under the buttons.
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+            val isNarrow = maxWidth < 420.dp
+            val titleMaxWidth = if (isNarrow) 132.dp else 220.dp
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = if (isNarrow) 12.dp else 20.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f, fill = false)
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    SvgIcon(
-                        resId = KurdishTvIcons.Tv,
-                        contentDescription = "Kurdish TV Live",
-                        tint = colors.onPrimary,
-                        modifier = Modifier.size(25.dp)
+                Surface(
+                    shape = M3ExpressiveShapes.Sunny,
+                    color = colors.primary,
+                    modifier = Modifier
+                        .size(if (isNarrow) 40.dp else 46.dp)
+                        .graphicsLayer {
+                            scaleX = logoScale
+                            scaleY = logoScale
+                        }
+                        .bouncyClickable { onRefresh() }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        SvgIcon(
+                            resId = KurdishTvIcons.Tv,
+                            contentDescription = "Kurdish TV Live",
+                            tint = colors.onPrimary,
+                            modifier = Modifier.size(if (isNarrow) 22.dp else 25.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(if (isNarrow) 8.dp else 12.dp))
+
+                Column {
+                    Text(
+                        text = "Kurdish TV Live",
+                        color = colors.textPrimary,
+                        fontSize = if (isNarrow) 17.sp else 20.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = titleMaxWidth)
+                    )
+                    Text(
+                        text = if (isNarrow) {
+                            "$channelCount channels"
+                        } else {
+                            "$channelCount channels • تەلەفزیۆنی کوردی"
+                        },
+                        color = colors.textSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = titleMaxWidth)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column {
-                Text(
-                    text = "Kurdish TV Live",
-                    color = colors.textPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HeaderIconButton(
+                    iconRes = KurdishTvIcons.Settings,
+                    description = "Settings",
+                    onClick = onOpenSettings
                 )
-                Text(
-                    text = "$channelCount channels • تەلەفزیۆنی کوردی",
-                    color = colors.textSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
+                HeaderIconButton(
+                    iconRes = KurdishTvIcons.AddLink,
+                    description = "Import IPTV playlist",
+                    onClick = onOpenImport
                 )
+                HeaderIconButton(
+                    iconRes = KurdishTvIcons.Refresh,
+                    description = "Reload channels",
+                    onClick = onRefresh
+                )
+                if (isLoading) {
+                    BouncingLoader(size = 26.dp, dotCount = 5)
+                }
             }
         }
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            HeaderIconButton(
-                iconRes = KurdishTvIcons.Settings,
-                description = "Settings",
-                onClick = onOpenSettings
-            )
-            HeaderIconButton(
-                iconRes = KurdishTvIcons.AddLink,
-                description = "Import IPTV playlist",
-                onClick = onOpenImport
-            )
-            HeaderIconButton(
-                iconRes = KurdishTvIcons.Refresh,
-                description = "Reload channels",
-                onClick = onRefresh
-            )
-            if (isLoading) {
-                BouncingLoader(size = 26.dp, dotCount = 5)
-            }
         }
     }
-}
 
-@Composable
-private fun HeaderIconButton(
-    iconRes: Int,
-    description: String,
-    onClick: () -> Unit
-) {
-    val colors = LocalAppColors.current
-    Surface(
-        shape = M3ExpressiveShapes.Burst,
-        color = colors.surfaceElevated,
-        modifier = Modifier
-            .size(42.dp)
-            .border(1.dp, colors.border, M3ExpressiveShapes.Burst)
-            .bouncyClickable { onClick() }
+    @Composable
+    private fun HeaderIconButton(
+        iconRes: Int,
+        description: String,
+        onClick: () -> Unit
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            SvgIcon(
-                resId = iconRes,
-                contentDescription = description,
-                tint = colors.primary,
-                modifier = Modifier.size(20.dp)
-            )
+        val colors = LocalAppColors.current
+        Surface(
+            shape = M3ExpressiveShapes.Burst,
+            color = colors.surfaceElevated,
+            modifier = Modifier
+                .size(40.dp)
+                .border(1.dp, colors.border, M3ExpressiveShapes.Burst)
+                .bouncyClickable { onClick() }
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                SvgIcon(
+                    resId = iconRes,
+                    contentDescription = description,
+                    tint = colors.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
-}
