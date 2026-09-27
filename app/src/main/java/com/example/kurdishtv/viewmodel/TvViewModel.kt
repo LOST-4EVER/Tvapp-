@@ -1,14 +1,22 @@
 package com.example.kurdishtv.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.model.ChannelFilterEngine
 import com.example.kurdishtv.model.KurdishChannelCatalog
 import com.example.kurdishtv.network.NetworkMonitor
 import com.example.kurdishtv.repository.TvRepository
+import com.example.kurdishtv.update.ApkInstaller
+import com.example.kurdishtv.update.AppUpdate
+import com.example.kurdishtv.update.DownloadState
+import com.example.kurdishtv.update.UpdateChecker
+import com.example.kurdishtv.update.UpdateState
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,7 +30,9 @@ import java.util.Locale
 
 class TvViewModel(
     private val repository: TvRepository,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val updateChecker: UpdateChecker? = null,
+    private val appContext: Context? = null
 ) : ViewModel() {
 
     // Start from the in-memory curated catalog (zero disk/network cost) and hydrate from
@@ -39,6 +49,14 @@ class TvViewModel(
     private var sleepTimerJob: Job? = null
     private var searchJob: Job? = null
     private var loadJob: Job? = null
+    private var updateJob: Job? = null
+
+    private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
+
+    /** Downloaded APKs live in cache/updates, which the system may clear. */
+    private val updateDir: File?
+        get() = appContext?.let { File(it.cacheDir, "updates") }
 
     private companion object {
         /** Long enough to coalesce a burst of keystrokes, short enough to feel live. */
@@ -52,6 +70,9 @@ class TvViewModel(
             // Cold start: a still-fresh cache short-circuits the network fetch.
             loadChannels(forceRefresh = false)
         }
+        // Check for updates in the background so a release is noticed without the
+        // user hunting for it. Failures are silent here; Settings surfaces them.
+        viewModelScope.launch { checkForUpdate(silent = true) }
     }
 
     /**
@@ -388,14 +409,108 @@ class TvViewModel(
         }
     }
 
+    // ── In-app update ─────────────────────────────────────────────────────────
+
+    /**
+     * Asks GitHub whether a newer build exists.
+     *
+     * @param silent when true, a failed check leaves the UI untouched so the
+     *   automatic background check never surfaces an error the user did not ask for.
+     */
+    fun checkForUpdate(silent: Boolean = false) {
+        val checker = updateChecker ?: return
+        if (updateJob?.isActive == true) return
+
+        updateJob = viewModelScope.launch {
+            if (!silent) _updateState.value = UpdateState.Checking
+
+            val result = checker.checkForUpdate(BuildConfig.VERSION_CODE)
+            result
+                .onSuccess { update ->
+                    _updateState.value = when {
+                        update != null -> UpdateState.Available(update)
+                        silent -> UpdateState.Idle
+                        else -> UpdateState.UpToDate(BuildConfig.VERSION_NAME)
+                    }
+                }
+                .onFailure { error ->
+                    // A silent check must not show a failure the user did not request.
+                    if (!silent) {
+                        _updateState.value = UpdateState.Failed(
+                            error.message ?: "Could not reach the update server"
+                        )
+                    }
+                }
+        }
+    }
+
+    /** Downloads an available update, reporting progress into [updateState]. */
+    fun downloadUpdate(update: AppUpdate) {
+        val checker = updateChecker ?: return
+        val dir = updateDir ?: return
+        if (updateJob?.isActive == true) return
+
+        updateJob = viewModelScope.launch {
+            _updateState.value = UpdateState.Downloading(update, DownloadState.Idle)
+            checker.download(update, dir) { progress ->
+                _updateState.value = UpdateState.Downloading(update, progress)
+            }
+                .onSuccess { file ->
+                    _updateState.value = UpdateState.ReadyToInstall(update, file.absolutePath)
+                }
+                .onFailure { error ->
+                    _updateState.value = UpdateState.Failed(
+                        error.message ?: "Download failed"
+                    )
+                }
+        }
+    }
+
+    /**
+     * Opens the system installer for a downloaded APK.
+     *
+     * Returns false when the device still needs the "allow from this source"
+     * permission, so the caller can route the user to that settings screen.
+     */
+    fun installUpdate(update: AppUpdate, filePath: String): Boolean {
+        val context = appContext ?: return false
+        val file = File(filePath)
+        if (!file.exists()) {
+            _updateState.value = UpdateState.Failed("The downloaded update is missing, please retry")
+            return false
+        }
+        val started = ApkInstaller.install(context, file)
+        if (!started) {
+            _updateState.value =
+                UpdateState.Failed("This device could not start the package installer")
+        }
+        return started
+    }
+
+    /** True when the app still needs permission to install packages. */
+    fun needsInstallPermission(): Boolean {
+        val context = appContext ?: return false
+        return !ApkInstaller.canRequestPackageInstalls(context)
+    }
+
+    fun openInstallPermissionSettings() {
+        appContext?.let { ApkInstaller.openInstallPermissionSettings(it) }
+    }
+
+    fun clearUpdateMessage() {
+        _updateState.value = UpdateState.Idle
+    }
+
     class Factory(
         private val repository: TvRepository,
-        private val networkMonitor: NetworkMonitor
+        private val networkMonitor: NetworkMonitor,
+        private val updateChecker: UpdateChecker? = null,
+        private val appContext: Context? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(TvViewModel::class.java)) {
-                return TvViewModel(repository, networkMonitor) as T
+                return TvViewModel(repository, networkMonitor, updateChecker, appContext) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

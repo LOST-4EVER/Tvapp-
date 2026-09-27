@@ -113,6 +113,7 @@ fun FeaturedHeroCard(
                                 logoUrl = channel.logoUrl,
                                 showLogos = showLogos,
                                 contentPadding = 10.dp,
+                                size = 72.dp,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

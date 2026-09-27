@@ -19,6 +19,7 @@ import com.example.kurdishtv.repository.TvRepository
 import com.example.kurdishtv.ui.motion.LocalLivePulse
 import com.example.kurdishtv.ui.motion.rememberLivePulse
 import com.example.kurdishtv.ui.navigation.KurdishTvNavGraph
+import com.example.kurdishtv.update.UpdateChecker
 import com.example.kurdishtv.viewmodel.SettingsViewModel
 import com.example.kurdishtv.viewmodel.TvViewModel
 import com.example.ui.theme.KurdishTvTheme
@@ -43,8 +44,17 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val updateChecker by lazy {
+        UpdateChecker(applicationContext, okHttpClient)
+    }
+
     private val viewModel: TvViewModel by viewModels {
-        TvViewModel.Factory(repository, networkMonitor)
+        TvViewModel.Factory(
+            repository = repository,
+            networkMonitor = networkMonitor,
+            updateChecker = updateChecker,
+            appContext = applicationContext
+        )
     }
 
     private val settingsViewModel: SettingsViewModel by viewModels {

@@ -34,6 +34,7 @@ fun KurdishTvNavGraph(
     val uiState by viewModel.uiState.collectAsState()
     val settings by settingsViewModel.settings.collectAsState()
     val settingsLoaded by settingsViewModel.loaded.collectAsState()
+    val updateState by viewModel.updateState.collectAsState()
 
     // The activity draws edge to edge, so screens must inset themselves out of the
     // status and navigation bars. The player is deliberately excluded: it hides the
@@ -102,6 +103,19 @@ fun KurdishTvNavGraph(
                 message = uiState.actionMessage,
                 onMessageShown = { viewModel.clearActionMessage() },
                 onBack = { navController.popBackStack() },
+                updateState = updateState,
+                onCheckForUpdate = { viewModel.checkForUpdate() },
+                onDownloadUpdate = { update -> viewModel.downloadUpdate(update) },
+                onInstallUpdate = { update, path ->
+                    // Android 8+ requires a per-app "allow from this source" grant
+                    // before the installer will accept a sideloaded package.
+                    if (viewModel.needsInstallPermission()) {
+                        viewModel.openInstallPermissionSettings()
+                    } else if (!viewModel.installUpdate(update, path)) {
+                        viewModel.openInstallPermissionSettings()
+                    }
+                },
+                onDismissUpdate = { viewModel.clearUpdateMessage() },
                 modifier = insetModifier
             )
         }

@@ -70,7 +70,9 @@ fun ChannelCard(
                     channelName = channel.name,
                     logoUrl = channel.logoUrl,
                     showLogos = showLogos,
-                    contentPadding = 18.dp
+                    contentPadding = 18.dp,
+                    // Decode for the tile this is drawn in, not at source resolution.
+                    size = 112.dp
                 )
 
                 Row(
