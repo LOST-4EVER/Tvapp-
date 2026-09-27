@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -78,10 +79,14 @@ fun ChannelLogo(
     val context = LocalContext.current
     val colors = LocalAppColors.current
     val loader = remember(context) { LogoLoader.get(context) }
+    // Coil sizes are in pixels, so the dp the tile is drawn at has to be converted
+    // against the current density.
+    val density = LocalDensity.current
 
-    val request = remember(logoUrl, showLogos, size) {
+    val request = remember(logoUrl, showLogos, size, density) {
         if (!showLogos) null
         else logoUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            val targetPx = with(density) { size.roundToPx() }.coerceAtLeast(1)
             ImageRequest.Builder(context)
                 .data(url)
                 .crossfade(true)
@@ -89,7 +94,7 @@ fun ChannelLogo(
                 // are often 512-1024px. Without an explicit size, Coil decodes at
                 // full resolution and keeps a bitmap roughly 40x larger than the
                 // space it occupies — the dominant memory cost in a grid of them.
-                .size(size)
+                .size(targetPx, targetPx)
                 .scale(Scale.FIT)
                 .precision(Precision.INEXACT)
                 .build()
