@@ -1,5 +1,6 @@
 package com.example.kurdishtv.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,11 +14,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -25,12 +29,20 @@ import com.example.ui.theme.LocalAppColors
 @Composable
 fun TopHeaderBar(
     channelCount: Int,
+    isLoading: Boolean = false,
     onOpenImport: () -> Unit,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
+    // While a refresh is in flight the logo gently breathes, so the header reads as
+    // alive without needing a blocking spinner over the grid.
+    val logoScale by animateFloatAsState(
+        targetValue = if (isLoading) 1.06f else 1f,
+        animationSpec = ExpressiveMotion.spatialMedium,
+        label = "HeaderLogoScale"
+    )
 
     Row(
         modifier = modifier
@@ -45,6 +57,10 @@ fun TopHeaderBar(
                 color = colors.primary,
                 modifier = Modifier
                     .size(46.dp)
+                    .graphicsLayer {
+                        scaleX = logoScale
+                        scaleY = logoScale
+                    }
                     .bouncyClickable { onRefresh() }
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -94,6 +110,9 @@ fun TopHeaderBar(
                 description = "Reload channels",
                 onClick = onRefresh
             )
+            if (isLoading) {
+                BouncingLoader(size = 26.dp, dotCount = 5)
+            }
         }
     }
 }

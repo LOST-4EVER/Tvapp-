@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +24,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.components.BouncingLoader
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -56,11 +56,7 @@ fun PlayerBufferingIndicator(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            CircularProgressIndicator(
-                color = colors.primary,
-                strokeWidth = 2.5.dp,
-                modifier = Modifier.size(20.dp)
-            )
+            BouncingLoader(size = 22.dp, dotCount = 5)
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(

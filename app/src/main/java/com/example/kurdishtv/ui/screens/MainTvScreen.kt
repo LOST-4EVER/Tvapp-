@@ -123,6 +123,7 @@ fun MainTvScreen(
                         OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
                         TopHeaderBar(
                             channelCount = filtered.size,
+                            isLoading = uiState.isLoading,
                             onOpenImport = { showImportDialog = true },
                             onRefresh = onRetryClick,
                             onOpenSettings = onOpenSettings
@@ -188,6 +189,7 @@ fun MainTvScreen(
                                 OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
                                 TopHeaderBar(
                                     channelCount = filtered.size,
+                                    isLoading = uiState.isLoading,
                                     onOpenImport = { showImportDialog = true },
                                     onRefresh = onRetryClick,
                                     onOpenSettings = onOpenSettings
@@ -244,6 +246,7 @@ fun MainTvScreen(
                             OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
                             TopHeaderBar(
                                 channelCount = filtered.size,
+                                isLoading = uiState.isLoading,
                                 onOpenImport = { showImportDialog = true },
                                 onRefresh = onRetryClick,
                                 onOpenSettings = onOpenSettings

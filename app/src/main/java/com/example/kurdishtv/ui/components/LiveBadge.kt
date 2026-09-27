@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,7 +43,7 @@ fun LiveBadge(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .size(7.dp)
                     .scale(pulseScale)
-                    .background(colors.liveRed, CircleShape)
+                    .background(colors.liveRed, M3ExpressiveShapes.Sunny)
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(
