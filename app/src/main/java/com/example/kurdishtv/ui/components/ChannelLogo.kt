@@ -75,12 +75,11 @@ fun ChannelLogo(
     val colors = LocalAppColors.current
     val loader = remember(context) { LogoLoader.get(context) }
 
-    val request = remember(logoUrl, showLogos, loader) {
+    val request = remember(logoUrl, showLogos) {
         if (!showLogos) null
         else logoUrl?.takeIf { it.isNotBlank() }?.let { url ->
             ImageRequest.Builder(context)
                 .data(url)
-                .imageLoader(loader)
                 .crossfade(true)
                 .build()
         }
@@ -110,6 +109,7 @@ fun ChannelLogo(
             contentDescription = channelName,
             contentScale = ContentScale.Fit,
             modifier = modifier.fillMaxSize().padding(contentPadding),
+            imageLoader = loader,
             loading = { fallback() },
             error = { fallback() }
         )
