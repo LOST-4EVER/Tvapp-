@@ -30,9 +30,18 @@ val AmoledSurfaceElevated = Color(0xFF1D1D24)
 val AmoledCardBorder = Color(0xFF26262E)
 
 // ── Text ──────────────────────────────────────────────────────────────────────
+// Contrast measured against the lightest surface these sit on (DarkSurfaceElevated,
+// #262C3E), which is where the app draws its highest-contrast cards. Tertiary text
+// is used for hints, placeholders and inactive segment labels, so it has to clear
+// the WCAG AA 4.5:1 body-text threshold rather than the 3:1 large-text one.
 val TextPrimary = Color(0xFFF8F9FA)
 val TextSecondary = Color(0xFFA2A9B8)
-val TextTertiary = Color(0xFF6B7280)
+
+// Was #6B7280, which measured 2.87:1 on DarkSurfaceElevated — below even the 3:1
+// large-text minimum, so hints and placeholders were effectively unreadable on the
+// surfaces the app uses most. #8D94A2 measures 4.56:1 on the worst surface and
+// 5.25:1 or better everywhere else.
+val TextTertiary = Color(0xFF8D94A2)
 
 // ── Overlays / status ─────────────────────────────────────────────────────────
 val GlassOverlay = Color(0xB313151F)
