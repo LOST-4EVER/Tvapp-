@@ -38,7 +38,12 @@ fun TopHeaderBar(
     onOpenImport: () -> Unit,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Squeeze the row for a short window — a phone on its side, where every dp of
+     * vertical space the header takes is a dp of grid that is not on show.
+     */
+    compact: Boolean = false
 ) {
     val colors = LocalAppColors.current
 
@@ -73,17 +78,32 @@ fun TopHeaderBar(
         val titleMaxWidth = if (isNarrow) 132.dp else 220.dp
         val gutter = if (isNarrow) 12.dp else 20.dp
         val logoSize = if (isNarrow) 40.dp else 46.dp
+        val verticalPadding = if (compact) 8.dp else 14.dp
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = gutter, vertical = 14.dp),
+                .padding(horizontal = gutter, vertical = verticalPadding),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // `weight(1f)` and not `weight(1f, fill = false)`.
+            //
+            // With `fill = false` the left cluster is laid out at whatever width it
+            // asks for and `SpaceBetween` absorbs the difference — but when the
+            // cluster's own width plus the three 40dp action buttons plus the gutters
+            // exceeds the row, the row does not shrink the cluster, it overflows, and
+            // the overflow goes off the *left* edge because the cluster is first. The
+            // brand tile is the leading child, so the brand tile is what got pushed
+            // half off the screen on a narrow phone.
+            //
+            // Filling the weight pins the cluster to exactly the space the action
+            // buttons leave, and the title column below takes the slack and
+            // ellipsizes, so the one thing that must stay fully visible — the brand
+            // tile and the three actions — always is.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f, fill = false)
+                modifier = Modifier.weight(1f)
             ) {
                 // The brand tile is the one place a bold shape still reads correctly:
                 // a rounded square, matching the logo tiles in the grid below it, so
@@ -114,7 +134,7 @@ fun TopHeaderBar(
 
                 Spacer(modifier = Modifier.width(if (isNarrow) 8.dp else 12.dp))
 
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Kurdish TV Live",
                         color = colors.textPrimary,

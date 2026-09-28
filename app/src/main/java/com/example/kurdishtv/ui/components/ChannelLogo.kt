@@ -104,12 +104,26 @@ fun ChannelLogo(
         }
     }
 
+    // The monogram tile deliberately does NOT take the caller's [modifier].
+    //
+    // It used to, and that was a layout bug rather than a cosmetic one: the same
+    // lambda is invoked from three different places — as this composable's own
+    // output when there is no image, and from inside `SubcomposeAsyncImage`'s
+    // `loading` and `error` slots — and the slots are composed in a *subcomposition*
+    // whose constraints are the ones Coil hands the `SubcomposeAsyncImage` node,
+    // not the ones the caller handed this function. Re-applying a caller modifier
+    // that says `fillMaxSize` inside that subcomposition means measuring a fill
+    // against a box that is itself the fill, which is how a tile ended up escaping
+    // the rounded logo well it was supposed to be sitting inside.
+    //
+    // Filling the space it is actually given is the only thing a fallback can
+    // honestly do, and the well that owns the clip already clips it.
     val fallback: @Composable () -> Unit = {
         // Derived from the channel name, so the same channel keeps the same colour
         // across refreshes, reorderings and devices.
         val accent = remember(channelName) { monogramAccent(channelName) }
         Box(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.linearGradient(
@@ -130,7 +144,9 @@ fun ChannelLogo(
     }
 
     if (request == null) {
-        fallback()
+        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            fallback()
+        }
     } else {
         SubcomposeAsyncImage(
             model = request,
