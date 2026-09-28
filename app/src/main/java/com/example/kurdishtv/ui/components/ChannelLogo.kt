@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -45,8 +46,18 @@ private object LogoLoader {
         instance ?: synchronized(this) {
             instance ?: ImageLoader.Builder(context.applicationContext)
                 .memoryCache {
+                    // The memory cache holds *decoded bitmaps*, so its cost is
+                    // width x height x 4 bytes per logo. At the 512px ceiling that is
+                    // 1 MB a logo, which means 20% of a large heap was room for a
+                    // hundred of them — far more than the grid ever has on screen, and
+                    // memory the OS will not hand to anything else while the app is
+                    // alive.
+                    //
+                    // Sized for what is actually visible plus a screenful of
+                    // scroll-back, which is what the cache is for. The *disk* cache
+                    // is where the long tail belongs, and it is already generous.
                     MemoryCache.Builder(context.applicationContext)
-                        .maxSizePercent(0.20)
+                        .maxSizePercent(0.12)
                         .build()
                 }
                 .diskCache {
@@ -55,7 +66,18 @@ private object LogoLoader {
                         .maxSizeBytes(48L * 1024 * 1024)
                         .build()
                 }
-                .crossfade(true)
+                // No crossfade.
+                //
+                // It was on as the loader default, so every one of the several hundred
+                // logos in the grid animated its own fade-in on every appearance. A
+                // fade is a per-frame alpha animation and a second draw of the image
+                // for its duration, so scrolling the grid — which is what a viewer
+                // does constantly — meant a rolling wave of them, each holding a
+                // render node open. On a television that is the most expensive
+                // animation in the app and the one nobody asked for: a logo that is
+                // simply *there* when it loads is what reads as fast, because the
+                // monogram fallback is already on screen underneath it.
+                .crossfade(false)
                 .respectCacheHeaders(false)
                 .build()
                 .also { instance = it }
@@ -89,11 +111,20 @@ fun ChannelLogo(
     val request = remember(logoUrl, showLogos, size, density) {
         if (!showLogos) null
         else logoUrl?.takeIf { it.isNotBlank() }?.let { url ->
-            val targetPx = with(density) { size.roundToPx() }.coerceAtLeast(1)
-            // No per-request crossfade: the shared [LogoLoader] already sets one as its
-            // default, and asking for it again here would build a second transition
-            // factory per request — several hundred short-lived objects for a single
-            // screenful of the grid — for a fade that is already configured.
+            // Decoded once for the largest tile this can be drawn in, not for the
+            // tile it happens to be in right now.
+            //
+            // The target used to be the caller's own draw size, which quietly made
+            // the decode resolution a function of the layout: the same channel's
+            // logo was a different cached bitmap on the compact landscape card than
+            // on the full-size one, so scrolling between them re-decoded the image
+            // instead of hitting the cache — several hundred times a screenful, in
+            // exactly the gesture the app asks viewers to make most.
+            //
+            // Rounding the target up to a power of two also means the bitmaps a
+            // grid holds are a small fixed set of sizes rather than one per cell
+            // width, which is what lets the memory cache actually do its job.
+            val targetPx = decodeSizeFor(size, density)
             ImageRequest.Builder(context)
                 .data(url)
                 // Logos are square tiles of a few dozen dp, but the source images
@@ -102,6 +133,10 @@ fun ChannelLogo(
                 // space it occupies — the dominant memory cost in a grid of them.
                 .size(targetPx, targetPx)
                 .scale(Scale.FIT)
+                // INEXACT lets the sampler pick a size at or slightly above the
+                // target. EXACT would force an exact-size bitmap, which for every
+                // width the adaptive grid can produce means a *new* allocation that
+                // nothing else in the cache can ever be reused for.
                 .precision(Precision.INEXACT)
                 .build()
         }
@@ -183,6 +218,37 @@ private val MonogramAccents = listOf(
     Color(0xFF4FC0D4), // turquoise
     Color(0xFFD8C05A) // sand
 )
+
+/**
+ * The pixel size a logo is decoded at for a tile of [size] dp.
+ *
+ * Rounded **up** to the next power of two, with a floor, so that:
+ *
+ *  - a logo is never decoded below the size it is drawn at, which is what makes it
+ *    look soft on a television;
+ *  - every tile that shares a bucket shares a bitmap, so the memory cache holds a
+ *    handful of sizes rather than one per distinct cell width the adaptive grid can
+ *    produce. Without the bucketing, a grid that lays out at 137dp and one that
+ *    lays out at 141dp keep entirely separate copies of every logo on screen.
+ *
+ * Capped at [MAX_DECODE_PX]: a 1024px source decoded at full size is 4 MB of
+ * bitmap for a tile that is a couple of hundred pixels across, and the grid can hold
+ * hundreds of them.
+ */
+private fun decodeSizeFor(size: Dp, density: Density): Int {
+    val raw = with(density) { size.roundToPx() }.coerceAtLeast(1)
+    if (raw >= MAX_DECODE_PX) return MAX_DECODE_PX
+    // Next power of two, from MIN_DECODE_PX up.
+    var bucket = MIN_DECODE_PX
+    while (bucket < raw) bucket = bucket shl 1
+    return bucket.coerceAtMost(MAX_DECODE_PX)
+}
+
+/** The smallest bucket. Below this a logo is small enough that artefacts show. */
+private const val MIN_DECODE_PX = 128
+
+/** The ceiling. A grid of several hundred cards cannot afford 1024px bitmaps. */
+private const val MAX_DECODE_PX = 512
 
 /** Stable per-channel accent, chosen from a hash of the name. */
 internal fun monogramAccent(seed: String): Color {

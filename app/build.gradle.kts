@@ -105,6 +105,11 @@ android {
     resources {
       excludes += "/META-INF/{AL2.0,LGPL2.1}"
       excludes += "/META-INF/*.version"
+      // Debug metadata that the Kotlin and AGP toolchains leave in the merged
+      // manifest's directory, and which no part of this app reads. Small, but it
+      // is free and it is pure noise in an APK.
+      excludes += "/META-INF/*.kotlin_module"
+      excludes += "/META-INF/*.kotlin_builtins"
     }
   }
   compileOptions {
@@ -146,7 +151,10 @@ dependencies {
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)
   // implementation(libs.androidx.camera.view)
-  implementation(libs.androidx.compose.material.icons.core)
+  // `material.icons.core` was on the runtime classpath and never imported. Every
+  // glyph in this app is a hand-written vector drawable under res/drawable (see
+  // SvgIcon), so the whole icons artifact was dead weight in the APK.
+  // implementation(libs.androidx.compose.material.icons.core)
   // implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.ui)
@@ -173,7 +181,10 @@ dependencies {
   // implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation(libs.logging.interceptor)
+  // `logging.interceptor` was declared but never applied: no `HttpLoggingInterceptor`
+  // is constructed anywhere in the app. It pulled okhttp's logging artifact into
+  // every build for nothing.
+  // implementation(libs.logging.interceptor)
   // implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
   // implementation(libs.retrofit)

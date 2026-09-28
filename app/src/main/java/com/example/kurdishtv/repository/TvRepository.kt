@@ -164,7 +164,14 @@ class TvRepository(
                 channel.copy(isFavorite = isFav)
             }
 
-            // Persist to disk cache asynchronously
+            // Persisted to the on-disk cache, still on `Dispatchers.IO` so the
+            // serialise-and-write is off the main thread.
+            //
+            // Deliberately *not* fired at a detached coroutine: the obvious version
+            // of this — `scope.launch { save }` built from the current context — is
+            // cancelled the instant `withContext` returns, because the Job in
+            // `currentCoroutineContext()` there is the `withContext` block's own.
+            // The write has to finish inside this block, or be given a real owner.
             channelCacheStorage.saveChannels(channelsWithFavs)
 
             Result.success(channelsWithFavs)
