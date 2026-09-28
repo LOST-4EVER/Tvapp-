@@ -22,9 +22,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -32,8 +35,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
-import com.example.kurdishtv.ui.motion.tvFocusable
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
+import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import com.example.kurdishtv.ui.motion.rememberMorphingPolygon
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -47,18 +55,41 @@ fun FeaturedHeroCard(
 ) {
     val colors = LocalAppColors.current
     val accent = monogramAccent(channel.name)
+    var isFocused by remember(channel.id) { mutableStateOf(false) }
+
+    // The hero's corners open up when it takes focus, and its logo tile — which holds
+    // an image and no text — becomes properly expressive. The silhouette of the card
+    // itself stays on the corner scale, because it carries the channel's name.
+    val heroShape = rememberMorphingCorners(
+        rest = M3ExpressiveShapes.Corners.extraLarge,
+        active = M3ExpressiveShapes.Corners.extraLarge.copy(
+            topStart = 42.dp, topEnd = 22.dp, bottomEnd = 42.dp, bottomStart = 22.dp
+        ),
+        isActive = isFocused,
+        spec = ExpressiveMotion.spatialDefault
+    )
+    val logoShape = rememberMorphingPolygon(
+        rest = ShapeMorph.logoRest,
+        active = ShapeMorph.logoActive,
+        isActive = isFocused,
+        spec = ExpressiveMotion.spatialDefault,
+        rotationWhileActive = 30f
+    )
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(M3ExpressiveShapes.ExtraLargeRounded)
-            .bouncyClickable(scaleDown = 0.97f) { onWatchClick(channel) }
-            .tvFocusable(
+            .bouncyClickable(scaleDown = 0.97f, focusable = false) { onWatchClick(channel) }
+            .expressiveFocusRing(
                 ringColor = colors.primary,
-                shape = M3ExpressiveShapes.ExtraLargeRounded
+                restShape = M3ExpressivePolygons.Square,
+                ringShape = M3ExpressivePolygons.SoftBurst,
+                focusScale = 1.02f,
+                ringWidth = 3.dp,
+                onFocusChanged = { isFocused = it }
             )
-            .border(1.dp, colors.border, M3ExpressiveShapes.ExtraLargeRounded),
-        shape = M3ExpressiveShapes.ExtraLargeRounded,
+            .border(1.dp, colors.border, heroShape),
+        shape = heroShape,
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -75,7 +106,7 @@ fun FeaturedHeroCard(
                             Color.Transparent
                         )
                     ),
-                    M3ExpressiveShapes.ExtraLargeRounded
+                    heroShape
                 )
                 .padding(18.dp)
         ) {
@@ -116,11 +147,11 @@ fun FeaturedHeroCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        shape = M3ExpressiveShapes.MediumCard,
+                        shape = logoShape,
                         color = colors.surfaceElevated,
                         modifier = Modifier
                             .size(76.dp)
-                            .border(1.dp, colors.border, M3ExpressiveShapes.MediumCard)
+                            .border(1.dp, colors.border, logoShape)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             ChannelLogo(

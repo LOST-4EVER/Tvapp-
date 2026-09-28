@@ -59,6 +59,16 @@ object ApkInstaller {
         return a.size == b.size && a.contentEquals(b)
     }
 
+    /**
+     * Reads a package's signing info, or null when it cannot be read.
+     *
+     * Catches [Exception] rather than only `NameNotFoundException` on purpose. The
+     * archive path can fail in several other ways on a real device — an OEM package
+     * manager throwing on a malformed APK, a SecurityException from a restricted
+     * profile — and this runs while the user is tapping Install. Letting any of
+     * those escape took the whole app down instead of falling through to the
+     * "cannot tell, so let Android decide" behaviour every other failure uses.
+     */
     @Suppress("DEPRECATION")
     private fun signingInfo(context: Context, source: String): PackageInfo? = try {
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -71,7 +81,8 @@ object ApkInstaller {
         } else {
             context.packageManager.getPackageArchiveInfo(source, flags)
         }
-    } catch (e: PackageManager.NameNotFoundException) {
+    } catch (e: Exception) {
+        Log.w(TAG, "signingInfo: could not read signing info for $source", e)
         null
     }
 

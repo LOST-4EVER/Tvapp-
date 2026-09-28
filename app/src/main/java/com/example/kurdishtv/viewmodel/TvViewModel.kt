@@ -155,13 +155,22 @@ class TvViewModel(
                         category = state.selectedCategory,
                         query = state.searchQuery
                     )
+                    // The previously selected channel can vanish between refreshes —
+                    // a source going down, or a playlist being edited. Keeping the old
+                    // reference would leave the side player and the transport
+                    // controls pointing at something that is no longer in the list,
+                    // and `selectNextChannel` would jump to the first entry instead of
+                    // continuing from where the user was.
+                    val selected = state.selectedChannel
+                        ?.takeIf { current -> list.any { it.id == current.id } }
+                        ?: list.firstOrNull()
                     state.copy(
                         isLoading = false,
                         channels = list,
                         filteredChannels = filtered,
                         recentChannels = recents,
                         customPlaylistUrls = customUrls,
-                        selectedChannel = state.selectedChannel ?: list.firstOrNull()
+                        selectedChannel = selected
                     )
                 }
             } catch (e: Exception) {
@@ -239,13 +248,16 @@ class TvViewModel(
                     repository.getRecentChannelIds()
                 }.getOrNull()
             } ?: return@launch
-            val channels = _uiState.value.channels
-            val byId = channels.associateBy { it.id }
+            // Deliberately does **not** write `selectedChannel` back.
+            //
+            // This block finishes some time after the selection was made, and on a
+            // cold cache the write can take long enough for the user to have tapped
+            // another channel in the meantime. Re-asserting the old value here used
+            // to snap the selection back to the channel they had already moved on
+            // from. The recents row is the only thing this coroutine owns.
+            val byId = _uiState.value.channels.associateBy { it.id }
             _uiState.update { state ->
-                state.copy(
-                    selectedChannel = channel,
-                    recentChannels = recents.mapNotNull { id -> byId[id] }
-                )
+                state.copy(recentChannels = recents.mapNotNull { id -> byId[id] })
             }
         }
     }
@@ -285,7 +297,17 @@ class TvViewModel(
 
     fun clearFavorites() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { runCatching { repository.clearFavorites() } }
+            // The write decides the message. Reporting "Favorites cleared" after a
+            // failed write was the worst version of this: the hearts vanished from
+            // the grid, the confirmation appeared, and the favourites were still
+            // there after a restart.
+            val cleared = withContext(Dispatchers.IO) {
+                runCatching { repository.clearFavorites() }.getOrDefault(false)
+            }
+            if (!cleared) {
+                _uiState.update { it.copy(actionMessage = "Could not clear favourites") }
+                return@launch
+            }
             _uiState.update { state ->
                 val updatedChannels = state.channels.map { it.copy(isFavorite = false) }
                 val filtered = ChannelFilterEngine.filter(
@@ -306,16 +328,27 @@ class TvViewModel(
 
     fun clearRecents() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { runCatching { repository.clearRecents() } }
+            val cleared = withContext(Dispatchers.IO) {
+                runCatching { repository.clearRecents() }.getOrDefault(false)
+            }
             _uiState.update { state ->
-                state.copy(recentChannels = emptyList(), actionMessage = "Watch history cleared")
+                state.copy(
+                    recentChannels = if (cleared) emptyList() else state.recentChannels,
+                    actionMessage = if (cleared) "Watch history cleared" else "Could not clear watch history"
+                )
             }
         }
     }
 
     fun clearCustomPlaylists() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { runCatching { repository.clearCustomPlaylists() } }
+            val cleared = withContext(Dispatchers.IO) {
+                runCatching { repository.clearCustomPlaylists() }.getOrDefault(false)
+            }
+            if (!cleared) {
+                _uiState.update { it.copy(actionMessage = "Could not remove custom playlists") }
+                return@launch
+            }
             _uiState.update { state ->
                 state.copy(customPlaylistUrls = emptySet(), actionMessage = "Custom playlists removed")
             }
@@ -325,8 +358,14 @@ class TvViewModel(
 
     fun clearChannelCache() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { runCatching { repository.clearChannelCache() } }
-            _uiState.update { state -> state.copy(actionMessage = "Channel cache cleared") }
+            val cleared = withContext(Dispatchers.IO) {
+                runCatching { repository.clearChannelCache() }.getOrDefault(false)
+            }
+            _uiState.update { state ->
+                state.copy(
+                    actionMessage = if (cleared) "Channel cache cleared" else "Could not clear the channel cache"
+                )
+            }
         }
     }
 
@@ -389,22 +428,27 @@ class TvViewModel(
 
     fun selectNextChannel() {
         val list = _uiState.value.filteredChannels.ifEmpty { _uiState.value.channels }
-        val current = _uiState.value.selectedChannel ?: return
-        val idx = list.indexOfFirst { it.id == current.id }
+        if (list.isEmpty()) return
+        // With nothing selected yet there is no "current" to step from, so start at
+        // the top of the list rather than doing nothing. Before this, the first
+        // press of the right-arrow key after a cold start appeared to be ignored.
+        val current = _uiState.value.selectedChannel
+        val idx = current?.let { c -> list.indexOfFirst { it.id == c.id } } ?: -1
         if (idx != -1 && idx < list.size - 1) {
             onChannelSelected(list[idx + 1])
-        } else if (list.isNotEmpty()) {
+        } else {
             onChannelSelected(list.first())
         }
     }
 
     fun selectPreviousChannel() {
         val list = _uiState.value.filteredChannels.ifEmpty { _uiState.value.channels }
-        val current = _uiState.value.selectedChannel ?: return
-        val idx = list.indexOfFirst { it.id == current.id }
+        if (list.isEmpty()) return
+        val current = _uiState.value.selectedChannel
+        val idx = current?.let { c -> list.indexOfFirst { it.id == c.id } } ?: -1
         if (idx > 0) {
             onChannelSelected(list[idx - 1])
-        } else if (list.isNotEmpty()) {
+        } else {
             onChannelSelected(list.last())
         }
     }
@@ -469,12 +513,18 @@ class TvViewModel(
     /**
      * Opens the system installer for a downloaded APK.
      *
-     * Returns false when the install could not be started. Each failure gets its
-     * own message because the fix is different in every case: a missing file needs
-     * a re-download, an ungranted "allow from this source" needs the settings
-     * screen, and a changed signing key needs an uninstall.
+     * Suspends, because it is not a cheap call: comparing signing certificates
+     * parses the downloaded archive's manifest and certificate block, which on a
+     * multi-megabyte APK is real disk I/O and crypto. It used to run synchronously
+     * from the Install button's click handler, putting all of that on the main
+     * thread for exactly as long as it takes.
+     *
+     * Returns false when the install could not be started. Each failure gets its own
+     * message because the fix is different in every case: a missing file needs a
+     * re-download, an ungranted "allow from this source" needs the settings screen,
+     * and a changed signing key needs an uninstall.
      */
-    fun installUpdate(update: AppUpdate, filePath: String): Boolean {
+    suspend fun installUpdate(update: AppUpdate, filePath: String): Boolean {
         val context = appContext ?: return false
         val file = File(filePath)
         if (!file.exists()) {
@@ -487,7 +537,10 @@ class TvViewModel(
             )
             return false
         }
-        if (!ApkInstaller.isSignedBySameCertificate(context, file)) {
+        val sameSignature = withContext(Dispatchers.IO) {
+            ApkInstaller.isSignedBySameCertificate(context, file)
+        }
+        if (!sameSignature) {
             // Android reports this only from inside its own installer, as
             // "package conflicts with an existing package", which reads like a
             // corrupt download. It is actually a different signing key, which
@@ -506,6 +559,23 @@ class TvViewModel(
                 UpdateState.Failed("This device could not start the package installer")
         }
         return started
+    }
+
+    /**
+     * Non-suspend entry point for the Install button.
+     *
+     * Only the "allow from this source" case can be fixed by sending the user to
+     * settings. Every other failure (missing file, changed signing key, no
+     * installer) is already reported in the update card, and bouncing the user
+     * into a settings screen that cannot help is worse than saying what went
+     * wrong.
+     */
+    fun requestInstallUpdate(update: AppUpdate, filePath: String) {
+        viewModelScope.launch {
+            if (!installUpdate(update, filePath) && needsInstallPermission()) {
+                openInstallPermissionSettings()
+            }
+        }
     }
 
     /** True when the app still needs permission to install packages. */

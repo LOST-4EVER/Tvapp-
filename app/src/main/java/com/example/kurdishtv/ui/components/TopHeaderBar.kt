@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,7 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.bouncyClickable
-import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
+import com.example.kurdishtv.ui.motion.rememberMorphingPolygon
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -43,8 +45,19 @@ fun TopHeaderBar(
     // alive without needing a blocking spinner over the grid.
     val logoScale by animateFloatAsState(
         targetValue = if (isLoading) 1.06f else 1f,
-        animationSpec = ExpressiveMotion.spatialMedium,
+        animationSpec = ExpressiveMotion.spatialDefault,
         label = "HeaderLogoScale"
+    )
+
+    // The brand tile only ever holds a glyph, so unlike the surfaces below it this is
+    // allowed to be a lobed shape — and a rounded square is the correct resting state
+    // because it matches the logo tiles in the grid the user is about to look at.
+    val brandShape = rememberMorphingPolygon(
+        rest = M3ExpressivePolygons.Square,
+        active = M3ExpressivePolygons.VerySunny,
+        isActive = isLoading,
+        spec = ExpressiveMotion.spatialDefault,
+        rotationWhileActive = 30f
     )
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
@@ -69,12 +82,15 @@ fun TopHeaderBar(
             ) {
                 // The brand tile is the one place a bold shape still reads correctly:
                 // a rounded square, matching the logo tiles in the grid below it, so
-                // the header and the content share a geometry.
+                // the header and the content share a geometry. While a refresh is in
+                // flight it opens into a very-sunny shape and breathes, so the header
+                // says "working" without a blocking spinner over the grid.
                 Surface(
-                    shape = M3ExpressiveShapes.MediumCard,
+                    shape = brandShape,
                     color = colors.primary,
                     modifier = Modifier
                         .size(logoSize)
+                        .border(1.dp, colors.primary.copy(alpha = 0.5f), brandShape)
                         .graphicsLayer {
                             scaleX = logoScale
                             scaleY = logoScale
@@ -104,10 +120,10 @@ fun TopHeaderBar(
                         modifier = Modifier.widthIn(max = titleMaxWidth)
                     )
                     Text(
-                        text = if (isNarrow) {
-                            "$channelCount channels"
-                        } else {
-                            "$channelCount channels • تەلەفزیۆنی کوردی"
+                        text = buildString {
+                            append(channelCount)
+                            append(if (channelCount == 1) " channel" else " channels")
+                            if (!isNarrow) append(" • تەلەفزیۆنی کوردی")
                         },
                         color = colors.textSecondary,
                         fontSize = 12.sp,
@@ -142,7 +158,7 @@ fun TopHeaderBar(
                     style = AppIconButtonStyle.Tonal
                 )
                 if (isLoading) {
-                    BouncingLoader(size = 26.dp, dotCount = 5)
+                    BouncingLoader(size = 26.dp)
                 }
             }
         }

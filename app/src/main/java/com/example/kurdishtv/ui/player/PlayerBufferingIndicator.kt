@@ -25,6 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.components.BouncingLoader
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.rememberMorphingCorners
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -44,19 +46,35 @@ fun PlayerBufferingIndicator(
         label = "pulseScale"
     )
 
+    // The panel breathes in silhouette as well as in size. Shape is a state channel
+    // in Expressive, and a buffering notice that changes outline reads as *alive*
+    // where one that merely pulses reads as a blinking light. It stays on the corner
+    // scale, because the panel carries two lines of text.
+    val panelShape = rememberMorphingCorners(
+        rest = M3ExpressiveShapes.Corners.extraLarge,
+        active = M3ExpressiveShapes.Corners.extraLarge.copy(
+            topStart = 44.dp,
+            topEnd = 44.dp,
+            bottomEnd = 22.dp,
+            bottomStart = 22.dp
+        ),
+        isActive = pulseScale > 1f,
+        spec = ExpressiveMotion.spatialDefault
+    )
+
     Surface(
-        shape = M3ExpressiveShapes.ExtraLargeRounded,
+        shape = panelShape,
         color = colors.surface.copy(alpha = 0.90f),
         modifier = modifier
             .scale(pulseScale)
-            .border(1.dp, colors.border, M3ExpressiveShapes.ExtraLargeRounded)
+            .border(1.dp, colors.border, panelShape)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            BouncingLoader(size = 22.dp, dotCount = 5)
+            BouncingLoader(size = 22.dp)
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(

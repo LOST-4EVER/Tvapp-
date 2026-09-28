@@ -16,17 +16,23 @@ class CustomPlaylistStorage(context: Context) {
         }
     }
 
+    /**
+     * Adds a playlist link and reports whether it is now stored.
+     *
+     * `commit()` rather than `apply()`, and the result follows the write: a link that
+     * failed to save must not be reported as added, or the UI shows a playlist the
+     * next launch will never fetch.
+     */
     fun addCustomPlaylistUrl(url: String): Boolean {
         val cleanUrl = normalize(url) ?: return false
         val current = getCustomPlaylistUrls().toMutableSet()
         if (current.size >= MAX_PLAYLISTS) return false
-        val added = current.add(cleanUrl)
-        if (added) {
-            try {
-                prefs.edit().putStringSet(KEY_CUSTOM_URLS, current).apply()
-            } catch (_: Exception) {}
+        if (!current.add(cleanUrl)) return false
+        return try {
+            prefs.edit().putStringSet(KEY_CUSTOM_URLS, current).commit()
+        } catch (_: Exception) {
+            false
         }
-        return added
     }
 
     /**
@@ -46,22 +52,23 @@ class CustomPlaylistStorage(context: Context) {
         return parsed.toString()
     }
 
+    /** Removes a playlist link, reporting whether it is no longer stored. */
     fun removeCustomPlaylistUrl(url: String): Boolean {
         val cleanUrl = normalize(url) ?: url.trim()
         val current = getCustomPlaylistUrls().toMutableSet()
-        val removed = current.remove(cleanUrl)
-        if (removed) {
-            try {
-                prefs.edit().putStringSet(KEY_CUSTOM_URLS, current).apply()
-            } catch (_: Exception) {}
+        if (!current.remove(cleanUrl)) return false
+        return try {
+            prefs.edit().putStringSet(KEY_CUSTOM_URLS, current).commit()
+        } catch (_: Exception) {
+            false
         }
-        return removed
     }
 
-    fun clear() {
-        try {
-            prefs.edit().remove(KEY_CUSTOM_URLS).apply()
-        } catch (_: Exception) {}
+    /** Removes every custom playlist. Returns whether the write actually landed. */
+    fun clear(): Boolean = try {
+        prefs.edit().remove(KEY_CUSTOM_URLS).commit()
+    } catch (_: Exception) {
+        false
     }
 
     companion object {

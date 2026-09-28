@@ -75,11 +75,21 @@ class UpdateChecker(
             // scale as VERSION_CODE and can be compared directly. Anything else
             // is unverified, so the app stays quiet rather than prompting for an
             // update that may not exist.
-            val verified = fromApi.takeIf { it.versionCode > 0 }
-                ?.takeIf { RUN_NUMBER_IN_BODY.containsMatchIn(it.notes.orEmpty()) }
+            //
+            // The recovered run number replaces [AppUpdate.versionCode] outright
+            // rather than being used only as a yes/no gate. Checking that the body
+            // *mentions* a run number and then comparing whatever versionCode the
+            // parser happened to produce left a hole: when the run number was
+            // present but unparseable, the gate passed and the tag's patch number
+            // was compared against VERSION_CODE anyway.
+            val runNumber = fromApi.notes
+                ?.let { runNumberFrom(it) }
                 ?: return@withContext Result.success(null)
 
-            Result.success(verified.takeIf { it.isNewerThan(currentVersionCode) })
+            Result.success(
+                fromApi.copy(versionCode = runNumber)
+                    .takeIf { it.isNewerThan(currentVersionCode) }
+            )
         }
 
     private fun fetchUpdateFrom(url: String): AppUpdate? {
@@ -115,7 +125,12 @@ class UpdateChecker(
         onProgress: (DownloadState) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         val target = File(downloadDir, APK_FILE_NAME)
-        val partial = File(downloadDir, "$APK_FILE_NAME.part")
+        // Keyed to the build being fetched. A single shared ".part" file meant a
+        // half-finished download of the *previous* release was resumed byte-for-byte
+        // into a different APK, producing a file that was neither version. The size
+        // check catches that most of the time, but not when the two builds happen to
+        // be the same length — and a corrupt APK reaches the installer either way.
+        val partial = File(downloadDir, "$APK_FILE_NAME.${update.versionCode}.part")
         runCatching {
             downloadDir.mkdirs()
             val existing = if (partial.exists()) partial.length() else 0L
@@ -189,11 +204,18 @@ class UpdateChecker(
         }
     }
 
-    /** Removes a previously downloaded APK so the next check starts clean. */
+    /**
+     * Removes previously downloaded APKs and any abandoned partial downloads.
+     *
+     * Partials are matched by prefix rather than by an exact name, because they are
+     * named per build number and there is no way to know which builds were started.
+     */
     fun clearDownloaded(downloadDir: File) {
         runCatching {
             File(downloadDir, APK_FILE_NAME).delete()
-            File(downloadDir, "$APK_FILE_NAME.part").delete()
+            downloadDir.listFiles { file ->
+                file.name.startsWith("$APK_FILE_NAME.") && file.name.endsWith(".part")
+            }?.forEach { it.delete() }
         }
     }
 

@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -74,6 +75,11 @@ fun PlayerScreen(
     val activity = remember(context) { context.findActivity() }
 
     var isUserPlaying by remember(channel.id) { mutableStateOf(autoplay) }
+    // Bumped to force a re-prepare of the same URL. ExoPlayer moves to STATE_IDLE on
+    // a playback error and never retries on its own, so the Retry button used to set
+    // isUserPlaying = true and then nothing happened: the player was already "playing"
+    // as far as it was concerned, just permanently broken. See VideoPlayerView.reloadKey.
+    var retryToken by remember { mutableIntStateOf(0) }
     var isControlsVisible by remember { mutableStateOf(true) }
     var resizeMode by remember { mutableStateOf(ResizeMode.FIT) }
     var isFullscreen by remember { mutableStateOf(true) }
@@ -144,6 +150,7 @@ fun PlayerScreen(
             onPlaybackError = { err -> errorMessage = err },
             colorFilter = colorFilter,
             areControlsVisible = isControlsVisible,
+            reloadKey = retryToken,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -157,10 +164,12 @@ fun PlayerScreen(
             onPlayPauseToggle = { isUserPlaying = !isUserPlaying },
             onNextChannel = {
                 errorMessage = null
+                retryToken = 0
                 onNextChannel()
             },
             onPreviousChannel = {
                 errorMessage = null
+                retryToken = 0
                 onPreviousChannel()
             },
             onFavoriteToggle = { onFavoriteToggle(channel.id) },
@@ -226,6 +235,7 @@ fun PlayerScreen(
                                 onClick = {
                                     errorMessage = null
                                     isUserPlaying = true
+                                    retryToken++
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = colors.primary,
@@ -246,6 +256,7 @@ fun PlayerScreen(
                             OutlinedButton(
                                 onClick = {
                                     errorMessage = null
+                                    retryToken = 0
                                     onNextChannel()
                                 },
                                 shape = M3ExpressiveShapes.Pill

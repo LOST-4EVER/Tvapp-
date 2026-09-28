@@ -12,21 +12,58 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.CategoryFilter
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
+import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import com.example.kurdishtv.ui.motion.rememberMorphingPolygon
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
+/**
+ * The wide-screen navigation rail.
+ *
+ * The rail is the one persistent piece of chrome on a tablet, so its selection state
+ * has to be unmistakable from across a room. Material's own `NavigationRailItem` draws
+ * its indicator as a fixed pill, and a fixed pill is exactly the kind of static signal
+ * that disappears in peripheral vision — so the items here are built directly and the
+ * indicator behind the selected glyph is an Expressive shape that *changes*.
+ *
+ * Selecting a destination turns the pill into a very slightly lobed sun and swings it
+ * a quarter turn on the way. The glyph sits on top of the indicator rather than inside
+ * it, which is what makes an organic silhouette safe here: the icon can never be
+ * pushed off-centre by a bumpy outline, no matter how decorative the shape gets.
+ *
+ * A one-shot spring rather than a permanent rotation is a deliberate choice. A rail
+ * with six destinations would need six continuously running animations to spin them
+ * all, every one of them invalidating a recomposition on each frame. The morph happens
+ * once, on selection, and the focus ring — which is the one element the user is
+ * actually looking for — is where the continuous motion went instead.
+ *
+ * Each item is focusable, so the rail is fully operable by D-pad, and the semantics
+ * are set explicitly to replace what `NavigationRailItem` provided.
+ */
 @Composable
 fun AdaptiveNavigationRail(
     selectedCategory: CategoryFilter,
@@ -47,9 +84,9 @@ fun AdaptiveNavigationRail(
                 modifier = Modifier.padding(top = 16.dp, bottom = 10.dp)
             ) {
                 Surface(
-                    // Rounded square, matching the logo tiles in the grid. The
-                    // 8-lobed Sunny silhouette had no flat area to centre the glyph
-                    // on, so the mark drifted off-centre inside its own tile.
+                    // Rounded square, matching the logo tiles in the grid. The 8-lobed
+                    // Sunny silhouette had no flat area to centre the glyph on, so the
+                    // mark drifted off-centre inside its own tile.
                     shape = M3ExpressiveShapes.MediumCard,
                     color = colors.primary,
                     modifier = Modifier
@@ -103,32 +140,10 @@ fun AdaptiveNavigationRail(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             railCategories.forEach { category ->
-                val isSelected = selectedCategory == category
-                NavigationRailItem(
-                    selected = isSelected,
-                    onClick = { onCategorySelected(category) },
-                    icon = {
-                        SvgIcon(
-                            resId = categoryIcon(category),
-                            contentDescription = category.displayName,
-                            tint = if (isSelected) colors.onPrimary else colors.textSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = category.displayName.split(" ").first(),
-                            fontSize = 10.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    colors = NavigationRailItemDefaults.colors(
-                        indicatorColor = colors.primary,
-                        selectedIconColor = colors.onPrimary,
-                        selectedTextColor = colors.primary,
-                        unselectedIconColor = colors.textSecondary,
-                        unselectedTextColor = colors.textSecondary
-                    )
+                RailCategoryItem(
+                    category = category,
+                    isSelected = selectedCategory == category,
+                    onClick = { onCategorySelected(category) }
                 )
             }
 
@@ -150,15 +165,92 @@ fun AdaptiveNavigationRail(
     }
 }
 
+/** One rail destination: an Expressive indicator, a glyph, and a label. */
+@Composable
+private fun RailCategoryItem(
+    category: CategoryFilter,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = LocalAppColors.current
+    var isFocused by remember(category) { mutableStateOf(false) }
+
+    val indicatorShape: Shape = rememberMorphingPolygon(
+        rest = ShapeMorph.indicatorRest,
+        active = ShapeMorph.indicatorActive,
+        isActive = isSelected,
+        spec = ExpressiveMotion.spatialDefault,
+        // The quarter turn is what stops this reading as a cross-fade between two
+        // outlines: the indicator arrives having turned, not merely changed.
+        rotationWhileActive = 45f
+    )
+    val containerShape = rememberMorphingCorners(
+        rest = M3ExpressiveShapes.Corners.largeCard,
+        active = M3ExpressiveShapes.Corners.cardFocused,
+        isActive = isFocused,
+        spec = ExpressiveMotion.spatialDefault
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(80.dp)
+            .clip(containerShape)
+            .bouncyClickable(scaleDown = 0.92f, focusable = false, onClick = onClick)
+            .expressiveFocusRing(
+                ringColor = colors.primary,
+                restShape = M3ExpressivePolygons.Square,
+                ringShape = M3ExpressivePolygons.Cookie6Sided,
+                focusScale = 1.06f,
+                ringWidth = 2.dp,
+                onFocusChanged = { isFocused = it }
+            )
+            .semantics {
+                role = Role.Tab
+                contentDescription = category.displayName
+            }
+            .padding(vertical = 6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 60.dp, height = 34.dp)
+                .then(
+                    if (isSelected) {
+                        Modifier.background(colors.primary, indicatorShape)
+                    } else {
+                        Modifier
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            SvgIcon(
+                resId = categoryIcon(category),
+                contentDescription = null,
+                tint = if (isSelected) colors.onPrimary else colors.textSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = category.displayName.split(" ").first(),
+            fontSize = 10.sp,
+            color = if (isSelected) colors.primary else colors.textSecondary,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1
+        )
+    }
+}
+
 @Composable
 private fun RailActionButton(
     iconRes: Int,
     description: String,
     onClick: () -> Unit
 ) {
-    // A 12-lobe Burst here rendered as a spiked star: its points overlapped the
-    // rail items above it, and with a gear glyph inside it was impossible to tell
-    // the button from its icon.
+    // A 12-lobe Burst here rendered as a spiked star: its points overlapped the rail
+    // items above it, and with a gear glyph inside it was impossible to tell the button
+    // from its icon. `AppIconButton` keeps its silhouette to a circle and a rounded
+    // square for exactly that reason.
     AppIconButton(
         iconRes = iconRes,
         contentDescription = description,

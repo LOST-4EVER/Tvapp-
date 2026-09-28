@@ -32,8 +32,12 @@ class RecentStorage(context: Context) {
                 }.take(MAX_RECENTS)
             } else {
                 val legacy = raw.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                if (legacy.isNotEmpty()) save(legacy)
-                legacy.take(MAX_RECENTS)
+                // Rewrite in the JSON format, already truncated. Migrating the
+                // untruncated list meant the very next read had to throw entries
+                // away again, and the on-disk value never matched what was read.
+                val trimmed = legacy.take(MAX_RECENTS)
+                if (trimmed.isNotEmpty()) save(trimmed)
+                trimmed
             }
         } catch (_: Exception) {
             emptyList()
@@ -58,10 +62,11 @@ class RecentStorage(context: Context) {
         } catch (_: Exception) {}
     }
 
-    fun clearRecents() {
-        try {
-            prefs.edit().remove(KEY_RECENTS).apply()
-        } catch (_: Exception) {}
+    /** Removes the watch history. Returns whether the write actually landed. */
+    fun clearRecents(): Boolean = try {
+        prefs.edit().remove(KEY_RECENTS).commit()
+    } catch (_: Exception) {
+        false
     }
 
     companion object {

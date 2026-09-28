@@ -1,9 +1,9 @@
 package com.example.kurdishtv.ui.components
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -21,120 +21,124 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.LocalReduceMotion
+import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import com.example.kurdishtv.ui.theme.ExpressiveMorph
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
+import com.example.kurdishtv.ui.theme.fittedPath
 import com.example.ui.theme.LocalAppColors
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.min
-import kotlin.math.sin
-
-/** Resolves a [Shape] into a drawable [Path] at a given size. */
-private fun Shape.toPath(size: Size, layoutDirection: LayoutDirection, density: Density): Path =
-    when (val outline = createOutline(size, layoutDirection, density)) {
-        is Outline.Generic -> outline.path
-        is Outline.Rounded -> Path().apply { addRoundRect(outline.roundRect) }
-        is Outline.Rectangle -> Path().apply { addRect(outline.rect) }
-    }
 
 /**
  * Material 3 Expressive loading indicator.
  *
- * Compose Material3 only ships the Expressive `LoadingIndicator` from 1.4.0, and
- * this project is on BOM 2024.09.00 (1.3.0), so the indicator is drawn directly:
- * dots travel a closed loop while morphing between expressive shapes, which is
- * what gives M3 its "stretch and settle" character instead of a mechanical spin.
+ * Material's own answer to "what should a loading state look like" is not a spinner.
+ * It is a single shape that walks continuously through a seven-shape sequence, turning
+ * as it goes, so the wait is filled with something worth watching rather than with a
+ * rotating line. Google calls it a *looping shape morph sequence composed of seven
+ * unique Material 3 shapes*, and the shapes are the ones in
+ * [M3ExpressivePolygons.LoadingSequence].
  *
- * One infinite transition drives every dot, so animation cost does not grow with
- * the dot count. Under reduced motion the dots hold still and keep their opacity
- * ramp, so nothing jumps.
+ * Compose Material3 only ships that component from 1.4.0 and this project is on BOM
+ * 2024.09.00, so it is drawn directly here. What made it possible to reproduce
+ * faithfully rather than approximate is that a morph is just an outline: the indicator
+ * is one polygon at any instant, and the animation is the fraction between two of them.
+ *
+ * This is also the one place in the app where a fully expressive silhouette is
+ * unambiguously correct — the shape carries no glyph, no label and no touch target,
+ * which is exactly the condition under which the lobed family is allowed.
+ *
+ * Under reduced motion the walk stops on a single shape and the turn stops with it.
+ * Nothing jumps, and the indicator is still unmistakably a loading state.
  */
 @Composable
 fun BouncingLoader(
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
-    dotCount: Int = 7,
     color: Color = LocalAppColors.current.primary
 ) {
     val reduceMotion = LocalReduceMotion.current
-    val transition = rememberInfiniteTransition(label = "BouncingLoader")
-    val shapes = remember { expressiveShapeSequence() }
+    val sequence = M3ExpressivePolygons.LoadingSequence
 
-    // 0→1 sweep around the loop. The keyframes hold at the end so each lap eases
-    // out rather than restarting abruptly.
-    val sweep by transition.animateFloat(
+    // The morphs are built once, not per frame. Lining two vertex rings up against
+    // each other is the expensive half, and the pairs never change.
+    val morphs = remember(sequence) {
+        sequence.indices.map { i ->
+            ExpressiveMorph.between(sequence[i], sequence[(i + 1) % sequence.size])
+        }
+    }
+
+    val transition = rememberInfiniteTransition(label = "M3LoadingIndicator")
+    // The two animated values are held as State and read *inside* the draw lambda
+    // rather than being delegated at the top level. Reading them during composition
+    // would recompose this composable on every frame of a seven-second loop; reading
+    // them during draw only re-runs the draw pass, which is what an indicator needs.
+    val walk = transition.animateFloat(
         initialValue = 0f,
-        targetValue = 1f,
+        targetValue = sequence.size.toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 1400
-                0f at 0
-                1f at 1150
-                1f at 1400
-            },
+            // Linear, because a morph that also eases looks like it is hesitating
+            // between shapes rather than moving continuously through them.
+            animation = tween(
+                durationMillis = sequence.size * MORPH_MILLIS,
+                easing = LinearEasing
+            ),
             repeatMode = RepeatMode.Restart
         ),
-        label = "BounceSweep"
+        label = "LoadingWalk"
+    )
+    val rotation = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = sequence.size * MORPH_MILLIS,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "LoadingRotation"
     )
 
+    val path = remember { Path() }
+
     Canvas(modifier = modifier.size(size)) {
-        val dotDiameter = min(this.size.width, this.size.height) / 7f
-        val orbit = min(this.size.width, this.size.height) / 2f - dotDiameter * 0.9f
-        val center = Offset(this.size.width / 2f, this.size.height / 2f)
+        val n = sequence.size
+        val position = if (reduceMotion) 0f else walk.value
+        val index = position.toInt().coerceIn(0, n - 1)
+        val fraction = (position - index).coerceIn(0f, 1f)
 
-        for (i in 0 until dotCount) {
-            val phase = ((sweep - i / dotCount.toFloat()) % 1f + 1f) % 1f
-            val angle = phase * 2f * PI.toFloat() - (PI / 2f).toFloat()
-            val x = center.x + orbit * cos(angle)
-            val y = center.y + orbit * sin(angle)
-
-            // The lead dot is fully opaque; the rest trail off behind it.
-            val prominence = 1f - i.toFloat() / dotCount
-            val alpha = if (reduceMotion) {
-                0.45f + 0.4f * prominence
-            } else {
-                0.22f + 0.78f * prominence
-            }
-            // Dots swell as they pass the front of the orbit.
-            val scale = if (reduceMotion) {
-                0.95f
-            } else {
-                0.7f + 0.45f * abs(cos(phase * PI.toFloat()))
-            }
-
-            val dotSize = dotDiameter * scale
-            val shape = shapes[(i + (phase * shapes.size).toInt()) % shapes.size]
-
-            drawPath(
-                path = shape.toPath(Size(dotSize, dotSize), layoutDirection, this),
-                color = color.copy(alpha = alpha)
-            )
+        val polygon = if (reduceMotion) {
+            sequence[0]
+        } else {
+            morphs[index].polygonAt(fraction, rotation.value)
         }
+        polygon.fittedPath(this.size, out = path)
+        drawPath(path = path, color = color)
     }
 }
 
+/** How long the indicator spends on each of its seven shapes. */
+private const val MORPH_MILLIS = 900
+
 /**
- * A calm placeholder shaped like a channel card, shown while the list hydrates
- * from disk so the grid does not visibly pop from empty to full on cold start.
+ * A calm placeholder shaped like a channel card, shown while the list hydrates from
+ * disk so the grid does not visibly pop from empty to full on cold start.
+ *
+ * The placeholder's corners breathe between two radii. It is the same shape animation
+ * the real cards use on focus, run in reverse and much slower, so a loading grid looks
+ * like the same objects settling into place rather than like a different screen.
  */
 @Composable
 fun ChannelCardSkeleton(modifier: Modifier = Modifier) {
@@ -151,13 +155,19 @@ fun ChannelCardSkeleton(modifier: Modifier = Modifier) {
         label = "SkeletonAlpha"
     )
     val block = colors.surfaceVariant.copy(alpha = alpha)
+    val skeletonShape = rememberMorphingCorners(
+        rest = M3ExpressiveShapes.Corners.logoTile,
+        active = M3ExpressiveShapes.Corners.largeCard,
+        isActive = !reduceMotion,
+        spec = ExpressiveMotion.spatialSlow
+    )
 
     Column(modifier = modifier.fillMaxWidth().padding(4.dp)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(112.dp)
-                .clip(M3ExpressiveShapes.LogoTile)
+                .clip(skeletonShape)
                 .background(block)
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -215,7 +225,7 @@ fun BouncingLoaderRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
-        BouncingLoader(size = 22.dp, dotCount = 5)
+        BouncingLoader(size = 22.dp)
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = text,
@@ -225,22 +235,3 @@ fun BouncingLoaderRow(
         )
     }
 }
-
-/**
- * The shapes the dot cycles through.
- *
- * This is the only place in the app where a lobed silhouette is correct: the dots
- * carry no glyph, no label and no touch target, so there is nothing to clip or to
- * mis-centre. The sequence stays within the soft, low-sharpness end of the library
- * — the pointed `Flower` and `PuffyDiamond` were dropped because at 6dp a spike is
- * indistinguishable from an aliasing artefact.
- */
-private fun expressiveShapeSequence(): List<Shape> = listOf(
-    M3ExpressiveShapes.Circle,
-    M3ExpressiveShapes.FourLeafClover,
-    M3ExpressiveShapes.SixSidedCookie,
-    M3ExpressiveShapes.SevenSidedCookie,
-    M3ExpressiveShapes.Puffy,
-    M3ExpressiveShapes.NineSidedCookie,
-    M3ExpressiveShapes.TwelveSidedCookie
-)

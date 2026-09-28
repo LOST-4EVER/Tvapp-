@@ -16,7 +16,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -39,8 +43,14 @@ fun EmptyChannelState(
 
     // Springs in rather than appearing flat, which makes an empty result read as a
     // deliberate state instead of a failed render.
+    //
+    // The target has to be flipped after the first composition. `animateFloatAsState`
+    // seeds itself from its target value, so a constant `targetValue = 1f` starts
+    // and ends at 1 and nothing animates at all — which is what this used to do.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
     val entrance by animateFloatAsState(
-        targetValue = 1f,
+        targetValue = if (entered) 1f else 0f,
         animationSpec = if (reduceMotion) {
             spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)
         } else {

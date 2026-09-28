@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -278,7 +279,7 @@ fun SettingsScreen(
                 ) {
                     AboutRow("Version", BuildConfig.VERSION_NAME)
                     AboutRow("Build", BuildConfig.VERSION_CODE.toString())
-                    AboutRow("Channels", settings.startCategory.displayName + " start")
+                    AboutRow("Start category", settings.startCategory.displayName)
                     AboutRow("Sources", "Curated list, IPTV-org, community")
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -559,8 +560,10 @@ private fun CategoryChipRow(
     onSelect: (CategoryFilter) -> Unit
 ) {
     val colors = LocalAppColors.current
+    val listState = rememberLazyListState()
     LazyRow(
-        modifier = Modifier.edgeFade(width = 20.dp),
+        modifier = Modifier.edgeFade(listState, width = 20.dp),
+        state = listState,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(vertical = 2.dp)
     ) {

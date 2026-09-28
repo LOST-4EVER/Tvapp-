@@ -156,20 +156,21 @@ object NetworkClient {
             .retryOnConnectionFailure(true)
             .followRedirects(true)
             .followSslRedirects(true)
-            // Transparently gzip the playlist and manifest responses. These are
-            // text payloads that compress roughly 10:1, which matters a lot on the
-            // slow links these streams are often fetched over.
-            .addInterceptor { chain ->
-                val request = chain.request()
-                if (request.header("Accept-Encoding") == null) {
-                    val compressed = request.newBuilder()
-                        .header("Accept-Encoding", "gzip")
-                        .build()
-                    chain.proceed(compressed)
-                } else {
-                    chain.proceed(request)
-                }
-            }
+            // No Accept-Encoding interceptor here on purpose.
+            //
+            // OkHttp already negotiates gzip transparently: when the caller sets no
+            // Accept-Encoding, BridgeInterceptor adds `Accept-Encoding: gzip` itself
+            // and strips the matching Content-Encoding off the response before the
+            // body is handed over. That behaviour is conditional on the header being
+            // *absent*. An interceptor that adds the header by hand — which is what
+            // this class used to do — therefore switches transparent mode off while
+            // still getting the compressed bytes from the server. The playlist and
+            // update manifest then arrived as gzip data that was decoded as UTF-8,
+            // producing mojibake that every parser rejected, and every remote source
+            // silently contributed zero channels.
+            //
+            // Letting OkHttp do it gets the same bandwidth saving and a body that is
+            // already plain text.
 
         try {
             val cacheDir = File(appContext.cacheDir, "kurdish_tv_http_cache")

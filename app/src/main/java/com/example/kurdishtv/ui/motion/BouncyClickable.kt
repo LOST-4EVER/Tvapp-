@@ -13,23 +13,34 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
 
 /**
- * Material 3 Expressive press feedback: the element springs down on press and
- * bounces back on release. Honours the user's reduced-motion preference.
+ * Material 3 Expressive press feedback: the element springs down on press and bounces
+ * back on release. Honours the user's reduced-motion preference.
  *
  * Also focusable, so the element is reachable with a D-pad or TV remote. Because
- * `indication = null` removes the default click ripple, focus is signalled by a
- * small springy scale-up — see [tvFocusable] for the ringed variant used on
- * larger surfaces such as channel cards.
+ * `indication = null` removes the default click ripple, focus is signalled by a small
+ * springy scale-up — see [tvFocusable] and [expressiveFocusRing] for the ringed
+ * variants used on larger surfaces.
+ *
+ * @param interactionSource pass an existing source when the caller also needs to
+ *   observe the press — that is how [com.example.kurdishtv.ui.components.AppIconButton]
+ *   morphs its outline while it is held. Left null, one is created here.
+ * @param focusable set false when the element already gets its focus handling from
+ *   somewhere else. Two `focusable` modifiers on one node share a single focus target,
+ *   so they do not create two D-pad stops, but they do mean two independent
+ *   focus callbacks that can disagree. Pair this with [expressiveFocusRing], which
+ *   supplies the focus behaviour, and there is only one owner of the state.
  */
 fun Modifier.bouncyClickable(
     enabled: Boolean = true,
     scaleDown: Float = 0.93f,
+    interactionSource: MutableInteractionSource? = null,
+    focusable: Boolean = true,
     onClick: () -> Unit
 ): Modifier = composed {
     val reduceMotion = LocalReduceMotion.current
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val source = interactionSource ?: remember { MutableInteractionSource() }
+    val isPressed by source.collectIsPressedAsState()
+    val isFocused by source.collectIsFocusedAsState()
 
     val targetScale = when {
         reduceMotion -> 1f
@@ -50,10 +61,13 @@ fun Modifier.bouncyClickable(
             scaleY = scale
         }
         .clickable(
-            interactionSource = interactionSource,
+            interactionSource = source,
             indication = null,
             enabled = enabled,
             onClick = onClick
         )
-        .focusable(enabled = enabled, interactionSource = interactionSource)
+        .then(
+            if (focusable) Modifier.focusable(enabled = enabled, interactionSource = source)
+            else Modifier
+        )
 }

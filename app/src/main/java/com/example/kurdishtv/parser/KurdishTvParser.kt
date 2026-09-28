@@ -83,10 +83,15 @@ object KurdishTvParser {
                         if (url.startsWith("http://") || url.startsWith("https://")) {
                             channels.add(buildChannel(rawName, url, null, null, sourceTag))
                             count++
+                            // Consume the pending #EXTINF so the next bare URL line
+                            // cannot inherit this entry's name and logo.
+                            currentExtName = null
+                            currentLogo = null
+                            currentGroup = null
                         }
                     }
                 }
-                (line.startsWith("http://") || line.startsWith("https://")) && !line.startsWith("#") -> {
+                line.startsWith("http://") || line.startsWith("https://") -> {
                     val name = currentExtName ?: "Kurdish Channel ${count + 1}"
                     channels.add(buildChannel(name, line, currentLogo, currentGroup, sourceTag))
                     count++
@@ -204,13 +209,26 @@ object KurdishTvParser {
         return if (hash == 0) "1" else hash.toString()
     }
 
+    /**
+     * Extracts the display name from an `#EXTINF:` line.
+     *
+     * The separator is the first comma that is *not* inside a quoted attribute value,
+     * not the last one. Group titles routinely contain commas (`group-title="News,
+     * Sport"`) and so do display names (`Kurdistan TV, HD`), so splitting on the last
+     * comma — the previous behaviour — turned the first into an empty name and the
+     * second into just "HD".
+     */
     private fun parseExtName(line: String): String {
-        val commaIndex = line.lastIndexOf(',')
-        return if (commaIndex != -1 && commaIndex < line.length - 1) {
-            line.substring(commaIndex + 1).trim()
-        } else {
-            "Kurdish Channel"
+        var inQuotes = false
+        for (i in line.indices) {
+            val c = line[i]
+            if (c == '"') {
+                inQuotes = !inQuotes
+            } else if (c == ',' && !inQuotes) {
+                return line.substring(i + 1).trim().ifBlank { "Kurdish Channel" }
+            }
         }
+        return "Kurdish Channel"
     }
 
     private fun parseTvgLogo(line: String): String? =

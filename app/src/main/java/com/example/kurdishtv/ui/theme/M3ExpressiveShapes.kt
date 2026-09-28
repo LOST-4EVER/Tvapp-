@@ -1,147 +1,43 @@
 package com.example.kurdishtv.ui.theme
 
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.min
-import kotlin.math.sin
+import com.example.kurdishtv.ui.motion.CornerScale
 
 /**
- * Material 3 Expressive shape system.
+ * The app's shape vocabulary, in two halves.
  *
- * Expressive shapes are not just rounded rectangles. Google's M3 Expressive update
- * added a library of decorative shapes (cookies, clovers, bursts, flowers, hearts)
- * that are built by modulating the *polar radius* of a polygon as you walk around
- * it. That is what gives them their characteristic soft, organic, slightly irregular
- * silhouettes while still resolving to a clean bounding box.
+ * ── The corner scale ────────────────────────────────────────────────────────
  *
- * The polar-modulation approach is used here because it scales cleanly: the same
- * shape renders correctly in a 24dp chip and a 320dp hero tile, which fixed-size
- * path data could not do.
+ * Every named token below [ExtraLargeRounded] is a `RoundedCornerShape` on a single
+ * consistent scale. These are the shapes used for anything that holds a glyph, a label
+ * or a touch target, and their uniformity is the reason: a consistent rhythm of corner
+ * radii is what makes adjacent surfaces read as one system, and it guarantees a label
+ * inside one is never clipped by a concave corner.
  *
- * [AppShapes] feeds the standard Material components so that every button, card and
- * dialog picks up an expressive corner treatment without call-site changes.
+ * They are no longer static, either. The scale is mirrored in [CornerScale] so the
+ * corners themselves can be animated — Material lists rounded corners as a spatial
+ * spring property, so a card that rounds further as it takes focus is the spec's own
+ * idea, not a trick.
  *
- * ── Where expressive geometry belongs ─────────────────────────────────────
+ * ── The expressive library ──────────────────────────────────────────────────
  *
- * The lobed family ([Burst], [Sunny], [Boom], the cookies, the clovers) is a
- * *decorative* vocabulary, and it only works where nothing has to be read off the
- * surface. It was previously used on icon buttons, section headers and cards that
- * carry text, where it produced three visible defects:
+ * Everything below the corner scale mirrors [M3ExpressivePolygons] and is exposed as
+ * an ordinary `Shape` for call sites that want a fixed outline. For anything that
+ * *changes* outline, use `rememberMorphingPolygon` in `com.example.kurdishtv.ui.motion`
+ * instead — a shape built here is a still frame of the library.
  *
- *  - a spiked silhouette whose points straddle the element's neighbour, so adjacent
- *    controls visually merge;
- *  - an uneven bounding box, which pushes the glyph or label out of the safe area
- *    (a 12-lobe Burst on a 40dp tile does not have 40dp of usable centre);
- *  - a concave corner that clips the first and last characters of a line of text.
- *
- * So the rule is: **a surface that holds a glyph, a label or a touch target uses
- * the rounded-corner scale below; a surface that holds only animation uses the
- * lobed family.** The only lobed call sites left are the loading dots, which have
- * no content at all.
+ * The rule for choosing between the two halves is not taste, it is legibility: a lobed
+ * silhouette pushed onto a surface carrying text clips the text and overlaps its
+ * neighbours. So lobed shapes go on surfaces that hold only an image, or only
+ * animation, and never on a control.
  */
 object M3ExpressiveShapes {
 
-    // ── Geometric foundations ────────────────────────────────────────────────
-    val Circle: Shape = RoundedCornerShape(percent = 50)
-    val Square: Shape = RoundedCornerShape(0.dp)
-    val Slanted: Shape = RoundedCornerShape(
-        topStart = 4.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp
-    )
+    // ── Corner scale: the shapes that hold text ──────────────────────────────
 
-    val Arch: Shape = RoundedCornerShape(
-        topStart = CornerSize(50), topEnd = CornerSize(50),
-        bottomEnd = CornerSize(16.dp), bottomStart = CornerSize(16.dp)
-    )
-    val Semicircle: Shape = RoundedCornerShape(
-        topStart = CornerSize(50), topEnd = CornerSize(50),
-        bottomEnd = CornerSize(0.dp), bottomStart = CornerSize(0.dp)
-    )
-    val Oval: Shape = RoundedCornerShape(percent = 50)
-    val Pill: Shape = RoundedCornerShape(percent = 50)
-
-    /**
-     * A pill whose corner radius differs between the two ends.
-     *
-     * Morphing between [Pill] and this shape gives a filter or chip a subtle
-     * squeeze on selection, which is the shape-based counterpart to the scale
-     * bounce already used for press feedback.
-     */
-    val MorphingPill: Shape = RoundedCornerShape(
-        topStart = CornerSize(50), topEnd = CornerSize(50),
-        bottomEnd = CornerSize(34), bottomStart = CornerSize(34)
-    )
-
-    // ── Directional / pointed ────────────────────────────────────────────────
-    val Triangle: Shape = RoundedCornerShape(
-        topStart = CornerSize(50), topEnd = CornerSize(50),
-        bottomEnd = CornerSize(0.dp), bottomStart = CornerSize(0.dp)
-    )
-    val Arrow: Shape = RoundedCornerShape(
-        topStart = CornerSize(0.dp), topEnd = CornerSize(40.dp),
-        bottomEnd = CornerSize(50), bottomStart = CornerSize(50)
-    )
-    val Fan: Shape = RoundedCornerShape(
-        topStart = CornerSize(50), topEnd = CornerSize(12.dp),
-        bottomEnd = CornerSize(12.dp), bottomStart = CornerSize(12.dp)
-    )
-
-    // ── Faceted ──────────────────────────────────────────────────────────────
-    val Diamond: Shape = RoundedCornerShape(percent = 50)
-    val Clamshell: Shape = RoundedCornerShape(
-        topStart = CornerSize(50), topEnd = CornerSize(50),
-        bottomEnd = CornerSize(24.dp), bottomStart = CornerSize(24.dp)
-    )
-    val Pentagon: Shape = RoundedCornerShape(
-        topStart = CornerSize(24.dp), topEnd = CornerSize(24.dp),
-        bottomEnd = CornerSize(50), bottomStart = CornerSize(50)
-    )
-    val Gem: Shape = RoundedCornerShape(
-        topStart = CornerSize(20.dp), topEnd = CornerSize(20.dp),
-        bottomEnd = CornerSize(50), bottomStart = CornerSize(50)
-    )
-
-    // ── Lobed / radial ───────────────────────────────────────────────────────
-    val VerySunny: Shape = radialShape(lobes = 12, depth = 0.10f, phase = 0f)
-    val Sunny: Shape = radialShape(lobes = 8, depth = 0.13f, phase = 0f)
-    val FourSidedCookie: Shape = radialShape(lobes = 4, depth = 0.09f, phase = 0f)
-    val SixSidedCookie: Shape = radialShape(lobes = 6, depth = 0.09f, phase = 0f)
-    val SevenSidedCookie: Shape = radialShape(lobes = 7, depth = 0.09f, phase = 0f)
-    val NineSidedCookie: Shape = radialShape(lobes = 9, depth = 0.09f, phase = 0f)
-    val TwelveSidedCookie: Shape = radialShape(lobes = 12, depth = 0.08f, phase = 0f)
-    val FourLeafClover: Shape = radialShape(lobes = 4, depth = 0.17f, phase = PI.toFloat() / 4f)
-    val EightLeafClover: Shape = radialShape(lobes = 8, depth = 0.16f, phase = PI.toFloat() / 8f)
-    val Burst: Shape = radialShape(lobes = 12, depth = 0.22f, phase = 0f, sharpness = 2.4f)
-    val SoftBurst: Shape = radialShape(lobes = 9, depth = 0.16f, phase = 0f, sharpness = 1.5f)
-    val Boom: Shape = radialShape(lobes = 14, depth = 0.30f, phase = 0f, sharpness = 1.0f)
-    val SoftBoom: Shape = radialShape(lobes = 16, depth = 0.17f, phase = 0f, sharpness = 1.1f)
-    val Flower: Shape = radialShape(lobes = 6, depth = 0.20f, phase = 0f, sharpness = 1.8f)
-    val Puffy: Shape = radialShape(lobes = 9, depth = 0.13f, phase = 0f, sharpness = 0.8f)
-    val PuffyDiamond: Shape = radialShape(lobes = 4, depth = 0.19f, phase = 0f, sharpness = 0.8f)
-    val Ghostish: Shape = radialShape(
-        lobes = 2, depth = 0.16f, phase = 0f, sharpness = 0.7f, teardrop = true
-    )
-    val Bun: Shape = radialShape(lobes = 3, depth = 0.15f, phase = 0f, sharpness = 0.9f)
-
-    // ── Pixel ────────────────────────────────────────────────────────────────
-    val PixelCircle: Shape = RoundedCornerShape(22.dp)
-    val PixelTriangle: Shape = pixelShape(steps = 6)
-
-    val Heart: Shape = heartShape()
-
-    // ── App tokens ───────────────────────────────────────────────────────────
-    // These are the tokens call sites are expected to use. They are all
-    // `RoundedCornerShape` with a consistent, predictable scale, so a label inside
-    // one of them is never clipped and adjacent surfaces keep a constant rhythm.
     val ExtraLargeRounded: Shape = RoundedCornerShape(32.dp)
     val LargeCard: Shape = RoundedCornerShape(26.dp)
     val MediumCard: Shape = RoundedCornerShape(20.dp)
@@ -149,6 +45,10 @@ object M3ExpressiveShapes {
     val Chip: Shape = RoundedCornerShape(12.dp)
     val BadgePill: Shape = RoundedCornerShape(10.dp)
     val SectionPill: Shape = RoundedCornerShape(18.dp)
+
+    /** Rounded-square tile used by channel logos. */
+    val LogoTile: Shape = RoundedCornerShape(22.dp)
+
     val Cookie: Shape = RoundedCornerShape(
         topStart = 16.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp
     )
@@ -162,117 +62,99 @@ object M3ExpressiveShapes {
         topStart = 28.dp, topEnd = 16.dp, bottomEnd = 28.dp, bottomStart = 20.dp
     )
 
-    /** Rounded-square tile used by channel logos. */
-    val LogoTile: Shape = RoundedCornerShape(22.dp)
-
     /**
-     * Builds a lobed shape by modulating the polar radius around the bounding box.
+     * The same scale, as animatable corner radii.
      *
-     * @param lobes number of outward bumps around the perimeter
-     * @param depth how far the bumps protrude, as a fraction of the base radius
-     * @param phase rotates the lobes; odd/even lobe counts need different phases so
-     *   the bumps sit symmetrically rather than straddling the corners
-     * @param sharpness exponent applied to each lobe; higher values give pointed
-     *   star-like spikes (Burst) while lower values give soft rounds (Puffy)
-     * @param teardrop biases the modulation so one lobe is larger, as in Ghostish
+     * `rememberMorphingCorners` takes two of these and springs between them, so a
+     * surface can round further as it gains focus without a second shape being
+     * authored for it.
      */
-    private fun radialShape(
-        lobes: Int,
-        depth: Float,
-        phase: Float,
-        sharpness: Float = 1.6f,
-        teardrop: Boolean = false
-    ): Shape = object : Shape {
-        override fun createOutline(
-            size: Size,
-            layoutDirection: LayoutDirection,
-            density: Density
-        ): Outline {
-            val path = Path()
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            val base = min(size.width, size.height) / 2f
-            val steps = (lobes * 24).coerceAtLeast(96)
+    object Corners {
+        val extraLarge = CornerScale.uniform(32.dp)
+        val largeCard = CornerScale.uniform(26.dp)
+        val mediumCard = CornerScale.uniform(20.dp)
+        val smallCard = CornerScale.uniform(14.dp)
+        val chip = CornerScale.uniform(12.dp)
+        val logoTile = CornerScale.uniform(22.dp)
 
-            for (i in 0..steps) {
-                val angle = (i.toFloat() / steps) * 2f * PI.toFloat() - PI.toFloat() / 2f
-                val wave = (1f - cos(lobes * (angle + phase))) / 2f
-                // pow sharpens each lobe: 1 = soft round, >1 = pointed.
-                val mod = 1f + depth * Math.pow(wave.toDouble(), sharpness.toDouble()).toFloat()
-                val bias = if (teardrop && i > steps * 0.45f && i < steps * 0.55f) 1.12f else 1f
-                val r = base * mod * bias
-                val x = cx + r * cos(angle)
-                val y = cy + r * sin(angle)
-                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            path.close()
-            return Outline.Generic(path)
-        }
+        /** A card that opens up as it takes focus. */
+        val cardFocused = CornerScale.uniform(30.dp)
+
+        /** A control pressed flat, then released back. */
+        val pressed = CornerScale.uniform(10.dp)
     }
 
-    /** A stepped triangle, echoing the low-resolution "pixel triangle" in the shape library. */
-    private fun pixelShape(steps: Int): Shape = object : Shape {
-        override fun createOutline(
-            size: Size,
-            layoutDirection: LayoutDirection,
-            density: Density
-        ): Outline {
-            val path = Path()
-            val w = size.width
-            val h = size.height
-            val step = h / steps
-            // Right edge descends in steps...
-            for (i in 0..steps) {
-                val y = i * step
-                val x = w - (steps - i) * (w / steps) * 0.5f
-                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            }
-            // ...then the hypotenuse climbs back in matching steps.
-            for (i in steps downTo 0) {
-                val y = i * step
-                val x = (steps - i) * (w / steps) * 0.5f
-                path.lineTo(x, y)
-            }
-            path.close()
-            return Outline.Generic(path)
-        }
-    }
+    // ── Geometric foundations ────────────────────────────────────────────────
 
-    /** A two-lobe heart built from parametric curves. */
-    private fun heartShape(): Shape = object : Shape {
-        override fun createOutline(
-            size: Size,
-            layoutDirection: LayoutDirection,
-            density: Density
-        ): Outline {
-            val path = Path()
-            val w = size.width
-            val h = size.height
-            path.moveTo(w / 2f, h * 0.92f)
-            path.cubicTo(w * -0.06f, h * 0.52f, w * 0.16f, h * 0.04f, w * 0.5f, h * 0.30f)
-            path.cubicTo(w * 0.84f, h * 0.04f, w * 1.06f, h * 0.52f, w / 2f, h * 0.92f)
-            path.close()
-            return Outline.Generic(path)
-        }
-    }
+    val Circle: Shape = M3ExpressivePolygons.Circle.toShape()
+    val Square: Shape = M3ExpressivePolygons.Square.toShape()
+    val Slanted: Shape = M3ExpressivePolygons.Slanted.toShape()
+    val Arch: Shape = M3ExpressivePolygons.Arch.toShape()
+    val SemiCircle: Shape = M3ExpressivePolygons.SemiCircle.toShape()
+    val Oval: Shape = M3ExpressivePolygons.Oval.toShape()
+    val Pill: Shape = M3ExpressivePolygons.Pill.toShape()
+
+    /** A pill with a pinch in it, for selection states that should not change hue. */
+    val MorphingPill: Shape = M3ExpressivePolygons.Pill.scaled(1f, 0.82f).toShape()
+
+    // ── Directional / pointed ────────────────────────────────────────────────
+
+    val Triangle: Shape = M3ExpressivePolygons.Triangle.toShape()
+    val Arrow: Shape = M3ExpressivePolygons.Arrow.toShape()
+    val Fan: Shape = M3ExpressivePolygons.Fan.toShape()
+
+    // ── Faceted ──────────────────────────────────────────────────────────────
+
+    val Diamond: Shape = M3ExpressivePolygons.Diamond.toShape()
+    val Clamshell: Shape = M3ExpressivePolygons.ClamShell.toShape()
+    val Pentagon: Shape = M3ExpressivePolygons.Pentagon.toShape()
+    val Gem: Shape = M3ExpressivePolygons.Gem.toShape()
+
+    // ── Lobed / radial ───────────────────────────────────────────────────────
+
+    val VerySunny: Shape = M3ExpressivePolygons.VerySunny.toShape()
+    val Sunny: Shape = M3ExpressivePolygons.Sunny.toShape()
+    val FourSidedCookie: Shape = M3ExpressivePolygons.Cookie4Sided.toShape()
+    val SixSidedCookie: Shape = M3ExpressivePolygons.Cookie6Sided.toShape()
+    val SevenSidedCookie: Shape = M3ExpressivePolygons.Cookie7Sided.toShape()
+    val NineSidedCookie: Shape = M3ExpressivePolygons.Cookie9Sided.toShape()
+    val TwelveSidedCookie: Shape = M3ExpressivePolygons.Cookie12Sided.toShape()
+    val FourLeafClover: Shape = M3ExpressivePolygons.Clover4Leaf.toShape()
+    val EightLeafClover: Shape = M3ExpressivePolygons.Clover8Leaf.toShape()
+    val Burst: Shape = M3ExpressivePolygons.Burst.toShape()
+    val SoftBurst: Shape = M3ExpressivePolygons.SoftBurst.toShape()
+    val Boom: Shape = M3ExpressivePolygons.Boom.toShape()
+    val SoftBoom: Shape = M3ExpressivePolygons.SoftBoom.toShape()
+    val Flower: Shape = M3ExpressivePolygons.Flower.toShape()
+    val Puffy: Shape = M3ExpressivePolygons.Puffy.toShape()
+    val PuffyDiamond: Shape = M3ExpressivePolygons.PuffyDiamond.toShape()
+    val Ghostish: Shape = M3ExpressivePolygons.Ghostish.toShape()
+    val Bun: Shape = M3ExpressivePolygons.Bun.toShape()
+
+    // ── Pixel ────────────────────────────────────────────────────────────────
+
+    val PixelCircle: Shape = M3ExpressivePolygons.PixelCircle.toShape()
+    val PixelTriangle: Shape = M3ExpressivePolygons.PixelTriangle.toShape()
+    val Heart: Shape = M3ExpressivePolygons.Heart.toShape()
 }
 
 /**
  * MaterialTheme shapes mapping (extraSmall → extraLarge).
  *
  * Named `AppShapes` rather than `Shapes` so it cannot shadow the
- * `androidx.compose.material3.Shapes` type it is built from, and so
- * call sites in other packages have to import it explicitly.
+ * `androidx.compose.material3.Shapes` type it is built from, and so call sites in
+ * other packages have to import it explicitly.
  *
- * [Shapes] requires `CornerBasedShape`, so the scale is constructed from
- * `RoundedCornerShape` directly rather than from the [Shape]-typed tokens above
- * (a `Shape` is too wide to satisfy it). The fully procedural lobed shapes are
- * applied at the call sites that accept a plain [Shape].
+ * The scale is deliberately gentle. The Expressive update pushed Material's default
+ * radii much higher, but this app puts a 13sp label inside most of its buttons, and a
+ * 28dp radius on a 36dp-tall control leaves barely anything of the glyph. So the
+ * expressive half of the system lives in the shape library and in animated corners,
+ * where it can be applied to surfaces that can carry it.
  */
 val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(14.dp),
     medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp),
+    large = RoundedCornerShape(26.dp),
     extraLarge = RoundedCornerShape(32.dp)
 )

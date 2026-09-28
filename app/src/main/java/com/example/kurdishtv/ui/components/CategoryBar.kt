@@ -2,7 +2,6 @@ package com.example.kurdishtv.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.model.ChannelFilterEngine
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.rememberMorphingPillShape
@@ -61,7 +61,11 @@ fun CategoryBar(
             }
         }
     }
-    val visible = remember(counts) {
+    // Keyed on the selection as well as the counts. The fallback below depends on
+    // both, and keying only on `counts` meant that moving the selection to a category
+    // the current list has no channels for reused the previous tab list — so the
+    // "keep the selected tab" rule below could not actually fire.
+    val visible = remember(counts, selectedCategory) {
         when {
             counts == null -> CategoryFilter.entries
             selectedCategory.let { sel -> counts[sel] ?: 0 } > 0 ->
@@ -95,22 +99,25 @@ fun CategoryBar(
 
             val backgroundColor by animateColorAsState(
                 targetValue = if (isSelected) colors.primary else colors.surfaceVariant,
-                animationSpec = spring(),
+                // An effects token, not a default spring: colour must not overshoot,
+                // and a colour that bounces past its target is a visible artefact.
+                animationSpec = ExpressiveMotion.effectsColor,
                 label = "CategoryPillBackground"
             )
             val contentColor by animateColorAsState(
                 targetValue = if (isSelected) colors.onPrimary else colors.textPrimary,
-                animationSpec = spring(),
+                animationSpec = ExpressiveMotion.effectsColor,
                 label = "CategoryPillContent"
             )
             val elevation by animateDpAsState(
                 targetValue = if (isSelected) 6.dp else 0.dp,
-                animationSpec = spring(),
+                animationSpec = ExpressiveMotion.spatialDp,
                 label = "CategoryPillElevation"
             )
 
-            // The pill's silhouette animates on selection, so the change is
-            // legible without relying on colour alone.
+            // The pill's silhouette animates on selection, so the change is legible
+            // without relying on colour alone — which matters on a television, where a
+            // tint shift across a dim room is much harder to catch than a shape change.
             val pillShape = rememberMorphingPillShape(
                 selected = isSelected,
                 reduceMotion = reduceMotion

@@ -10,13 +10,10 @@ class ChannelCacheStorage(context: Context) {
     private val cacheFile = File(context.applicationContext.filesDir, "cached_kurdish_channels.json")
 
     /**
-     * How recently the channel list was last written, or 0 when there is no usable cache.
-     *
-     * Lets a cold start skip the network round-trip entirely when the list is still fresh,
-     * which is the common case when the app is reopened during normal viewing.
-     */
-    /**
      * How recently the channel list was last written.
+     *
+     * Lets a cold start skip the network round-trip entirely when the list is still
+     * fresh, which is the common case when the app is reopened during normal viewing.
      *
      * Returns 0 when there is no usable cache *and* when the device clock has
      * moved backwards (timezone change or NTP correction), so the caller cannot
@@ -48,6 +45,15 @@ class ChannelCacheStorage(context: Context) {
         }
     }
 
+    /**
+     * Writes the list to disk.
+     *
+     * Written to a sibling temp file and then renamed, which is atomic on the same
+     * filesystem. `writeText` straight onto the cache truncated it first, so a kill
+     * or a full-disk error partway through left a half-written file; the next launch
+     * then read that as "no cache" and threw away a perfectly good list. A failed
+     * rename leaves the old cache intact, which is the behaviour that matters.
+     */
     fun saveChannels(channels: List<Channel>) {
         if (channels.isEmpty()) return
         try {
@@ -70,14 +76,29 @@ class ChannelCacheStorage(context: Context) {
                 }
                 jsonArray.put(obj)
             }
-            cacheFile.writeText(jsonArray.toString())
+            val tmp = File(cacheFile.parentFile, "${cacheFile.name}.tmp")
+            tmp.writeText(jsonArray.toString())
+            if (!tmp.renameTo(cacheFile)) {
+                // renameTo will not overwrite on every filesystem; fall back to a
+                // delete-then-rename, still leaving the old file intact if the
+                // write itself is what failed.
+                if (!cacheFile.delete() && cacheFile.exists()) return
+                tmp.renameTo(cacheFile)
+            }
         } catch (_: Exception) {}
     }
 
-    fun clearCache() {
-        try {
-            if (cacheFile.exists()) cacheFile.delete()
-        } catch (_: Exception) {}
+    /**
+     * Deletes the on-disk channel cache.
+     *
+     * `File.delete()` already returns false when it fails, so the result is passed
+     * straight through. A cache that is simply absent counts as cleared — there is
+     * nothing left to remove, and reporting failure there would be misleading.
+     */
+    fun clearCache(): Boolean = try {
+        !cacheFile.exists() || cacheFile.delete()
+    } catch (_: Exception) {
+        false
     }
 
     private fun parseChannels(jsonString: String): List<Channel> {

@@ -21,7 +21,12 @@ fun KurdishTvTheme(
 
     // Material You (Android 12+): pull the accent from the user's wallpaper palette.
     // Falls back to the bundled accent on older releases or if extraction fails.
-    val dynamicScheme = remember(settings, context) {
+    //
+    // Keyed on `dynamicColor` alone, not on the whole settings object. Extraction
+    // reads the system wallpaper palette, and keying on everything meant that
+    // flipping any unrelated switch — autoplay, channel logos, the start category —
+    // re-ran it.
+    val dynamicScheme = remember(settings.dynamicColor, context) {
         if (settings.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             runCatching { dynamicDarkColorScheme(context) }.getOrNull()
         } else {

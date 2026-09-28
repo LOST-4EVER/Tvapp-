@@ -30,7 +30,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.kurdishtv.update.AppUpdate
 import com.example.kurdishtv.update.DownloadState
@@ -99,7 +98,7 @@ fun UpdateCard(
                         is UpdateState.Checking -> {
                             Spacer(modifier = Modifier.height(14.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                BouncingLoader(size = 20.dp, dotCount = 5)
+                                BouncingLoader(size = 20.dp)
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
                                     text = "Checking for updates…",
@@ -200,10 +199,7 @@ fun UpdateCard(
                 OutlinedButton(
                     onClick = onCheck,
                     shape = M3ExpressiveShapes.Pill,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(M3ExpressiveShapes.Pill)
-                        .bouncyClickable(scaleDown = 0.97f) { onCheck() }
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Check for updates", fontWeight = FontWeight.Medium)
                 }
@@ -218,7 +214,7 @@ private fun DownloadProgress(progress: DownloadState) {
     when (progress) {
         is DownloadState.Idle -> {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BouncingLoader(size = 20.dp, dotCount = 5)
+                BouncingLoader(size = 20.dp)
                 Spacer(modifier = Modifier.width(10.dp))
                 Text("Preparing download…", color = colors.textSecondary, fontSize = 12.sp)
             }

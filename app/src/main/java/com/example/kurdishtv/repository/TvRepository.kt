@@ -55,9 +55,11 @@ class TvRepository(
         withContext(Dispatchers.IO) {
             if (!forceRefresh) {
                 val age = channelCacheStorage.getCacheAgeMs()
-                // 0 means "no cache" *or* "clock moved backwards"; both are handled
-                // the same way, by simply not short-circuiting. Reading the cache
-                // is what actually decides, so a 0 here costs one file read.
+                // 0 is ambiguous: it means "no cache" *or* "the clock moved
+                // backwards". It cannot be distinguished here, and it does not
+                // need to be — the read below is what actually decides. A fresh
+                // age only lets us *try* the cache; an empty or unreadable one
+                // falls through to the network exactly as if it had been stale.
                 if (age < CACHE_FRESH_MS) {
                     val cached = channelCacheStorage.getCachedChannels()
                     if (!cached.isNullOrEmpty()) {
@@ -148,7 +150,7 @@ class TvRepository(
                     candidate = "${ch.id}_$suffix"
                     suffix++
                 }
-                uniqueChannels.add(ch.copy(id = candidate, originalId = ch.originalId))
+                uniqueChannels.add(ch.copy(id = candidate))
             }
 
             // Apply favorite states.
@@ -195,13 +197,13 @@ class TvRepository(
 
     fun removeCustomPlaylistUrl(url: String): Boolean = customPlaylistStorage.removeCustomPlaylistUrl(url)
 
-    fun clearFavorites() = favoriteStorage.clear()
+    fun clearFavorites(): Boolean = favoriteStorage.clear()
 
-    fun clearRecents() = recentStorage.clearRecents()
+    fun clearRecents(): Boolean = recentStorage.clearRecents()
 
-    fun clearCustomPlaylists() = customPlaylistStorage.clear()
+    fun clearCustomPlaylists(): Boolean = customPlaylistStorage.clear()
 
-    fun clearChannelCache() = channelCacheStorage.clearCache()
+    fun clearChannelCache(): Boolean = channelCacheStorage.clearCache()
 
     private companion object {
         /** Per-source fetch ceiling. A dead source must not stall the whole merge. */

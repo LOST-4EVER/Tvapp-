@@ -28,16 +28,33 @@ class SettingsViewModel(
     /** True once persisted preferences have replaced the defaults. */
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 
+    /**
+     * Bumped by every user edit, read only on the main thread.
+     *
+     * The initial load is an async disk read, and the Settings screen is reachable
+     * on the very first frame. A user who toggles something in that window used to
+     * have it silently reverted: [update] wrote the new value and queued the save,
+     * then the pending load landed and overwrote `_settings` with the pre-edit
+     * state — which was then never written back, so the change was lost outright.
+     */
+    private var editGeneration = 0
+
     init {
         viewModelScope.launch {
+            val generationAtStart = editGeneration
             val stored = withContext(Dispatchers.IO) { storage.load() }
-            _settings.value = stored
+            // Only adopt the stored value if nothing has been edited since. Either
+            // way the screen is now hydrated, so `loaded` flips unconditionally.
+            if (editGeneration == generationAtStart) {
+                _settings.value = stored
+            }
             _loaded.value = true
         }
     }
 
     fun update(transform: (AppSettings) -> AppSettings) {
         val next = transform(_settings.value)
+        editGeneration++
         _settings.value = next
         viewModelScope.launch(Dispatchers.IO) { storage.save(next) }
     }

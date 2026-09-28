@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -70,6 +71,13 @@ fun KurdishTvNavGraph(
 
         composable(Screen.Player.route) {
             val selectedChannel = uiState.selectedChannel
+            // The player has nothing to render without a channel (the source was
+            // removed or a refresh dropped it). Popping here would be a side
+            // effect inside composition, which Compose can and does re-run, so it
+            // is deferred to a coroutine keyed on the null-ness of the channel.
+            LaunchedEffect(selectedChannel) {
+                if (selectedChannel == null) navController.popBackStack()
+            }
             if (selectedChannel != null) {
                 PlayerScreen(
                     channel = selectedChannel,
@@ -86,8 +94,6 @@ fun KurdishTvNavGraph(
                     onFavoriteToggle = { id -> viewModel.onFavoriteToggled(id) },
                     onBackClick = { navController.popBackStack() }
                 )
-            } else {
-                navController.popBackStack()
             }
         }
 
@@ -107,16 +113,7 @@ fun KurdishTvNavGraph(
                 onCheckForUpdate = { viewModel.checkForUpdate() },
                 onDownloadUpdate = { update -> viewModel.downloadUpdate(update) },
                 onInstallUpdate = { update, path ->
-                    // Only the "allow from this source" case can be fixed by
-                    // sending the user to settings. Every other failure (missing
-                    // file, changed signing key, no installer) is already reported
-                    // in the update card, and bouncing the user into a settings
-                    // screen that cannot help is worse than saying what went wrong.
-                    if (!viewModel.installUpdate(update, path) &&
-                        viewModel.needsInstallPermission()
-                    ) {
-                        viewModel.openInstallPermissionSettings()
-                    }
+                    viewModel.requestInstallUpdate(update, path)
                 },
                 onDismissUpdate = { viewModel.clearUpdateMessage() },
                 modifier = insetModifier

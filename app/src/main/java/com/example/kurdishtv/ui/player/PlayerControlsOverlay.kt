@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
@@ -32,8 +33,7 @@ import com.example.kurdishtv.ui.components.AppIconButton
 import com.example.kurdishtv.ui.components.AppIconButtonStyle
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.LiveBadge
-import com.example.kurdishtv.ui.components.SvgIcon
-import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.components.SquishyPillButton
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -127,13 +127,15 @@ fun PlayerControlsOverlay(
                                     color = colors.textPrimary,
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "${channel.category} • ${channel.quality}",
                                     color = colors.textSecondary,
                                     fontSize = 12.sp,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -250,65 +252,34 @@ fun PlayerControlsOverlay(
                         ) {
                             // A glass pill reads correctly over video; the label is
                             // white rather than the accent, which would vanish
-                            // against a bright frame.
-                            Surface(
-                                shape = M3ExpressiveShapes.Pill,
-                                color = colors.glass,
-                                modifier = Modifier.bouncyClickable(onClick = onResizeModeToggle)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    SvgIcon(
-                                        resId = KurdishTvIcons.AspectRatio,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(5.dp))
-                                    Text(
-                                        text = resizeMode.label,
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
+                            // against a bright frame. The pill squashes on press,
+                            // which is the only way to confirm a tap up here, since
+                            // the whole bar fades out moments later.
+                            SquishyPillButton(
+                                iconRes = KurdishTvIcons.AspectRatio,
+                                label = resizeMode.label,
+                                onClick = onResizeModeToggle,
+                                containerColor = colors.glass
+                            )
 
                             // Colour correction. Cycles through the presets and is
                             // highlighted while one is active, so the current
                             // treatment is visible without opening a menu.
-                            Surface(
-                                shape = M3ExpressiveShapes.Pill,
-                                color = if (colorFilter.isActive) {
+                            // The label only appears once a filter is applied, and the
+                            // pill stays squashed while one is — so "a filter is on"
+                            // is carried by the outline as well as by the accent.
+                            SquishyPillButton(
+                                iconRes = KurdishTvIcons.Palette,
+                                label = if (colorFilter.isActive) colorFilter.label else "",
+                                onClick = onCycleColorFilter,
+                                containerColor = if (colorFilter.isActive) {
                                     colors.primary
                                 } else {
                                     colors.glass
                                 },
-                                modifier = Modifier.bouncyClickable(onClick = onCycleColorFilter)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    SvgIcon(
-                                        resId = KurdishTvIcons.Palette,
-                                        contentDescription = "Video colour filter",
-                                        tint = if (colorFilter.isActive) colors.onPrimary else Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    if (colorFilter.isActive) {
-                                        Spacer(modifier = Modifier.width(5.dp))
-                                        Text(
-                                            text = colorFilter.label,
-                                            color = colors.onPrimary,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
-                            }
+                                contentColor = if (colorFilter.isActive) colors.onPrimary else Color.White,
+                                active = colorFilter.isActive
+                            )
 
                             AppIconButton(
                                 iconRes = if (isFullscreen) KurdishTvIcons.FullscreenExit else KurdishTvIcons.Fullscreen,

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -135,6 +134,10 @@ fun MainTvScreen(
                     filtered = filtered,
                     isBrowsingHome = isBrowsingHome,
                     gridMinCellSize = gridMinCellSize,
+                    // Shared with the caller: the LaunchedEffect that surfaces
+                    // importMessage targets *this* host state, so a locally created
+                    // one here would mean nothing is ever shown.
+                    snackbarHostState = snackbarHostState,
                     onSearchQueryChanged = onSearchQueryChanged,
                     onCategorySelected = onCategorySelected,
                     onChannelClick = onChannelClick,
@@ -146,68 +149,79 @@ fun MainTvScreen(
             }
 
             isTabletLandscape -> {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    AdaptiveNavigationRail(
-                        selectedCategory = uiState.selectedCategory,
-                        onCategorySelected = onCategorySelected,
-                        onOpenImport = { showImportDialog = true },
-                        onRefresh = onRetryClick,
-                        onOpenSettings = onOpenSettings
-                    )
-
-                    Column(
-                        modifier = Modifier
-                            .weight(1.15f)
-                            .fillMaxHeight()
-                    ) {
-                        OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
-                        TopHeaderBar(
-                            channelCount = filtered.size,
-                            isLoading = uiState.isLoading,
+                // This branch has no Scaffold, so the snackbar host is overlaid
+                // directly. Without it the import/sync messages were silently
+                // dropped on exactly the layout with the most room to show them.
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        AdaptiveNavigationRail(
+                            selectedCategory = uiState.selectedCategory,
+                            onCategorySelected = onCategorySelected,
                             onOpenImport = { showImportDialog = true },
                             onRefresh = onRetryClick,
                             onOpenSettings = onOpenSettings
                         )
-                        SearchBarM3(
-                            query = uiState.searchQuery,
-                            onQueryChange = onSearchQueryChanged
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        CategoryBar(
-                            selectedCategory = uiState.selectedCategory,
-                            onCategorySelected = onCategorySelected,
-                            channels = uiState.channels
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
 
-                        if (filtered.isEmpty()) {
-                            EmptyChannelState(
-                                searchQuery = uiState.searchQuery,
-                                onReset = {
-                                    onSearchQueryChanged("")
-                                    onCategorySelected(CategoryFilter.ALL)
-                                }
+                        Column(
+                            modifier = Modifier
+                                .weight(1.15f)
+                                .fillMaxHeight()
+                        ) {
+                            OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
+                            TopHeaderBar(
+                                channelCount = filtered.size,
+                                isLoading = uiState.isLoading,
+                                onOpenImport = { showImportDialog = true },
+                                onRefresh = onRetryClick,
+                                onOpenSettings = onOpenSettings
                             )
-                        } else {
-                            ChannelGrid(
-                                filtered = filtered,
-                                uiState = uiState,
-                                showLogos = settings.showLogos,
-                                isHome = isBrowsingHome,
-                                minCellSize = gridMinCellSize,
-                                onChannelClick = onChannelClick,
-                                onFavoriteToggle = onFavoriteToggle
+                            SearchBarM3(
+                                query = uiState.searchQuery,
+                                onQueryChange = onSearchQueryChanged
                             )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            CategoryBar(
+                                selectedCategory = uiState.selectedCategory,
+                                onCategorySelected = onCategorySelected,
+                                channels = uiState.channels
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            if (filtered.isEmpty()) {
+                                EmptyChannelState(
+                                    searchQuery = uiState.searchQuery,
+                                    onReset = {
+                                        onSearchQueryChanged("")
+                                        onCategorySelected(CategoryFilter.ALL)
+                                    }
+                                )
+                            } else {
+                                ChannelGrid(
+                                    filtered = filtered,
+                                    uiState = uiState,
+                                    showLogos = settings.showLogos,
+                                    isHome = isBrowsingHome,
+                                    minCellSize = gridMinCellSize,
+                                    onChannelClick = onChannelClick,
+                                    onFavoriteToggle = onFavoriteToggle
+                                )
+                            }
                         }
-                    }
 
-                    SidePlayerPane(
-                        channel = uiState.selectedChannel ?: filtered.firstOrNull(),
-                        onFullscreenClick = onChannelClick,
-                        onFavoriteToggle = onFavoriteToggle,
+                        SidePlayerPane(
+                            channel = uiState.selectedChannel ?: filtered.firstOrNull(),
+                            onFullscreenClick = onChannelClick,
+                            onFavoriteToggle = onFavoriteToggle,
+                            modifier = Modifier
+                                .weight(0.85f)
+                                .fillMaxHeight()
+                        )
+                    }
+                    SnackbarHost(
+                        hostState = snackbarHostState,
                         modifier = Modifier
-                            .weight(0.85f)
-                            .fillMaxHeight()
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp)
                     )
                 }
             }
@@ -352,6 +366,7 @@ private fun LandscapeCompactLayout(
     filtered: List<Channel>,
     isBrowsingHome: Boolean,
     gridMinCellSize: Dp,
+    snackbarHostState: SnackbarHostState,
     onSearchQueryChanged: (String) -> Unit,
     onCategorySelected: (CategoryFilter) -> Unit,
     onChannelClick: (Channel) -> Unit,
@@ -361,7 +376,6 @@ private fun LandscapeCompactLayout(
     onOpenImport: () -> Unit
 ) {
     val colors = LocalAppColors.current
-    val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
         containerColor = colors.background,
@@ -369,21 +383,13 @@ private fun LandscapeCompactLayout(
         topBar = {
             Column {
                 OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TopHeaderBar(
-                        channelCount = filtered.size,
-                        isLoading = uiState.isLoading,
-                        onOpenImport = onOpenImport,
-                        onRefresh = onRetryClick,
-                        onOpenSettings = onOpenSettings,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                TopHeaderBar(
+                    channelCount = filtered.size,
+                    isLoading = uiState.isLoading,
+                    onOpenImport = onOpenImport,
+                    onRefresh = onRetryClick,
+                    onOpenSettings = onOpenSettings
+                )
                 SearchBarM3(
                     query = uiState.searchQuery,
                     onQueryChange = onSearchQueryChanged
@@ -480,7 +486,7 @@ private fun ChannelGrid(
                     // positions and cross-fades the ones that arrive.
                     .animateItem(
                         fadeInSpec = tween(ExpressiveMotion.DURATION_MEDIUM, easing = ExpressiveMotion.emphasized),
-                        placementSpec = ExpressiveMotion.spatialMediumOffset
+                        placementSpec = ExpressiveMotion.spatialDefaultOffset
                     )
                     .staggeredEntrance(index = index)
             )
