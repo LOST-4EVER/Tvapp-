@@ -1,10 +1,8 @@
 package com.example.tuner
 
-import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
 import android.media.tv.TvContract
-import android.media.tv.TvInputManager
 import android.net.Uri
 import com.example.R
 import com.example.kurdishtv.data.ChannelCacheStorage
@@ -27,33 +25,59 @@ data class TunerSyncResult(
 )
 
 /**
+ * The TV provider's channel-table columns.
+ *
+ * Written out as strings rather than referenced as `TvContract.Channels.COLUMN_*`
+ * because the current public SDK no longer exposes several of the presentation
+ * columns this needs, and a reference to one that is not there does not compile.
+ * The provider's schema is a stable, documented contract and these are its column
+ * names; `_ID` is still referenced through `BaseColumns` because that one is
+ * genuinely part of the public API.
+ */
+private object ChannelColumns {
+    const val CHANNEL_ID = "channel_id"
+    const val INPUT_ID = "input_id"
+    const val NAME = "name"
+    const val DESCRIPTION = "description"
+    const val LOGO = "logo"
+    const val HIDDEN = "hidden"
+
+    /**
+     * Per-channel data belonging to the TV input service that published it.
+     *
+     * This is the column the whole design turns on: whatever URI is published here
+     * is the URI the system hands back to
+     * [android.media.tv.TvInputService.Session.onTune], which is how a channel
+     * number finds its way back to a stream URL.
+     */
+    const val INTERNAL_PROVIDER_DATA = "internal_provider_data"
+}
+
+/**
  * Publishes the app's channels into the system Live TV database.
  *
  * ### Where the channel list comes from
  *
  * From [TvRepository], unchanged — the same object the app's own grid is fed by. It
- * already fetches the remote playlists this app depends on, merges them, dedupes
- * them and caches the result for half an hour, and it already fails soft when a
- * source is down. A tuner that fetched and parsed the same GitHub URLs with its own
- * OkHttp call would be a second implementation of the merge, the dedupe, the retry
- * and the cache, free to drift from the first one. In particular the two would
- * disagree about what a channel is called and which of two feeds is "the" feed,
- * and the system picker would show names the app does not.
+ * already fetches the remote playlists, merges them, dedupes them, caches the result
+ * for half an hour and fails soft when a source is down. A tuner that fetched and
+ * parsed the same GitHub URLs with its own HTTP call would be a second implementation
+ * of all of that, free to drift from the first. The two would then disagree about
+ * what a channel is called and which of two feeds is "the" feed, and the system
+ * picker would show names the app does not.
  *
  * That is also why this is OkHttp and not Retrofit: OkHttp is what the project
  * already uses, through [NetworkClient], which owns the connection pool, the
- * dispatcher and the HTTP cache. Adding a second HTTP stack to save a few lines of
- * `suspend fun` would mean a second connection pool and a second cache to keep
- * warm on a device with little memory to spare.
+ * dispatcher and the HTTP cache. A second HTTP stack would mean a second connection
+ * pool and a second cache to keep warm on a device with little memory to spare.
  *
  * ### What is written
  *
- * Presentation only — name, number, category, artwork. The stream URL is
- * deliberately *not* published. The system Live TV app has no business holding a
- * URL it will never use, and the session resolves the number back to a URL through
- * [TunerChannelStore] when playback actually starts. That also means a stream URL
- * can change — which they do, constantly, on community playlists — without
- * anything in the system database needing to be rewritten.
+ * Presentation plus one URI. The stream URL is deliberately **not** published: the
+ * URI published in [ChannelColumns.INTERNAL_PROVIDER_DATA] carries only the channel
+ * number, and the session resolves that back to a URL through [TunerChannelStore]
+ * when playback actually starts. So a stream URL can change — as community playlist
+ * URLs constantly do — without anything in the system database being rewritten.
  */
 class TunerChannelSync(
     private val context: Context,
@@ -69,23 +93,26 @@ class TunerChannelSync(
      */
     private val mutex = Mutex()
 
-    suspend fun sync(forceRefresh: Boolean = false): TunerSyncResult =
-        mutex.withLock { withContext(Dispatchers.IO) { syncLocked(forceRefresh) } }
+    suspend fun sync(forceRefresh: Boolean = false, inputIdOverride: String? = null): TunerSyncResult =
+        mutex.withLock { withContext(Dispatchers.IO) { syncLocked(forceRefresh, inputIdOverride) } }
 
-    private suspend fun syncLocked(forceRefresh: Boolean): TunerSyncResult {
+    private suspend fun syncLocked(
+        forceRefresh: Boolean,
+        inputIdOverride: String?
+    ): TunerSyncResult {
         val app = context.applicationContext
-        val inputId = inputId(app) ?: return TunerSyncResult(0, 0, "No TvInputManager")
+        val inputId = inputIdOverride ?: rememberInputId(app)
+        if (inputId.isNullOrBlank()) {
+            return TunerSyncResult(0, 0, "The system has not told us our tuner id yet")
+        }
 
         val channels = try {
-            repository(app)
-                .fetchChannels(forceRefresh)
-                .getOrThrow()
-                .take(MAX_PUBLISHED_CHANNELS)
+            repository(app).fetchChannels(forceRefresh).getOrThrow().take(MAX_PUBLISHED_CHANNELS)
         } catch (e: Exception) {
             // A failed fetch is not a failure to publish. The numbers from the last
-            // good sync are still on disk, so the picker keeps working offline —
-            // which is the whole point of persisting them separately from the
-            // system rows, which the system is free to prune.
+            // good sync are still on disk, so the picker keeps working offline,
+            // which is the whole reason they are persisted separately from the
+            // system rows — the system is free to prune those.
             NetworkClient.logDebug("Tuner channel sync could not reach a source", e)
             return TunerSyncResult(0, 0, e.message ?: "Could not reach the channel sources")
         }
@@ -111,8 +138,8 @@ class TunerChannelSync(
             if (ok) published++
         }
 
-        // Only remove what we actually published as ours and no longer have. Rows
-        // belonging to other tuners are not in `existing` and are never touched.
+        // Remove only rows this tuner published and no longer has. Rows belonging
+        // to other tuners are not in `existing` and are never touched.
         var removed = 0
         for ((number, rowId) in existing) {
             if (number in liveNumbers) continue
@@ -127,41 +154,27 @@ class TunerChannelSync(
     }
 
     /**
-     * The system-assigned identity of this app's tuner.
-     *
-     * Read from the platform rather than derived from the package name, because the
-     * system is what decides it, and a hand-rolled id that merely *looks* right
-     * writes channels the system will never associate with the tuner it asked for.
-     */
-    private fun inputId(context: Context): String? = try {
-        context.getSystemService(TvInputManager::class.java)?.tunerUuid?.toString()
-    } catch (e: Exception) {
-        NetworkClient.logDebug("Could not read the tuner id", e)
-        null
-    }
-
-    /**
      * The system rows already published for this tuner, as `channel number -> row id`.
      *
-     * Needed because inserting the same channel twice is not free of consequence:
-     * the provider is keyed on the pair, but the app still has to decide between an
-     * insert and an update, and the row id is what an update or a delete needs.
+     * Needed to decide between an insert and an update, and because the row id is
+     * what an update or a delete needs.
      */
     private fun existingRows(context: Context, inputId: String): Map<Long, Long> {
         val result = HashMap<Long, Long>()
         try {
             context.contentResolver.query(
                 TvContract.Channels.CONTENT_URI,
-                arrayOf(TvContract.Channels._ID, TvContract.Channels.COLUMN_CHANNEL_ID),
-                "${TvContract.Channels.COLUMN_INPUT_ID} = ?",
+                arrayOf(TvContract.Channels._ID, ChannelColumns.CHANNEL_ID),
+                "${ChannelColumns.INPUT_ID} = ?",
                 arrayOf(inputId),
                 null
             )?.use { cursor ->
                 val idIndex = cursor.getColumnIndexOrThrow(TvContract.Channels._ID)
-                val numberIndex =
-                    cursor.getColumnIndexOrThrow(TvContract.Channels.COLUMN_CHANNEL_ID)
-                while (cursor.moveToNext()) {
-                    result[cursor.getLong(numberIndex)] = cursor.getLong(idIndex)
+                val numberIndex = cursor.getColumnIndex(ChannelColumns.CHANNEL_ID)
+                if (numberIndex >= 0) {
+                    while (cursor.moveToNext()) {
+                        result[cursor.getLong(numberIndex)] = cursor.getLong(idIndex)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -171,45 +184,35 @@ class TunerChannelSync(
     }
 
     /**
-     * Builds the presentation row for one channel.
+     * Builds the row for one channel.
      *
-     * Two columns are deliberately left alone on every update:
+     * `hidden` is never written, and neither is the viewer's own channel number:
+     * writing whole rows back wholesale would resurrect every channel the viewer
+     * had hidden or renumbered in the system UI, on every sync. That is the sort of
+     * thing that makes people uninstall a TV app.
      *
-     *  - `COLUMN_HIDDEN`, which is the viewer's own decision to hide a channel from
-     *    the picker. Writing the whole row back wholesale would resurrect every
-     *    channel the viewer had hidden, on every sync, which is the sort of thing
-     *    that makes people uninstall a TV app.
-     *  - `COLUMN_NUMBER`, for the same reason: the number the viewer assigned is
-     *    theirs, not ours.
-     *
-     * `COLUMN_LOGO` is the app's own icon rather than the channel's remote artwork.
-     * The column is specified as a content or file URI; a remote `http` URL is
-     * resolved by the Live TV app with no guarantee at all, and a broken tile in the
-     * channel list looks like a fault. The per-channel artwork the playlists carry
-     * is already on screen in the app's own grid, where it is loaded properly.
+     * The logo is the app's own icon rather than the channel's remote artwork. The
+     * column is specified for a content or file URI, and a remote `http` URL is
+     * resolved by the Live TV app with no guarantee at all — a broken tile in the
+     * channel list reads as a fault rather than as a missing image. The per-channel
+     * artwork the playlists carry is already on screen in the app's own grid, where
+     * it is loaded properly.
      */
     private fun rowValues(
         context: Context,
         inputId: String,
         channel: TunerChannel
     ): ContentValues = ContentValues().apply {
-        put(TvContract.Channels.COLUMN_CHANNEL_ID, channel.number)
-        put(TvContract.Channels.COLUMN_INPUT_ID, inputId)
-        put(TvContract.Channels.COLUMN_NAME, channel.name)
-        put(TvContract.Channels.COLUMN_DESCRIPTION, channel.category)
-        put(TvContract.Channels.COLUMN_LOGO, appLogoUri(context))
-        // Per-channel custom data, the documented slot for it. Not how the session
-        // resolves a stream — that goes through the channel number — but it round
-        // trips in `TuneRequest.getAdapterData()` on some framework paths, so it is
-        // a free second way back to the same answer.
-        put(
-            TvContract.Channels.COLUMN_INTERNAL_PRESENTATION_DATA,
-            Uri.parse("$PRESENTATION_SCHEME://channel/${channel.number}")
-        )
+        put(ChannelColumns.CHANNEL_ID, channel.number)
+        put(ChannelColumns.INPUT_ID, inputId)
+        put(ChannelColumns.NAME, channel.name)
+        put(ChannelColumns.DESCRIPTION, channel.category)
+        put(ChannelColumns.LOGO, appLogoUri(context))
+        put(ChannelColumns.INTERNAL_PROVIDER_DATA, channelUri(channel.number))
     }
 
     private fun appLogoUri(context: Context): Uri = Uri.parse(
-        "${ContentResolver.SCHEME_ANDROID_RESOURCE}://${context.packageName}/${R.mipmap.ic_launcher}"
+        "android.resource://${context.packageName}/${R.mipmap.ic_launcher}"
     )
 
     /**
@@ -226,18 +229,53 @@ class TunerChannelSync(
 
     companion object {
         /**
-         * How many channels are published to the system.
+         * How many channels are published.
          *
-         * The merge can run to a few thousand entries once community playlists are
-         * imported, and every one of them is a row the system has to index, hold and
-         * render in a picker that has to stay responsive on a television. The list
-         * keeps the source's own order, so this takes the first N — the curated and
-         * primary sources, which are the channels a viewer would actually want at
-         * the top of a list they scroll with a remote.
+         * The merge runs to a few thousand entries once community playlists are
+         * imported, and each one is a row the system has to index, hold and render
+         * in a picker that has to stay responsive on a television. The list keeps
+         * the source's own order, so this takes the first N — the curated and
+         * primary sources, which are the channels a viewer scrolling with a remote
+         * would want at the top anyway.
          */
         const val MAX_PUBLISHED_CHANNELS = 800
 
-        private const val PRESENTATION_SCHEME = "kurdishtv"
+        private const val CHANNEL_URI_SCHEME = "kurdishtv"
+
+        private const val INPUT_ID_PREFS = "kurdish_tv_tuner"
+        private const val KEY_INPUT_ID = "input_id"
+
+        /** The per-channel URI the system hands back to `Session.onTune`. */
+        fun channelUri(number: Long): Uri = Uri.parse("$CHANNEL_URI_SCHEME://channel/$number")
+
+        /** The channel number a tune URI names, or 0 when it names nothing we own. */
+        fun channelNumberOf(uri: Uri): Long {
+            if (!CHANNEL_URI_SCHEME.equals(uri.scheme, ignoreCase = true)) return 0L
+            return uri.lastPathSegment?.toLongOrNull() ?: 0L
+        }
+
+        /** The tuner id the system assigned, as learned on a previous run. */
+        fun rememberInputId(context: Context): String? = try {
+            context.applicationContext
+                .getSharedPreferences(INPUT_ID_PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_INPUT_ID, null)
+                ?.takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        }
+
+        fun rememberInputId(context: Context, inputId: String) {
+            try {
+                context.applicationContext
+                    .getSharedPreferences(INPUT_ID_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_INPUT_ID, inputId)
+                    .apply()
+            } catch (_: Exception) {
+                // Not being able to remember it only costs a sync on first
+                // launch each time. It must never stop the current one.
+            }
+        }
 
         /** The file the tuner's channel numbers live in. */
         fun store(context: Context): TunerChannelStore = TunerChannelStore(

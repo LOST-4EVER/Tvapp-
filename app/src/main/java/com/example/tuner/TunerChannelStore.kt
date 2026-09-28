@@ -8,12 +8,11 @@ import java.io.File
 /**
  * One channel as the system Live TV app sees it.
  *
- * [number] is the identity handed to `TvContract.Channels.COLUMN_CHANNEL_ID` — a
+ * [number] is the identity handed to the TV provider as the channel's own id — a
  * number the *user* would recognise as a channel number, and, more importantly, the
- * only stable key the framework hands back to a session in
- * [android.media.tv.TuneRequest.getChannelId]. It is therefore the join between the
- * system picker and the stream URL, which is why it has to survive refreshes
- * untouched.
+ * only stable key that survives a refresh. It travels to the system inside the
+ * per-channel URI and comes back on `Session.onTune`, which is what makes it the
+ * join between the system picker and the stream URL.
  *
  * [sourceId] is the parser's own channel id, which is stable across refreshes by
  * design. It is what "the same channel" is decided by.

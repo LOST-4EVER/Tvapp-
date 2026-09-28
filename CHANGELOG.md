@@ -17,9 +17,10 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Channel numbers are assigned once and persisted, never renumbered on a refresh.
     The system records the viewer's current channel, favourites and guide offsets
     against those numbers, so a channel moving from 340 to 12 looks deleted.
-  - Only presentation is published — name, number, category, artwork. The stream URL
-    stays in the app, resolved at playback time, so a URL that rots (as community
-    playlist URLs do) needs nothing rewritten in the system database.
+  - Only presentation is published — name, number, category, artwork — plus a
+    per-channel URI carrying the channel number. The stream URL stays in the app and
+    is resolved at playback time, so a URL that rots (as community playlist URLs do)
+    needs nothing rewritten in the system database.
   - The channel list comes from the same repository, parser and cache the app's own
     grid is fed by, so the two can never disagree about a name or a stream.
   - `COLUMN_HIDDEN` and `COLUMN_NUMBER` are never written, so channels a viewer
