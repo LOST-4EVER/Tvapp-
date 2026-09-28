@@ -207,8 +207,10 @@ class TunerChannelSync(
         put(ChannelColumns.INPUT_ID, inputId)
         put(ChannelColumns.NAME, channel.name)
         put(ChannelColumns.DESCRIPTION, channel.category)
-        put(ChannelColumns.LOGO, appLogoUri(context))
-        put(ChannelColumns.INTERNAL_PROVIDER_DATA, channelUri(channel.number))
+        // `ContentValues` has no `Uri` overload — the provider stores both of these
+        // as text, and the framework parses them back on the way out.
+        put(ChannelColumns.LOGO, appLogoUri(context).toString())
+        put(ChannelColumns.INTERNAL_PROVIDER_DATA, channelUri(channel.number).toString())
     }
 
     private fun appLogoUri(context: Context): Uri = Uri.parse(

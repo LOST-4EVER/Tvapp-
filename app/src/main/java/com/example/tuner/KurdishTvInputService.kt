@@ -1,5 +1,6 @@
 package com.example.tuner
 
+import android.media.tv.TvInputService
 import android.net.Uri
 import android.view.Surface
 import androidx.annotation.OptIn
@@ -220,6 +221,7 @@ private class TunerSession(
      * matters most here: a live stream that lets the device drop its Wi-Fi radio
      * between segments stops for good, and the only symptom is a frozen picture.
      */
+    @OptIn(UnstableApi::class)
     private fun obtainPlayer(): ExoPlayer {
         player?.let { return it }
 
