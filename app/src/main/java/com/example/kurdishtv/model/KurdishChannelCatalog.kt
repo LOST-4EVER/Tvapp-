@@ -358,15 +358,6 @@ object KurdishChannelCatalog {
             isHd = true
         ),
         Channel(
-            id = "channel8",
-            name = "Channel8",
-            streamUrl = "https://live.channel8.com/Channel8-Kurdish/index.fmp4.m3u8",
-            logoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Channel8corp.png/960px-Channel8corp.png",
-            category = "General",
-            quality = "HLS / 720p",
-            isHd = false
-        ),
-        Channel(
             id = "emantv",
             name = "EmanTv",
             streamUrl = "https://avr.host247.net/live/emantv/playlist.m3u8",
@@ -654,5 +645,311 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         )
+        // ── Harvested channels ────────────────────────────────────────────────────
+        // Every entry below was found in the app's own live sources plus public
+        // community playlists, then verified end to end: the master playlist
+        // resolves, its highest-bandwidth variant resolves, and a real media
+        // segment from that variant returns MPEG-TS/fMP4 bytes. A 200 on the
+        // master alone is not proof a stream plays — Channel 8's fMP4 path
+        // answered 200 at every level and 403 on every segment, so its duplicate
+        // entry was removed rather than kept.
+        //
+        // `quality` is the resolution the source actually publishes. Where a
+        // playlist advertises no RESOLUTION attribute it reads "HLS / Auto"
+        // rather than guessing, and the card shows that verbatim.
+
+        Channel(
+            id = "iraqia_sports",
+            name = "Iraqya Sports",
+            streamUrl = "https://imn-live.esite-lab.com/hls/iraqia-sports-1.m3u8",
+            category = "Sport",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "mmn_sport",
+            name = "MMN Sport",
+            streamUrl = "http://mmn.mypsx.net:1935/live/mmnhdsport/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/8NG9hZMg/MMNSPORT.png",
+            category = "Sport",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "mmn_kids",
+            name = "MMN Kids",
+            streamUrl = "http://mmn.mypsx.net:1935/live/mmnhdkids/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/GdS0dL0X/mmnkid.png",
+            category = "Kids",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "spi_kids",
+            name = "Spi Kids",
+            streamUrl = "https://live20.bozztv.com/giatv/giatv-spikids4k2025/spikids4k2025/chunks.m3u8",
+            logoUrl = "https://i.postimg.cc/nFJkFmgm/KIDS.png",
+            category = "Kids",
+            quality = "HLS / Auto",
+            isHd = true
+        ),
+        Channel(
+            id = "mmn_quran",
+            name = "MMN Quran",
+            streamUrl = "http://mmn.mypsx.net:1935/live/mmnhdquran/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/08wJZLfh/quran.png",
+            category = "Quran",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "soz_quran",
+            name = "Soz Quran",
+            streamUrl = "http://live20.bozztv.com/giatv/giatv-sozquran/sozquran/chunks.m3u8",
+            logoUrl = "https://i.postimg.cc/xfDMt1tB/SOZ.png",
+            category = "Quran",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "mmn_documentary",
+            name = "MMN Documentary",
+            streamUrl = "http://mmn.mypsx.net:1935/live/mmnhddocumentary/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/by0Sfk4T/clip.png",
+            category = "Documentary",
+            quality = "HLS / 720p",
+            isHd = true
+        ),
+        Channel(
+            id = "bnar_tv",
+            name = "BNAR TV",
+            streamUrl = "https://cdn.karwan.tv/bnar-family/tracks-v1a1/mono.m3u8",
+            logoUrl = "https://i.postimg.cc/byWG7G01/BARINF.png",
+            category = "Kurdish",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "bnar_movies",
+            name = "BNAR Movies",
+            streamUrl = "https://cdn.karwan.tv/bnar-movies/tracks-v1a1/mono.m3u8",
+            logoUrl = "https://i.postimg.cc/1yGh2Bc1/bnarmov.png",
+            category = "Kurdish",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "bnar_action",
+            name = "BNAR Action",
+            streamUrl = "https://cdn.karwan.tv/bnar-action/tracks-v1a1/mono.m3u8",
+            category = "Kurdish",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "barin_movies",
+            name = "Barin Movies",
+            streamUrl = "https://cdn.karwan.tv/barin-movies/tracks-v1a1/mono.m3u8",
+            logoUrl = "https://i.postimg.cc/gzZc6gR6/Barinm.png",
+            category = "Kurdish",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "infinity_tv",
+            name = "Infinity TV",
+            streamUrl = "https://cdn.karwan.tv/infinity-tv/tracks-v1a1/mono.m3u8",
+            category = "Kurdish",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "rojhelat",
+            name = "Rozhelat",
+            streamUrl = "https://hlspackager.akamaized.net/live/DB/ROJHELAT/HLS/ROJHELAT-avc1_2500000=10002,mp4a_128000=20000.m3u8",
+            logoUrl = "https://www.rojhelat.media/wp-content/uploads/2026/01/logo-mob-2.png",
+            category = "Kurdish",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "nuce_tv",
+            name = "NUÇE TV",
+            streamUrl = "https://hlspackager.akamaized.net/live/DB/NU_TV/HLS/NU_TV.m3u8",
+            logoUrl = "https://i.ibb.co/7x6grdcN/WORLD-TV-PLUS-NUCE-TV.jpg",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "gk_plus",
+            name = "GK Plus",
+            streamUrl = "https://live.host247.net/gk/gkplus/playlist.m3u8",
+            logoUrl = "https://i.ibb.co/kgVxwSNk/WORLD-TV-PLUS-GK-PLUS.jpg",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "ranya_city",
+            name = "Ranya City",
+            streamUrl = "https://avr.host247.net/Ranya/RanyaCity/playlist.m3u8",
+            logoUrl = "https://i.ibb.co/VcK15tpv/WORLD-TV-PLUS-RANYA-CITY.jpg",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "halabja_tv",
+            name = "Halabja TV",
+            streamUrl = "http://halabjatv.ddns.net:40/live/halabjatv/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/ChRybCtn/halabja.png",
+            category = "Kurdish",
+            quality = "HLS / 720p",
+            isHd = true
+        ),
+        Channel(
+            id = "denge_zelal",
+            name = "Denge Zelal",
+            streamUrl = "https://dengetv.ozelip.com:3143/live/dengelive.m3u8",
+            logoUrl = "https://r.resimlink.com/Tvf-DB3hOso8.png",
+            category = "Kurdish",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "shna_tv",
+            name = "Shna TV",
+            streamUrl = "http://shnatv.ddns.net:1935/live/shnatv/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/zDRMbxtm/D73-D4-D06-8642-4-D17-AC21-B718-D5-D84064.jpg",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "iraqia_syriac",
+            name = "Iraqia Syriac",
+            streamUrl = "https://imn-live.esite-lab.com/hls/iraqia-syriac.m3u8",
+            category = "Kurdish",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "mihrab_tv",
+            name = "Mihrab TV",
+            streamUrl = "http://bblserver.ddns.net:1935/live/mihrabfm/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/y1r0XkCp/minara.png",
+            category = "Religious",
+            quality = "HLS / 720p",
+            isHd = true
+        ),
+        Channel(
+            id = "soran_entertainment",
+            name = "Soran Entertainment",
+            streamUrl = "http://avrstream.com:1935/live/SoranEntertainment/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/Y9Tw96J5/Pics-Art-25-08-01-16-59-38-543.png",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "kurd7",
+            name = "Kurd 7",
+            streamUrl = "http://avrstream.com:1935/live/Kurd7HD/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/xy7W0wD.png",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "bask_plus",
+            name = "Bask Plus",
+            streamUrl = "http://baskhd.ddns.net:40/live/baskhd/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/CxFf6zdt/photo-2026-02-16-06-41-54.jpg",
+            category = "Kurdish",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "euro_kurd",
+            name = "Euro Kurd",
+            streamUrl = "http://baskhd.ddns.net:40/live/Eurokurd/playlist.m3u8",
+            logoUrl = "https://i.postimg.cc/08Vjd4K2/EKURD.png",
+            category = "Kurdish",
+            quality = "HLS / 720p",
+            isHd = true
+        ),
+        Channel(
+            id = "mmn_news",
+            name = "MMN News",
+            streamUrl = "http://mmn.mypsx.net:1935/live/mmnhdnews/playlist.m3u8",
+            category = "News",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "mmn_movies",
+            name = "MMN Movies",
+            streamUrl = "http://mmn.mypsx.net:1935/live/mmnhdmovies/playlist.m3u8",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "mmn_action",
+            name = "MMN Action",
+            streamUrl = "http://mmn.mypsx.net:1935/live/mmnhdaction/playlist.m3u8",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "mmn_show",
+            name = "MMN Show",
+            streamUrl = "http://mmn.mypsx.net:1935/live/mmnhddshow/playlist.m3u8",
+            category = "General",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
+        Channel(
+            id = "al_jazeera_2",
+            name = "Al Jazeera 2",
+            streamUrl = "https://live-hls-web-aja2-gcp.thehlive.com/AJA2/01.m3u8",
+            category = "News",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "al_jazeera_mubasher",
+            name = "Al Jazeera Mubasher",
+            streamUrl = "https://live-hls-web-ajm-bp.thehlive.com/AJM/01.m3u8",
+            category = "News",
+            quality = "HLS / Auto",
+            isHd = false
+        ),
+        Channel(
+            id = "trt_arabic",
+            name = "TRT Arabic",
+            streamUrl = "https://tv-trtarabi.medya.trt.com.tr/master_1080.m3u8",
+            category = "General",
+            quality = "HLS / Auto",
+            isHd = true
+        ),
+        Channel(
+            id = "trt_1",
+            name = "TRT 1",
+            streamUrl = "https://tv-trt1.medya.trt.com.tr/master_720.m3u8",
+            category = "General",
+            quality = "HLS / Auto",
+            isHd = true
+        ),
+        Channel(
+            id = "sky_news_arabia",
+            name = "Sky News Arabia",
+            streamUrl = "https://stream.skynewsarabia.com/hls/sna_720.m3u8",
+            category = "News",
+            quality = "HLS / 1080p",
+            isHd = true
+        ),
     )
 }

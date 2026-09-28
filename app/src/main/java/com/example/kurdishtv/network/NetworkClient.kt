@@ -50,15 +50,60 @@ object NetworkClient {
     @Volatile
     private var clientInstance: OkHttpClient? = null
 
+    @Volatile
+    private var mediaClientInstance: OkHttpClient? = null
+
     fun getOkHttpClient(context: Context): OkHttpClient {
         return clientInstance ?: synchronized(this) {
             clientInstance ?: buildClient(context.applicationContext).also { clientInstance = it }
         }
     }
 
+    /**
+     * A second client dedicated to video, deliberately **not** sharing the
+     * playlist client's cache or dispatcher.
+     *
+     * Sharing them caused two real problems:
+     *
+     *  - HLS segments were written into the 64 MB HTTP cache. Segment responses
+     *    usually carry no `Cache-Control`, so OkHttp stored megabytes of MPEG-TS
+     *    and evicted the playlists and logo images that actually benefit from
+     *    being cached.
+     *  - The playlist client allows 6 concurrent requests per host, and it is
+     *    shared with Coil. A grid scrolling past a dozen logos from one CDN could
+     *    hold those slots open while a stream was trying to fetch its segments
+     *    from that same host, so playback stalled behind logo loading.
+     *
+     * Video also needs a longer read timeout: these streams are frequently served
+     * from slow origins, and a 15 s cutoff aborts segments that were about to land.
+     */
+    private fun getMediaClient(context: Context): OkHttpClient {
+        return mediaClientInstance ?: synchronized(this) {
+            mediaClientInstance ?: OkHttpClient.Builder()
+                .dispatcher(
+                    Dispatcher().apply {
+                        maxRequests = 16
+                        maxRequestsPerHost = 8
+                    }
+                )
+                .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(15, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                // No cache and no gzip interceptor: a media body must stream
+                // through untouched, and re-encoding video to save bandwidth costs
+                // far more than it saves on a live stream.
+                .build()
+                .also { mediaClientInstance = it }
+        }
+    }
+
     @UnstableApi
     fun createMediaDataSourceFactory(context: Context): OkHttpDataSource.Factory {
-        return OkHttpDataSource.Factory(getOkHttpClient(context))
+        return OkHttpDataSource.Factory(getMediaClient(context))
             .setUserAgent(USER_AGENT)
     }
 
