@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -40,7 +41,6 @@ import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.rememberMorphingCorners
-import com.example.kurdishtv.ui.motion.rememberMorphingPolygon
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -68,12 +68,11 @@ fun FeaturedHeroCard(
         isActive = isFocused,
         spec = ExpressiveMotion.spatialDefault
     )
-    val logoShape = rememberMorphingPolygon(
+    val logoShape = rememberMorphingCorners(
         rest = ShapeMorph.logoRest,
         active = ShapeMorph.logoActive,
         isActive = isFocused,
-        spec = ExpressiveMotion.spatialDefault,
-        rotationWhileActive = 30f
+        spec = ExpressiveMotion.spatialDefault
     )
 
     Card(
@@ -120,7 +119,7 @@ fun FeaturedHeroCard(
                         LiveBadge()
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
-                            shape = M3ExpressiveShapes.Pill,
+                            shape = RoundedCornerShape(percent = 50),
                             color = colors.primaryContainer
                         ) {
                             Text(
@@ -140,7 +139,7 @@ fun FeaturedHeroCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -150,7 +149,7 @@ fun FeaturedHeroCard(
                         shape = logoShape,
                         color = colors.surfaceElevated,
                         modifier = Modifier
-                            .size(76.dp)
+                            .size(72.dp)
                             .border(1.dp, colors.border, logoShape)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -158,8 +157,8 @@ fun FeaturedHeroCard(
                                 channelName = channel.name,
                                 logoUrl = channel.logoUrl,
                                 showLogos = showLogos,
-                                contentPadding = 9.dp,
-                                size = 76.dp,
+                                contentPadding = 8.dp,
+                                size = 72.dp,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -171,7 +170,7 @@ fun FeaturedHeroCard(
                         Text(
                             text = channel.name,
                             color = colors.textPrimary,
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -185,38 +184,39 @@ fun FeaturedHeroCard(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        // The primary action sits with the channel's name rather than
+                        // on a row of its own. It used to be a full-width band under
+                        // three stacked rows, which made the hero so tall that on a
+                        // phone you scrolled past it before reaching a single
+                        // channel — the hero was eating the screen it was meant to
+                        // introduce.
+                        Button(
+                            onClick = { onWatchClick(channel) },
+                            shape = RoundedCornerShape(percent = 50),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.primary,
+                                contentColor = colors.onPrimary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                            // No extra clickable here: the whole card is already a
+                            // click target, so a second one would fire it twice.
+                            modifier = Modifier.align(Alignment.Start)
+                        ) {
+                            SvgIcon(
+                                resId = KurdishTvIcons.PlayRes,
+                                contentDescription = null,
+                                tint = colors.onPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(7.dp))
+                            Text(
+                                text = "Watch live now",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // A full-width filled button is the loudest thing on the page and
-                // competes with the artwork it sits under. Sized to its label it
-                // still reads as the primary action.
-                Button(
-                    onClick = { onWatchClick(channel) },
-                    shape = M3ExpressiveShapes.Pill,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.primary,
-                        contentColor = colors.onPrimary
-                    ),
-                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
-                    // No extra clickable here: the whole card is already a click
-                    // target, so a second one would fire the action twice.
-                    modifier = Modifier.align(Alignment.Start)
-                ) {
-                    SvgIcon(
-                        resId = KurdishTvIcons.PlayRes,
-                        contentDescription = null,
-                        tint = colors.onPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Watch live now",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
                 }
             }
         }

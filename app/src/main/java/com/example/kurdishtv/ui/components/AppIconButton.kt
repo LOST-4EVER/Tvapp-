@@ -24,11 +24,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
-import com.example.kurdishtv.ui.motion.rememberMorphingPolygon
-import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
+import com.example.kurdishtv.ui.motion.rememberMorphingCorners
 import com.example.ui.theme.LocalAppColors
 
 /**
@@ -60,20 +60,18 @@ enum class AppIconButtonStyle {
  * Everything that renders an icon inside a tappable circle goes through here, so press
  * feedback, glyph size and the border treatment stay identical across screens.
  *
- * The shape is the interesting part. The button rests as a circle and squares off —
- * with a quarter turn, so it lands on its corner — while it is held. A circle that
- * becomes a rounded square under a finger is the clearest possible reading of "this is
- * being pressed", and unlike a ripple it is still visible from across a room and to
- * someone who has reduced motion switched on at the system level.
+ * The shape is the interesting part. The button rests as a circle and squares off
+ * while it is held. A circle that becomes a rounded square under a finger is the
+ * clearest possible reading of "this is being pressed", and unlike a ripple it is still
+ * visible from across a room and to someone who has reduced motion switched on at the
+ * system level.
  *
- * It is a circle-to-square morph rather than a lobed one on purpose. A control carries
- * a glyph, and a seven-lobed silhouette around a gear leaves the gear off-centre and
- * makes the button's points overlap its neighbours. The expressive half of the app's
- * shape vocabulary goes on the surfaces that can carry it.
- *
- * An [active] control takes a second step: its shape settles into a hexagon, so a
- * muted-mute button or an armed sleep timer reads as *set* even before its tint is
- * noticed.
+ * It is a circle-to-squircle morph on the corner scale, not a lobed polygon. A control
+ * carries a glyph, and a control's outline is also its **clip**: every one of these
+ * buttons is a `Surface`, so whatever the shape is, the glyph is drawn inside that same
+ * outline. That is why the Expressive library came off the controls entirely — a
+ * polygon whose arc bulged across its own outline clipped its own icon away, and the
+ * button rendered as an empty disc.
  */
 @Composable
 fun AppIconButton(
@@ -111,29 +109,17 @@ fun AppIconButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    // All three shapes are built unconditionally and one is chosen between them.
-    // Calling composables from inside a branch would change how many slots this
-    // composable occupies depending on press state, which is exactly the sort of
-    // thing that turns into a "slot table changed structure" crash later on.
-    val pressedShape = rememberMorphingPolygon(
-        rest = ShapeMorph.buttonRest,
-        active = ShapeMorph.buttonPressed,
+    // Sized as a fraction of this button's own [size], not a fixed dp radius: the
+    // same token is a circle at 40dp, at 44dp and at the rail's 36dp, and the clamp
+    // in `cornerRadius` means no caller can request a radius its button is too small
+    // to carry. A hard-coded 20dp was a circle on one of those and a broken shape on
+    // another.
+    val shape: Shape = rememberMorphingCorners(
+        rest = CornerScale.uniform(ShapeMorph.cornerRadius(size, 0.5f)),
+        active = CornerScale.uniform(ShapeMorph.cornerRadius(size, 0.28f)),
         isActive = isPressed,
-        spec = ExpressiveMotion.spatialFast,
-        rotationWhileActive = 45f
+        spec = ExpressiveMotion.spatialFast
     )
-    val activeShape = rememberMorphingPolygon(
-        rest = ShapeMorph.buttonRest,
-        active = M3ExpressivePolygons.Pentagon,
-        isActive = active,
-        spec = ExpressiveMotion.spatialDefault
-    )
-    val restShape = remember { ShapeMorph.buttonRest.toShape() }
-    val shape: Shape = when {
-        isPressed -> pressedShape
-        active -> activeShape
-        else -> restShape
-    }
 
     Surface(
         shape = shape,
@@ -189,12 +175,10 @@ fun SquishyPillButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val shape = rememberMorphingPolygon(
-        rest = ShapeMorph.chipRest,
-        active = ShapeMorph.chipActive,
-        isActive = isPressed || active,
-        spec = ExpressiveMotion.spatialFast
-    )
+    // A percent radius rather than a dp one: this pill is ~30dp tall, and half of
+    // that is 15dp, so the 20dp "active" radius it used to take made its own corners
+    // overlap. A pill is a pill at every size, and this is a pill.
+    val shape: Shape = ShapeMorph.pill
 
     Surface(
         shape = shape,

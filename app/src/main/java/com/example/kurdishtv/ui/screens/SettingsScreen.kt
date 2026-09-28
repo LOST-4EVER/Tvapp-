@@ -110,59 +110,13 @@ fun SettingsScreen(
                 SettingsHeader(onBack = onBack)
             }
 
-            // ── Appearance ────────────────────────────────────────────────────
-            item(key = "appearance") {
-                SettingsSection(
-                    title = "Appearance",
-                    subtitle = "Colors, theme and motion",
-                    iconRes = KurdishTvIcons.Tune
-                ) {
-                    SectionLabel("Accent color")
-                    AccentSwatchRow(
-                        selected = settings.accent,
-                        // With Material You on, the swatch that is visibly in use is
-                        // the wallpaper's, not the stored one. Marking the stored
-                        // accent as selected made the screen claim a colour the app
-                        // was not drawing.
-                        overridden = settings.dynamicColor && supportsDynamicColor,
-                        onSelect = { accent -> onUpdate { it.copy(accent = accent) } }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SettingsSwitchRow(
-                        iconRes = KurdishTvIcons.Palette,
-                        title = "Material You colors",
-                        subtitle = if (supportsDynamicColor) {
-                            "Match your wallpaper (Android 12+)"
-                        } else {
-                            "Requires Android 12 or newer"
-                        },
-                        checked = settings.dynamicColor && supportsDynamicColor,
-                        enabled = supportsDynamicColor,
-                        onCheckedChange = { value -> onUpdate { it.copy(dynamicColor = value) } }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SectionLabel("Theme")
-                    SegmentedOptions(
-                        options = ThemeMode.entries,
-                        selected = settings.themeMode,
-                        labelOf = { it.displayName },
-                        onSelect = { mode -> onUpdate { it.copy(themeMode = mode) } }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SectionLabel("Motion")
-                    SegmentedOptions(
-                        options = MotionLevel.entries,
-                        selected = settings.motion,
-                        labelOf = { it.displayName },
-                        onSelect = { level -> onUpdate { it.copy(motion = level) } }
-                    )
-                }
-            }
-
             // ── Playback ──────────────────────────────────────────────────────
+            //
+            // First, not third. Of everything on this screen, playback is the only
+            // thing someone opens Settings to change *because it annoyed them while
+            // watching* — autoplay fighting them, controls vanishing mid-tap. It is
+            // the section most likely to be needed and the least likely to be found
+            // if it is buried under colour pickers.
             item(key = "playback") {
                 SettingsSection(
                     title = "Playback",
@@ -219,7 +173,75 @@ fun SettingsScreen(
                 }
             }
 
+            // ── Appearance ────────────────────────────────────────────────────
+            item(key = "appearance") {
+                SettingsSection(
+                    title = "Appearance",
+                    subtitle = "Colors, theme and motion",
+                    iconRes = KurdishTvIcons.Tune
+                ) {
+                    SectionLabel("Accent color")
+                    AccentSwatchRow(
+                        selected = settings.accent,
+                        // With Material You on, the swatch that is visibly in use is
+                        // the wallpaper's, not the stored one. Marking the stored
+                        // accent as selected made the screen claim a colour the app
+                        // was not drawing.
+                        overridden = settings.dynamicColor && supportsDynamicColor,
+                        onSelect = { accent -> onUpdate { it.copy(accent = accent) } }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SettingsSwitchRow(
+                        iconRes = KurdishTvIcons.Palette,
+                        title = "Material You colors",
+                        subtitle = if (supportsDynamicColor) {
+                            "Match your wallpaper (Android 12+)"
+                        } else {
+                            "Requires Android 12 or newer"
+                        },
+                        checked = settings.dynamicColor && supportsDynamicColor,
+                        enabled = supportsDynamicColor,
+                        onCheckedChange = { value -> onUpdate { it.copy(dynamicColor = value) } }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SectionLabel("Theme")
+                    SegmentedOptions(
+                        options = ThemeMode.entries,
+                        selected = settings.themeMode,
+                        labelOf = { it.displayName },
+                        onSelect = { mode -> onUpdate { it.copy(themeMode = mode) } }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SectionLabel("Motion")
+                    SegmentedOptions(
+                        options = MotionLevel.entries,
+                        selected = settings.motion,
+                        labelOf = { it.displayName },
+                        onSelect = { level -> onUpdate { it.copy(motion = level) } }
+                    )                }
+            }
+
+            // ── Update ────────────────────────────────────────────────────────
+            item(key = "update") {
+                UpdateCard(
+                    state = updateState,
+                    onCheck = onCheckForUpdate,
+                    onDownload = onDownloadUpdate,
+                    onInstall = onInstallUpdate,
+                    onDismiss = onDismissUpdate
+                )
+            }
+
             // ── Data ──────────────────────────────────────────────────────────
+            //
+            // Below Update, above About. Every row in this section destroys
+            // something, and one of them resets every other preference on the screen.
+            // Sat in the middle of the list it read as just another group of
+            // switches, with "Reset all settings" two rows above the app version.
+            // Buried at the end, it is where destructive actions belong.
             item(key = "data") {
                 SettingsSection(
                     title = "Data & storage",
@@ -262,15 +284,6 @@ fun SettingsScreen(
             }
 
             // ── About ─────────────────────────────────────────────────────────
-            item(key = "update") {
-                UpdateCard(
-                    state = updateState,
-                    onCheck = onCheckForUpdate,
-                    onDownload = onDownloadUpdate,
-                    onInstall = onInstallUpdate,
-                    onDismiss = onDismissUpdate
-                )
-            }
             item(key = "about") {
                 SettingsSection(
                     title = "About",

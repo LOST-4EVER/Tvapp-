@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
+import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoPlayerView
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
@@ -97,12 +97,19 @@ fun SidePlayerPane(
                     )
                 }
 
+                // The click is on the Surface, not on an `IconButton` inside it.
+                // `IconButton` enforces a 48dp minimum touch target, so nesting one in
+                // a 36dp surface measured 48dp of content in a 36dp box: the glyph was
+                // clipped by the surface outline and the hit area spilled over the
+                // pane's own edge.
                 Surface(
                     shape = CircleShape,
                     color = colors.glass,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier
+                        .size(36.dp)
+                        .bouncyClickable { onFavoriteToggle(channel.id) }
                 ) {
-                    IconButton(onClick = { onFavoriteToggle(channel.id) }) {
+                    Box(contentAlignment = Alignment.Center) {
                         SvgIcon(
                             resId = if (channel.isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
                             contentDescription = "Favorite",

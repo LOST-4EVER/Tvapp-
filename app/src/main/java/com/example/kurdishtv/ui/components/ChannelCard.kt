@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +41,6 @@ import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.rememberMorphingCorners
-import com.example.kurdishtv.ui.motion.rememberMorphingPolygon
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -211,10 +211,11 @@ fun ChannelCard(
  * colour before the name is read — and a channel with no logo at all still gets a
  * designed tile rather than a gap in the grid.
  *
- * When the card takes focus the well opens from a rounded square into a puffy blob.
- * This is the only genuinely lobed surface on the card, and it is safe here for two
- * reasons: the well holds an image and no text, and the puffy shape's bounds fill the
- * tile exactly, so the logo is never clipped — only the tile's own silhouette changes.
+ * When the card takes focus the well's corners open up. It used to open into a puffy
+ * lobed blob; a lobed outline on the card's largest element made the tile's silhouette
+ * fight the card's own rounded rectangle right above it, and the logo inside was no
+ * longer reliably inside *anything*. A corner that opens 20dp → 28dp says the same
+ * thing and leaves the logo exactly where it was.
  */
 @Composable
 private fun ChannelLogoWell(
@@ -229,15 +230,11 @@ private fun ChannelLogoWell(
 
     // Built unconditionally and gated on the flag, rather than called from inside a
     // branch: the composition has to keep the same shape whatever the setting is.
-    val animatedWell = rememberMorphingPolygon(
+    val animatedWell = rememberMorphingCorners(
         rest = ShapeMorph.logoRest,
         active = ShapeMorph.logoActive,
         isActive = isActive && allowAnimation,
-        spec = ExpressiveMotion.spatialDefault,
-        // A quarter turn on the way in. Without it the blob appears already formed and
-        // reads as a cross-fade between two outlines rather than as one tile changing
-        // shape.
-        rotationWhileActive = 45f
+        spec = ExpressiveMotion.spatialDefault
     )
     val stillWell = M3ExpressiveShapes.LogoTile
     val wellShape: Shape = if (allowAnimation) animatedWell else stillWell
@@ -287,15 +284,11 @@ internal fun CardFavoriteButton(
     onClick: () -> Unit
 ) {
     val colors = LocalAppColors.current
-    // A favourite is the one piece of state on the card with an unambiguous icon, so
-    // it is also the one place a heart-shaped silhouette is honest rather than
-    // decorative — the shape states what the glyph states.
-    val shape = rememberMorphingPolygon(
-        rest = ShapeMorph.buttonRest,
-        active = M3ExpressivePolygons.Heart,
-        isActive = isFavorite,
-        spec = ExpressiveMotion.spatialFast
-    )
+    // The heart *glyph* already says "favourite"; the silhouette does not need to say
+    // it a second time, and a heart outline around a heart glyph puts the two slightly
+    // out of register. The button stays a circle and signals state by fill and tint,
+    // which is also the only signal that survives being glanced at obliquely.
+    val shape = remember { RoundedCornerShape(percent = 50) }
     Surface(
         shape = shape,
         color = if (isFavorite) colors.liveRed.copy(alpha = 0.18f) else colors.glass,

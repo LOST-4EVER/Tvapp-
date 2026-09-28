@@ -29,10 +29,12 @@ import com.example.kurdishtv.ui.motion.CornerScale
  * *changes* outline, use `rememberMorphingPolygon` in `com.example.kurdishtv.ui.motion`
  * instead — a shape built here is a still frame of the library.
  *
- * The rule for choosing between the two halves is not taste, it is legibility: a lobed
- * silhouette pushed onto a surface carrying text clips the text and overlaps its
- * neighbours. So lobed shapes go on surfaces that hold only an image, or only
- * animation, and never on a control.
+ * The rule for choosing between the two halves is not taste, it is that a control's
+ * outline is also its **clip**. A `Surface` draws its background *and* its content
+ * inside the shape it is given, so a lobed or malformed outline does not merely look
+ * wrong — it cuts the glyph out of its own button. Every interactive surface in this
+ * app is therefore on the corner scale, and the expressive half is confined to the
+ * focus ring and the loading sequence, where nothing is clipped and nothing is read.
  */
 object M3ExpressiveShapes {
 
@@ -84,7 +86,37 @@ object M3ExpressiveShapes {
         val pressed = CornerScale.uniform(10.dp)
     }
 
-    // ── Geometric foundations ────────────────────────────────────────────────
+    // ── Pill ─────────────────────────────────────────────────────────────────
+
+    /**
+     * A true pill: a corner radius of 50% of the shorter side.
+     *
+     * This was the one entry in the whole vocabulary that a *control* reached for
+     * through the polygon library, and it was the source of most of the visible
+     * breakage — a pill was the shape behind the category chips, the "Watch live now"
+     * button, the FEATURED tag, every dialog's primary button, the offline banner, the
+     * update card and the sleep-timer chips.
+     *
+     * `RoundedCornerShape(percent = 50)` is what Material's own `Pill` is, and it is
+     * exact for every size: the radius tracks the shorter side, so the same token is a
+     * pill at 34dp tall and a stadium at 200dp wide, and a label of any length stays
+     * inside it. The polygon version had to be refitted to its box every frame and
+     * still came out as a pointed lens.
+     */
+    val Pill: Shape = RoundedCornerShape(percent = 50)
+
+    /** A pill with a pinch in it, for selection states that should not change hue. */
+    val MorphingPill: Shape = RoundedCornerShape(percent = 42)
+
+    // ── The expressive library ────────────────────────────────────────────────
+    //
+    // These mirror [M3ExpressivePolygons] and are exposed as an ordinary `Shape` for
+    // a call site that wants a fixed outline. **They are not for controls.** A
+    // control's outline is also its clip, and a lobed silhouette on a surface that
+    // carries a glyph or a label either clips the glyph away or pushes the label out
+    // of the safe area. Everything interactive in this app is on the corner scale
+    // above; this half is for the focus ring and the loading sequence, where nothing
+    // is clipped and nothing has to be read.
 
     val Circle: Shape = M3ExpressivePolygons.Circle.toShape()
     val Square: Shape = M3ExpressivePolygons.Square.toShape()
@@ -92,10 +124,6 @@ object M3ExpressiveShapes {
     val Arch: Shape = M3ExpressivePolygons.Arch.toShape()
     val SemiCircle: Shape = M3ExpressivePolygons.SemiCircle.toShape()
     val Oval: Shape = M3ExpressivePolygons.Oval.toShape()
-    val Pill: Shape = M3ExpressivePolygons.Pill.toShape()
-
-    /** A pill with a pinch in it, for selection states that should not change hue. */
-    val MorphingPill: Shape = M3ExpressivePolygons.Pill.scaled(1f, 0.82f).toShape()
 
     // ── Directional / pointed ────────────────────────────────────────────────
 
