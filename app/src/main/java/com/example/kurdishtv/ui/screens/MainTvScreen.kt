@@ -215,6 +215,8 @@ fun MainTvScreen(
                             channel = uiState.selectedChannel ?: filtered.firstOrNull(),
                             onFullscreenClick = onChannelClick,
                             onFavoriteToggle = onFavoriteToggle,
+                            // Same picture shape the fullscreen player was set to.
+                            resizeMode = settings.resizeMode,
                             modifier = Modifier
                                 .weight(0.85f)
                                 .fillMaxHeight()
