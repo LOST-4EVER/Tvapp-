@@ -8,6 +8,34 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **Search could not find channels whose name contains a separator.** The playlist
+  parser rewrites every `-` and `_` in a raw channel name into a space, so a channel
+  shown as `NRT 1` is stored under exactly that string. Typing the name the way it is
+  written in most community playlists — `nrt-1`, `NRT_1` — matched nothing, and from
+  the sofa an empty grid for a channel that is visibly on screen is indistinguishable
+  from search being broken. Both the query and the names it is compared against are
+  now put into one canonical form, so `nrt-1`, `nrt_1`, `nrt1` and `NRT 1` all find
+  the same channel. Accent and script folding are deliberately not attempted.
+- **The keyboard's Search key did nothing.** The field had no IME action, so most
+  keyboards showed a bare newline that did not submit and did not dismiss. It now
+  takes a Search action that clears focus, which is what closes the keyboard, and the
+  manifest declares `adjustResize` so the window shrinks on the older releases and TV
+  boxes whose IMEs do not report an accurate height.
+- **A downloaded update could become uninstallable.** Tapping Install without the
+  "allow from this source" permission replaced the update card's state with a
+  *failure*, and the card renders its buttons from that state — so the Install button
+  disappeared and was replaced by "Retry", which re-runs the update *check* rather
+  than the install. The flow was: tap Install, get bounced to Settings, grant the
+  permission, return, and find the already-downloaded APK could no longer be installed
+  from the app at all. The permission gap is no longer a failure state, so the button
+  survives the round trip, and the card now says up front that the permission is
+  needed. The permission is also read once per Settings visit instead of on every
+  recomposition, which was a `PackageManager` binder call per frame.
+- **A running sleep timer recomposed the entire app once a second.** The countdown
+  was three fields on the main UI state, and the navigation graph collects that
+  state, so a timer invalidated every screen beneath it — a grid of several hundred
+  cards included — sixty times a minute, to redraw a badge on a player that was often
+  not even the visible screen. It has its own flow now, collected only by the player.
 - **Two animations ran at 60fps for the whole life of the app, drawing nothing.** The
   LIVE-badge pulse and the focus-ring turn are `withFrameNanos` loops, and both were
   keyed only on whether the viewer had switched motion *off* — which says nothing

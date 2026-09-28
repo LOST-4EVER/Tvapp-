@@ -50,6 +50,15 @@ fun UpdateCard(
     onDownload: (AppUpdate) -> Unit,
     onInstall: (AppUpdate, String) -> Unit,
     onDismiss: () -> Unit,
+    /**
+     * Whether Android is still refusing to let this app install packages.
+     *
+     * When it is, the card says so *before* the viewer taps Install and then has to
+     * discover it, instead of after — and, more importantly, it stops offering a
+     * "Retry" that re-runs the update check while the APK that is already on disk
+     * sits there unusable. See the note in `TvViewModel.requestInstallUpdate`.
+     */
+    needsInstallPermission: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
@@ -136,8 +145,14 @@ fun UpdateCard(
                         is UpdateState.ReadyToInstall -> {
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Downloaded. Install to update — Android will ask you " +
-                                    "to confirm.",
+                                text = if (needsInstallPermission) {
+                                    "Downloaded and ready. Android needs permission to " +
+                                        "install this update — tap Install and allow it " +
+                                        "when the system asks."
+                                } else {
+                                    "Downloaded. Install to update — Android will ask you " +
+                                        "to confirm."
+                                },
                                 color = colors.textSecondary,
                                 fontSize = 12.sp
                             )
@@ -222,8 +237,10 @@ private fun DownloadProgress(progress: DownloadState) {
 
         is DownloadState.Running -> {
             val fraction = progress.fraction
-            // An indeterminate bar would be wrong here: the server does send a
-            // content length, so a determinate bar is more informative.
+            // Read in the draw phase is not available for a Material progress
+            // indicator, so this animates as ordinary state. It is throttled to one
+            // update per 256 KB by the downloader, so on a real connection this
+            // settles in a few frames and then stops.
             val animated by animateFloatAsState(
                 targetValue = fraction ?: 0f,
                 label = "DownloadProgress"

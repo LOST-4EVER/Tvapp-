@@ -34,6 +34,14 @@ fun KurdishTvNavGraph(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    // The sleep-timer countdown is deliberately **not** part of [TvUiState]. It used
+    // to be three fields on it, updated once a second, which meant a running timer
+    // invalidated this whole composable — and therefore the entire `NavHost` and
+    // every screen's worth of content — sixty times a minute, whether or not anyone
+    // was looking at the timer. It is a readout for the player and nothing else, so
+    // it gets its own flow that only the player collects.
+    val sleepTimer by viewModel.sleepTimer.collectAsState()
+    val needsInstallPermission by viewModel.needsInstallPermission.collectAsState()
     val settings by settingsViewModel.settings.collectAsState()
     val settingsLoaded by settingsViewModel.loaded.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
@@ -41,6 +49,12 @@ fun KurdishTvNavGraph(
     // The activity draws edge to edge, so screens must inset themselves out of the
     // status and navigation bars. The player is deliberately excluded: it hides the
     // system bars for fullscreen video and would be letterboxed by the padding.
+    //
+    // `safeDrawing` already includes the IME, which is what keeps the keyboard from
+    // covering the results while a search is being typed. The manifest's
+    // `windowSoftInputMode="adjustResize"` is what makes that inset *change* on older
+    // releases and on TV boxes whose IMEs do not report a frame-accurate height; it
+    // is belt to the insets' braces, not a substitute for them.
     val insetModifier = modifier
         .fillMaxSize()
         .windowInsetsPadding(WindowInsets.safeDrawing)
@@ -103,8 +117,8 @@ fun KurdishTvNavGraph(
                     settings = settings,
                     autoplay = settings.autoplay,
                     autoHideControls = settings.autoHideControls,
-                    sleepTimerMinutes = uiState.sleepTimerMinutes,
-                    sleepTimerFormattedText = uiState.sleepTimerFormattedText,
+                    sleepTimerMinutes = sleepTimer.minutes,
+                    sleepTimerFormattedText = sleepTimer.formattedText,
                     isPlaybackPaused = uiState.isPlaybackPaused,
                     isMuted = uiState.isMuted,
                     onToggleMute = { viewModel.toggleMute() },
@@ -124,6 +138,12 @@ fun KurdishTvNavGraph(
         }
 
         composable(Screen.Settings.route) {
+            // Re-read when the screen is opened: this is one of only two moments the
+            // answer can have changed, the other being an install attempt. Reading it
+            // on every recomposition instead meant a PackageManager binder call per
+            // frame of the settings list's own animations.
+            LaunchedEffect(Unit) { viewModel.refreshInstallPermission() }
+
             SettingsScreen(
                 settings = settings,
                 onUpdate = { transform -> settingsViewModel.update(transform) },
@@ -142,6 +162,9 @@ fun KurdishTvNavGraph(
                     viewModel.requestInstallUpdate(update, path)
                 },
                 onDismissUpdate = { viewModel.clearUpdateMessage() },
+                // Read here rather than fetched inside the card, so the update UI can
+                // warn about the permission *before* the viewer taps Install.
+                needsInstallPermission = needsInstallPermission,
                 modifier = insetModifier
             )
         }
