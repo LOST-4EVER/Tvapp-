@@ -81,6 +81,7 @@ fun SettingsScreen(
     onDownloadUpdate: (AppUpdate) -> Unit = {},
     onInstallUpdate: (AppUpdate, String) -> Unit = { _, _ -> },
     onDismissUpdate: () -> Unit = {},
+    needsInstallPermission: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
@@ -232,7 +233,8 @@ fun SettingsScreen(
                     onCheck = onCheckForUpdate,
                     onDownload = onDownloadUpdate,
                     onInstall = onInstallUpdate,
-                    onDismiss = onDismissUpdate
+                    onDismiss = onDismissUpdate,
+                    needsInstallPermission = needsInstallPermission
                 )
             }
 

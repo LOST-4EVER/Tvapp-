@@ -46,6 +46,17 @@ class TvViewModel(
     )
     val uiState: StateFlow<TvUiState> = _uiState.asStateFlow()
 
+    /**
+     * The sleep timer, on its own flow.
+     *
+     * It updates once a second, and it is a readout for the player and nothing else.
+     * As fields of [TvUiState] it meant a running timer invalidated the main state —
+     * and therefore every collector of it, which is the whole navigation graph — once
+     * a second, whether or not the player was the visible screen.
+     */
+    private val _sleepTimer = MutableStateFlow(SleepTimerState())
+    val sleepTimer: StateFlow<SleepTimerState> = _sleepTimer.asStateFlow()
+
     private var sleepTimerJob: Job? = null
     private var searchJob: Job? = null
     private var loadJob: Job? = null
@@ -437,47 +448,30 @@ class TvViewModel(
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
         if (minutes <= 0) {
-            _uiState.update {
-                it.copy(
-                    sleepTimerMinutes = 0,
-                    sleepTimerRemainingSeconds = 0,
-                    sleepTimerFormattedText = null
-                )
-            }
+            _sleepTimer.value = SleepTimerState()
             return
         }
 
         val totalSeconds = minutes * 60
-        _uiState.update {
-            it.copy(
-                sleepTimerMinutes = minutes,
-                sleepTimerRemainingSeconds = totalSeconds,
-                sleepTimerFormattedText = formatRemainingTime(totalSeconds)
-            )
-        }
+        _sleepTimer.value = SleepTimerState(
+            minutes = minutes,
+            formattedText = formatRemainingTime(totalSeconds)
+        )
 
         sleepTimerJob = viewModelScope.launch {
             var remaining = totalSeconds
             while (remaining > 0) {
                 delay(1000L)
                 remaining--
-                val formatted = formatRemainingTime(remaining)
-                _uiState.update {
-                    it.copy(
-                        sleepTimerRemainingSeconds = remaining,
-                        sleepTimerFormattedText = formatted
-                    )
-                }
-            }
-            // Sleep timer finished: pause playback cleanly
-            _uiState.update {
-                it.copy(
-                    sleepTimerMinutes = 0,
-                    sleepTimerRemainingSeconds = 0,
-                    sleepTimerFormattedText = null,
-                    isPlaybackPaused = true
+                // Only the timer's own flow moves. See [sleepTimer].
+                _sleepTimer.value = SleepTimerState(
+                    minutes = minutes,
+                    formattedText = formatRemainingTime(remaining)
                 )
             }
+            // Sleep timer finished: pause playback cleanly
+            _sleepTimer.value = SleepTimerState()
+            _uiState.update { it.copy(isPlaybackPaused = true) }
         }
     }
 
@@ -597,11 +591,13 @@ class TvViewModel(
             return false
         }
         if (!ApkInstaller.canRequestPackageInstalls(context)) {
-            _updateState.value = UpdateState.Failed(
-                "Android needs permission to install this update. Tap Install again to open that setting."
-            )
+            _needsInstallPermission.value = true
+            // Deliberately not a failure state: the download is still good, the
+            // button must survive, and the caller turns this into a trip to Settings.
+            // See [requestInstallUpdate].
             return false
         }
+        _needsInstallPermission.value = false
         val sameSignature = withContext(Dispatchers.IO) {
             ApkInstaller.isSignedBySameCertificate(context, file)
         }
@@ -634,17 +630,48 @@ class TvViewModel(
      * installer) is already reported in the update card, and bouncing the user
      * into a settings screen that cannot help is worse than saying what went
      * wrong.
+     *
+     * Critically, [installUpdate] must be left in [UpdateState.ReadyToInstall] when
+     * it stops for want of that permission. It used to overwrite the state with
+     * [UpdateState.Failed], and because the card renders its actions *from* the
+     * state, that removed the Install button and replaced it with "Retry / Dismiss" —
+     * which re-runs the update *check*, not the install. So the flow was: tap Install,
+     * get bounced to Settings, grant the permission, come back, and find that the
+     * multi-megabyte APK that had already been downloaded could no longer be
+     * installed from the app at all. The only way out was a second full download.
      */
     fun requestInstallUpdate(update: AppUpdate, filePath: String) {
         viewModelScope.launch {
-            if (!installUpdate(update, filePath) && needsInstallPermission()) {
+            if (!installUpdate(update, filePath) && needsInstallPermissionNow()) {
+                // Put the card back where it was before bouncing to Settings, so the
+                // Install button is still there on the way back in.
+                _updateState.value = UpdateState.ReadyToInstall(update, filePath)
                 openInstallPermissionSettings()
             }
         }
     }
 
+    /**
+     * Whether Android is still refusing to let this app install packages.
+     *
+     * Exposed as state rather than as a function because the update card reads it
+     * during composition, and the underlying check goes to `PackageManager`. Reading
+     * it on every recomposition of the navigation graph meant a binder round trip
+     * per frame of whatever animation was running; the answer only ever changes when
+     * the user leaves and re-enters the system settings screen, so it is re-read
+     * when Settings is opened and when an install is attempted.
+     */
+    private val _needsInstallPermission = MutableStateFlow(false)
+    val needsInstallPermission: StateFlow<Boolean> = _needsInstallPermission.asStateFlow()
+
+    /** Re-reads the permission. Cheap, and only called at the two moments it can change. */
+    fun refreshInstallPermission() {
+        val context = appContext ?: return
+        _needsInstallPermission.value = !ApkInstaller.canRequestPackageInstalls(context)
+    }
+
     /** True when the app still needs permission to install packages. */
-    fun needsInstallPermission(): Boolean {
+    private fun needsInstallPermissionNow(): Boolean {
         val context = appContext ?: return false
         return !ApkInstaller.canRequestPackageInstalls(context)
     }

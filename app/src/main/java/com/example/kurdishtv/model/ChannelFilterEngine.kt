@@ -43,7 +43,7 @@ object ChannelFilterEngine {
         category: CategoryFilter,
         query: String
     ): List<Channel> {
-        val cleanQuery = query.trim().lowercase(Locale.ROOT)
+        val cleanQuery = normalizeQuery(query)
         val isQueryEmpty = cleanQuery.isEmpty()
 
         if (isQueryEmpty && category == CategoryFilter.ALL) {
@@ -141,6 +141,31 @@ object ChannelFilterEngine {
      * `contains(other, ignoreCase = true)` is the same test without the copies.
      */
     private fun matchesQuery(channel: Channel, cleanQuery: String): Boolean =
-        channel.name.contains(cleanQuery, ignoreCase = true) ||
-            channel.category.contains(cleanQuery, ignoreCase = true)
+        normalizeQuery(channel.name).contains(cleanQuery) ||
+            normalizeQuery(channel.category).contains(cleanQuery)
+
+    /**
+     * Puts a name or a query into one canonical shape so the two can be compared.
+     *
+     * A channel shown as `NRT 1` is stored under exactly that string, because
+     * [KurdishTvParser.formatChannelName] rewrites every `-` and `_` in a playlist's
+     * raw name into a space. A viewer who typed the name they know from somewhere
+     * else — `nrt-1`, `NRT_1` — got an empty result set for a channel that was
+     * plainly on screen, which from the sofa is indistinguishable from search being
+     * broken.
+     *
+     * Applied to **both** sides, and separators are dropped rather than turned into
+     * spaces: that way `nrt-1`, `nrt_1` and `nrt1` all match the same channel, and
+     * `NRT 1` does too. Normalising only the query would fix the hyphen and leave
+     * every spaced name unmatchable from an unspaced query, which is the commoner
+     * direction — people type `nrt1`.
+     *
+     * The per-channel cost is one pass over a short string, and it replaces the
+     * `ignoreCase` comparisons this used to do twice per channel, so it is not an
+     * addition to the hot path so much as a change of shape within it. Accent
+     * folding and script folding are deliberately *not* attempted: they are a larger
+     * claim than this test can honestly make, and a much larger cost per keystroke.
+     */
+    private fun normalizeQuery(text: String): String =
+        text.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }
 }
