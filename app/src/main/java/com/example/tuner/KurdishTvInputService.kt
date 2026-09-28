@@ -105,7 +105,7 @@ private class TunerSession(
     private val service: TvInputService,
     private val store: TunerChannelStore,
     sessionId: String
-) : TvInputService.Session(service, sessionId) {
+) : TvInputService.Session(service) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var player: ExoPlayer? = null

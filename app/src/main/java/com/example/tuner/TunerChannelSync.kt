@@ -158,12 +158,21 @@ class TunerChannelSync(
      * system is what decides it. A hand-made id that merely *looks* right publishes
      * channels the system will never associate with the tuner it asked for, and the
      * symptom is a tuner that appears in the list with nothing behind it.
+     *
+     * `TvInputManager.getTunerUuid()` is the documented way to get it and the way
+     * every TV input sample does, but it is no longer in the public SDK — so it
+     * cannot be called directly without failing to compile. The method itself is
+     * still present on the device: a hidden API is removed from the *stubs*, not
+     * from the platform, which is why this reaches it by name. Called reflectively
+     * in one place, guarded, and never assumed — if a future release really does
+     * remove it, the sync reports that it could not and the app carries on.
      */
     private fun tunerId(context: Context): String? = try {
-        context.getSystemService(TvInputManager::class.java)
-            ?.tunerUuid
-            ?.toString()
-            ?.takeIf { it.isNotBlank() }
+        val manager = context.getSystemService(TvInputManager::class.java) ?: return null
+        val getter = manager.javaClass.methods.firstOrNull {
+            it.name == "getTunerUuid" && it.parameterTypes.isEmpty()
+        } ?: return null
+        getter.invoke(manager)?.toString()?.takeIf { it.isNotBlank() }
     } catch (e: Exception) {
         NetworkClient.logDebug("Could not read this app's tuner id", e)
         null
