@@ -41,6 +41,9 @@ fun KurdishTvNavGraph(
     // was looking at the timer. It is a readout for the player and nothing else, so
     // it gets its own flow that only the player collects.
     val sleepTimer by viewModel.sleepTimer.collectAsState()
+    // The remote's number pad, likewise off the main state so that typing a digit
+    // does not invalidate the grid of several hundred cards behind it.
+    val channelJump by viewModel.channelJump.collectAsState()
     val needsInstallPermission by viewModel.needsInstallPermission.collectAsState()
     val settings by settingsViewModel.settings.collectAsState()
     val settingsLoaded by settingsViewModel.loaded.collectAsState()
@@ -98,6 +101,22 @@ fun KurdishTvNavGraph(
                 // composition as soon as it is covered, so returning re-runs the
                 // grid's effects against the focus it saved on the way out.
                 focusToken = backStackEntryId,
+                // Moving the highlight in the sidebar selects the channel without
+                // opening it — the preview pane follows the D-pad, and OK is what
+                // actually starts something.
+                onChannelFocused = { channel -> viewModel.onChannelSelected(channel) },
+                channelJump = channelJump,
+                onNumericKey = { digit -> viewModel.onNumericKey(digit) },
+                onStepChannel = { delta ->
+                    if (delta > 0) {
+                        viewModel.selectNextChannel()
+                    } else {
+                        viewModel.selectPreviousChannel()
+                    }
+                },
+                onNumericBackspace = { viewModel.onNumericBackspace() },
+                onNumericCommit = { viewModel.commitChannelJump() },
+                onNumericCancel = { viewModel.cancelChannelJump() },
                 modifier = insetModifier
             )
         }

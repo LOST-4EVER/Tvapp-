@@ -62,6 +62,17 @@ class TvViewModel(
     private var loadJob: Job? = null
     private var updateJob: Job? = null
 
+    // ── Channel numbers on the remote keypad ────────────────────────────────
+    //
+    // A television remote has a number pad, and this app ignored every key on it.
+    // The numbers are the fastest way to reach a channel on a screen with six
+    // hundred of them, and they are what a viewer who knows "NRT is 47" reaches
+    // for without thinking about it.
+    private val _channelJump = MutableStateFlow<ChannelJump?>(null)
+    val channelJump: StateFlow<ChannelJump?> = _channelJump.asStateFlow()
+
+    private var jumpCommitJob: Job? = null
+
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
 
@@ -72,6 +83,104 @@ class TvViewModel(
     private companion object {
         /** Long enough to coalesce a burst of keystrokes, short enough to feel live. */
         const val SEARCH_DEBOUNCE_MS = 220L
+
+        /**
+         * How long a typed number waits for another digit before it is acted on.
+         *
+         * A viewer typing "47" has to be given time to type the 7, and a viewer who
+         * stops at "4" has to be given time to notice that nothing happened. Just
+         * over a second is the usual compromise on a television, where the distance
+         * to the remote makes fine motor timing less reliable than it is on a
+         * keyboard.
+         */
+        const val JUMP_COMMIT_DELAY_MS = 1_400L
+
+        /**
+         * The most digits a channel number can have.
+         *
+         * Not cosmetic: a remote key that sticks, or a viewer holding a digit down
+         * through auto-repeat, would otherwise append forever and the number could
+         * never match anything again. Four digits is beyond any list this app holds.
+         */
+        const val MAX_JUMP_DIGITS = 4
+    }
+
+    // ── Channel numbers ─────────────────────────────────────────────────────
+
+    /**
+     * Adds a digit to the number being typed.
+     *
+     * `digit` is 0-9. Anything else is ignored rather than clamped, because a key
+     * that is not a number reaching here means the caller is wrong, and guessing
+     * would be worse than doing nothing.
+     */
+    fun onNumericKey(digit: Int) {
+        if (digit !in 0..9) return
+        val current = _channelJump.value?.digits.orEmpty()
+        setJump((current + digit).takeLast(MAX_JUMP_DIGITS))
+    }
+
+    /** Removes the last digit, or cancels the whole entry if it was the only one. */
+    fun onNumericBackspace() {
+        val shorter = _channelJump.value?.digits?.dropLast(1) ?: return
+        if (shorter.isEmpty()) cancelChannelJump() else setJump(shorter)
+    }
+
+    /**
+     * Publishes a number and restarts the idle timer that acts on it.
+     *
+     * One place, because the target has to be recomputed and the timer restarted on
+     * every change to the digits — and doing the two separately is how the readout
+     * ends up describing a number the viewer has already edited past.
+     */
+    private fun setJump(digits: String) {
+        _channelJump.value = ChannelJump(digits = digits, target = jumpTargetFor(digits))
+        jumpCommitJob?.cancel()
+        jumpCommitJob = viewModelScope.launch {
+            delay(JUMP_COMMIT_DELAY_MS)
+            commitChannelJump()
+        }
+    }
+
+    /**
+     * Acts on the number being typed and clears the readout.
+     *
+     * Selects rather than plays. Typing a number is a way of *moving* through the
+     * list — the grid scrolls the channel into view and takes D-pad focus, and the
+     * preview pane follows — and the viewer presses OK for the channel they want,
+     * exactly as they would if they had arced to it. Jumping straight to fullscreen
+     * video from a number key makes every mistyped digit a stream the app then has
+     * to start, buffer and tear down.
+     */
+    fun commitChannelJump() {
+        jumpCommitJob?.cancel()
+        val target = _channelJump.value?.target
+        _channelJump.value = null
+        if (target != null) onChannelSelected(target)
+    }
+
+    /** Throws the number away without acting on it. */
+    fun cancelChannelJump() {
+        jumpCommitJob?.cancel()
+        _channelJump.value = null
+    }
+
+    /**
+     * The channel a number names, in the list the viewer is actually looking at.
+     *
+     * The *filtered* list, not the whole catalogue: the numbers are the ones shown
+     * in the sidebar and implied by the grid, so a number that only resolved
+     * against channels the viewer has filtered out, searched away or never scrolled
+     * to would tune a channel they cannot see and cannot recognise.
+     *
+     * One-based, because that is how a television numbers its channels and how the
+     * sidebar labels them. Zero is not a channel number, so it never resolves —
+     * which is also what makes it a safe digit to *start* a number with.
+     */
+    private fun jumpTargetFor(digits: String): Channel? {
+        val number = digits.toIntOrNull() ?: return null
+        if (number < 1) return null
+        return _uiState.value.filteredChannels.getOrNull(number - 1)
     }
 
     init {
@@ -249,6 +358,9 @@ class TvViewModel(
     }
 
     fun onSearchQueryChanged(query: String) {
+        // The numbers name positions in the current results, and the results are
+        // changing underneath them.
+        if (_channelJump.value != null) cancelChannelJump()
         // Store the query immediately so the text field stays responsive, but debounce the
         // actual filtering. Re-filtering every channel on every keystroke was the main cause
         // of jank while typing, since the merged remote playlists can hold thousands of
@@ -270,6 +382,9 @@ class TvViewModel(
     }
 
     fun onCategorySelected(category: CategoryFilter) {
+        // Same reason as the search: a number typed into the previous category does
+        // not name the same channel in the new one.
+        if (_channelJump.value != null) cancelChannelJump()
         // A category switch supersedes any in-flight search debounce.
         searchJob?.cancel()
         // Already showing it, and the filtered list tracks it: nothing to compute.
@@ -358,6 +473,9 @@ class TvViewModel(
     }
 
     fun onChannelSelected(channel: Channel) {
+        // Any number on screen is now describing a different selection, and leaving
+        // the readout up would claim a channel the viewer has moved off.
+        if (_channelJump.value != null) cancelChannelJump()
         // Selecting the channel should feel instant, so update the selection first and
         // refresh the "recently watched" row once the write has completed.
         _uiState.update { it.copy(selectedChannel = channel, isPlaybackPaused = false) }
