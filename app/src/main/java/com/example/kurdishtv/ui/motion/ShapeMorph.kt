@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.kurdishtv.ui.theme.ExpressiveMorph
 import com.example.kurdishtv.ui.theme.ExpressivePolygon
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.MorphingPolygonShape
 
 /**
@@ -80,6 +81,18 @@ object ShapeMorph {
     /** The live dot: 4dp on an 8dp dot is a circle, flattening to 2dp as it pulses. */
     val liveRest: CornerScale = CornerScale.uniform(4.dp)
     val liveActive: CornerScale = CornerScale.uniform(2.dp)
+
+    /**
+     * The outline drawn around whatever currently holds D-pad focus.
+     *
+     * The one place the Expressive library still earns its keep, and the reason the
+     * rest of it stayed. A focus ring is *stroked*, not filled: it clips nothing, it
+     * contains no label, and it is the only element in the app whose entire job is to
+     * be visually unlike everything else. "Where am I" should look different from
+     * every other state in the app, and a nine-lobed cookie that slowly turns is a
+     * far clearer answer to that than a rounded rectangle that got slightly rounder.
+     */
+    val focusRing: ExpressivePolygon = M3ExpressivePolygons.Cookie9Sided
 }
 
 /**
