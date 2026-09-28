@@ -58,6 +58,14 @@ fun VideoPlayerView(
      * the notice is only needed once they auto-hide.
      */
     areControlsVisible: Boolean = true,
+    /**
+     * Change this to force a re-prepare of the same [streamUrl].
+     *
+     * ExoPlayer moves to STATE_IDLE on a playback error and does not retry on
+     * its own, so toggling play/pause is not enough to recover a stream that has
+     * just come back online. Bumping this re-runs the prepare effect.
+     */
+    reloadKey: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -113,7 +121,7 @@ fun VideoPlayerView(
             }
     }
 
-    LaunchedEffect(streamUrl) {
+    LaunchedEffect(streamUrl, reloadKey) {
         if (streamUrl.isNotBlank()) {
             try {
                 isBuffering = true
