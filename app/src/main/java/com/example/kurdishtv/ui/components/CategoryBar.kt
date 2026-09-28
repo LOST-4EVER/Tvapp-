@@ -38,7 +38,16 @@ fun CategoryBar(
     selectedCategory: CategoryFilter,
     onCategorySelected: (CategoryFilter) -> Unit,
     channels: List<Channel> = emptyList(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Shorten the chips for a short window.
+     *
+     * A phone on its side has around 360dp of height. Between them the offline
+     * banner, the brand row, the search field and the category row were spending
+     * well over half of it before a single channel appeared, and the chips were the
+     * most compressible part of that: they carry one short word and nothing else.
+     */
+    compact: Boolean = false
 ) {
     val colors = LocalAppColors.current
     val reduceMotion = LocalReduceMotion.current
@@ -91,8 +100,8 @@ fun CategoryBar(
     LazyRow(
         modifier = modifier,
         state = listState,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp)
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = if (compact) 3.dp else 6.dp)
     ) {
         items(visible, key = { it.name }) { category ->
             val isSelected = selectedCategory == category
@@ -137,20 +146,24 @@ fun CategoryBar(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                    modifier = Modifier.padding(
+                        horizontal = if (compact) 11.dp else 16.dp,
+                        vertical = if (compact) 6.dp else 10.dp
+                    )
                 ) {
                     SvgIcon(
                         resId = categoryIcon(category),
                         contentDescription = null,
                         tint = contentColor,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(if (compact) 14.dp else 16.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(if (compact) 5.dp else 6.dp))
                     Text(
                         text = category.displayName,
                         color = contentColor,
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold
+                        fontSize = if (compact) 12.sp else 13.sp,
+                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        maxLines = 1
                     )
                 }
             }

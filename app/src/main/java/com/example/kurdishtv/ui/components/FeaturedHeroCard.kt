@@ -60,6 +60,10 @@ fun FeaturedHeroCard(
     // The hero's corners open up when it takes focus, and its logo tile — which holds
     // an image and no text — becomes properly expressive. The silhouette of the card
     // itself stays on the corner scale, because it carries the channel's name.
+    //
+    // Fixed dp radii are safe here and nowhere else in the app: the hero is a
+    // full-width card roughly 180dp tall on every layout, so even the widest radius
+    // in play stays well inside half its short side.
     val heroShape = rememberMorphingCorners(
         rest = M3ExpressiveShapes.Corners.extraLarge,
         active = M3ExpressiveShapes.Corners.extraLarge.copy(
@@ -82,7 +86,13 @@ fun FeaturedHeroCard(
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 restShape = M3ExpressivePolygons.Square,
-                ringShape = M3ExpressivePolygons.SoftBurst,
+                // The same ring the cards and the rail use. The hero had its own
+                // `SoftBurst`, so the two surfaces you are most likely to move
+                // between answered "you are here" in two different shapes, and a
+                // burst is a wide, spiky silhouette — the wrong one to lay over the
+                // largest surface in the app, where it crosses the LIVE badge and
+                // the logo.
+                ringShape = ShapeMorph.focusRing,
                 focusScale = 1.02f,
                 ringWidth = 3.dp,
                 onFocusChanged = { isFocused = it }

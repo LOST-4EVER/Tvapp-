@@ -1,22 +1,22 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
@@ -66,12 +66,11 @@ enum class AppIconButtonStyle {
  * visible from across a room and to someone who has reduced motion switched on at the
  * system level.
  *
- * It is a circle-to-squircle morph on the corner scale, not a lobed polygon. A control
- * carries a glyph, and a control's outline is also its **clip**: every one of these
- * buttons is a `Surface`, so whatever the shape is, the glyph is drawn inside that same
- * outline. That is why the Expressive library came off the controls entirely — a
- * polygon whose arc bulged across its own outline clipped its own icon away, and the
- * button rendered as an empty disc.
+ * It is a circle-to-squircle morph on the corner scale, not a lobed polygon, and the
+ * glyph is drawn into a plain `Box` that the shape only clips — never owns. That
+ * separation is the point: a control's outline is also its clip, and a shape that is
+ * even slightly wrong then deletes the icon along with the outline. See the comment
+ * on the `Box` below.
  */
 @Composable
 fun AppIconButton(
@@ -121,11 +120,26 @@ fun AppIconButton(
         spec = ExpressiveMotion.spatialFast
     )
 
-    Surface(
-        shape = shape,
-        color = container,
+    // The background is drawn with `background(color, shape)` and the glyph is a
+    // *sibling* of nothing — it is a child of a Box that is only clipped, never
+    // shape-owned.
+    //
+    // `Surface(shape, color) { glyph }` was the previous arrangement, and it is the
+    // one arrangement that cannot be got right by reasoning: `Surface` clips its
+    // content to the shape it is given, so the glyph lives inside the same path as
+    // the fill. Any error in that path — a radius that exceeded half the control's
+    // short side, a polygon arc that swung across the outline — does not merely make
+    // the button look wrong, it deletes the icon and leaves a bare disc. That is
+    // what the three header buttons and the card hearts were rendering as.
+    //
+    // Here the two are independent: the Box is sized and clipped, the background
+    // follows the same shape, and the glyph is centred inside. A wrong shape now
+    // costs a wrong outline and nothing else.
+    Box(
         modifier = modifier
             .size(size)
+            .clip(shape)
+            .background(container, shape)
             // A filled circle needs no ring; the silhouette is already the shape.
             .then(
                 if (style == AppIconButtonStyle.Filled) {
@@ -138,16 +152,15 @@ fun AppIconButton(
                 scaleDown = scaleDown,
                 interactionSource = interactionSource,
                 onClick = onClick
-            )
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            SvgIcon(
-                resId = iconRes,
-                contentDescription = contentDescription,
-                tint = content,
-                modifier = Modifier.size(iconSize)
-            )
-        }
+        SvgIcon(
+            resId = iconRes,
+            contentDescription = contentDescription,
+            tint = content,
+            modifier = Modifier.size(iconSize)
+        )
     }
 }
 
@@ -157,8 +170,12 @@ fun AppIconButton(
  * The other half of the app's control family. [AppIconButton] is for a glyph alone;
  * this is for a glyph *and* a word, which is why its shape stays a pill at rest — a
  * rounded square around a 12sp label looks like a mistake, not a shape. What it does
- * share is the press behaviour: the outline flattens on the way in and springs back on
- * release, so a press over video is visible even when the controls fade out.
+ * share is the press behaviour: [bouncyClickable] springs the control down and back,
+ * so a press over video is visible even when the controls fade out moments later.
+ *
+ * Passing a blank [label] is supported and deliberate: the control then degrades to a
+ * fixed-size round icon button rather than to a pill with a hole where its text
+ * should be.
  */
 @Composable
 fun SquishyPillButton(
@@ -172,39 +189,61 @@ fun SquishyPillButton(
     fontSize: TextUnit = 12.sp,
     active: Boolean = false
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
     // A percent radius rather than a dp one: this pill is ~30dp tall, and half of
     // that is 15dp, so the 20dp "active" radius it used to take made its own corners
     // overlap. A pill is a pill at every size, and this is a pill.
     val shape: Shape = ShapeMorph.pill
 
-    Surface(
-        shape = shape,
-        color = containerColor,
-        modifier = modifier.bouncyClickable(
-            interactionSource = interactionSource,
-            onClick = onClick
-        )
+    // A blank label used to render as `icon + 5dp gap + an empty Text` inside a 50%
+    // radius, which is a circle roughly one glyph wide: a bare disc sitting in a
+    // control bar next to a labelled pill and an icon button, reading as a rendering
+    // fault rather than as a control. It reached the player as a filled accent
+    // circle, because that is exactly the colour the "a colour filter is active"
+    // state uses.
+    //
+    // A label is what makes this a pill at all, so without one the honest thing to
+    // render is a fixed-size round icon button: same glyph, same press, an actual
+    // hit target, and nothing that looks like a control that failed to render its
+    // text.
+    val hasLabel = label.isNotBlank()
+
+    Row(
+        modifier = modifier
+            .then(
+                if (hasLabel) {
+                    Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                } else {
+                    Modifier.size(40.dp)
+                }
+            )
+            .clip(shape)
+            .background(containerColor, shape)
+            .bouncyClickable(onClick = onClick),
+        // Centred when there is no label. A fixed-size Row defaults to
+        // `Arrangement.Start`, which would pin a lone glyph against the leading edge
+        // of its own circle instead of in the middle of it.
+        horizontalArrangement =
+            if (hasLabel) Arrangement.spacedBy(5.dp) else Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SvgIcon(
-                resId = iconRes,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(iconSize)
-            )
-            Spacer(modifier = Modifier.width(5.dp))
-            Text(
-                text = label,
-                color = contentColor,
-                fontSize = fontSize,
-                fontWeight = FontWeight.Medium
-            )
-        }
+        SvgIcon(
+            resId = iconRes,
+            // These controls are always inside a bar that already names them in
+            // text, so the glyph itself is decorative.
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(iconSize)
+        )
+        // Always composed, never conditionally: a composable called from inside an
+        // `if` changes the Row's slot count and Compose cannot reconcile the two
+        // states. An empty string draws nothing and measures to nothing, which is
+        // the same result the branch would have produced.
+        Text(
+            text = label,
+            color = contentColor,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
     }
 }

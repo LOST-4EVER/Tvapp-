@@ -336,7 +336,8 @@ private fun TvTopChrome(
     onCategorySelected: (CategoryFilter) -> Unit,
     onRetryClick: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenImport: () -> Unit
+    onOpenImport: () -> Unit,
+    compact: Boolean = false
 ) {
     Column {
         OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
@@ -345,7 +346,8 @@ private fun TvTopChrome(
             isLoading = uiState.isLoading,
             onOpenImport = onOpenImport,
             onRefresh = onRetryClick,
-            onOpenSettings = onOpenSettings
+            onOpenSettings = onOpenSettings,
+            compact = compact
         )
         SearchBarM3(
             query = uiState.searchQuery,
@@ -357,7 +359,8 @@ private fun TvTopChrome(
         CategoryBar(
             selectedCategory = uiState.selectedCategory,
             onCategorySelected = onCategorySelected,
-            channels = uiState.channels
+            channels = uiState.channels,
+            compact = compact
         )
     }
 }
@@ -398,7 +401,11 @@ private fun LandscapeCompactLayout(
                 onCategorySelected = onCategorySelected,
                 onRetryClick = onRetryClick,
                 onOpenSettings = onOpenSettings,
-                onOpenImport = onOpenImport
+                onOpenImport = onOpenImport,
+                // Vertical space is the scarce resource in this layout — a phone on
+                // its side has around 360dp of it — so the chrome gives some back
+                // before the grid ever gets a chance to use it.
+                compact = true
             )
         }
     ) { paddingValues ->

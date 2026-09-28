@@ -81,12 +81,37 @@ fun PlayerScreen(
     // as far as it was concerned, just permanently broken. See VideoPlayerView.reloadKey.
     var retryToken by remember { mutableIntStateOf(0) }
     var isControlsVisible by remember { mutableStateOf(true) }
-    var resizeMode by remember { mutableStateOf(ResizeMode.FIT) }
     var isFullscreen by remember { mutableStateOf(true) }
-    // Not rememberSaveable: enum entries are not a Bundle-supported type, so
-    // persisting it across process death would throw on restore. Recomputing
-    // from Normal on a cold start costs nothing.
-    var colorFilter by remember { mutableStateOf(VideoColorFilter.None) }
+
+    // How the video fills the screen, and which correction is on it, are choices the
+    // viewer made *for this stream*. Rotating the phone — or the system reclaiming
+    // the activity — used to throw both away and silently put the picture back the
+    // way it was before they were made.
+    //
+    // The default is [ResizeMode.FILL], not FIT. Almost every channel in the
+    // catalogue is 16:9, and this screen is a phone held upright, so FIT letterboxes
+    // a 16:9 frame inside a 9:19.5 screen and gives the viewer a picture roughly a
+    // third of the height of the display, marooned between two black bands that
+    // nothing else on the screen occupies. FILL puts the video edge to edge and
+    // crops the sides, which is what every other live and short-form player does in
+    // portrait, and it makes the transport controls sit against the picture rather
+    // than against dead space. FIT and ZOOM are one tap away for the streams where
+    // the whole frame matters — a 4:3 channel, or a pillarboxed source.
+    //
+    // Enums are not Bundle-supported, so the saveable state holds the entry's `name`
+    // and the enum is resolved from it. A name that no longer resolves (an app
+    // update that renames an entry) falls back to the default rather than throwing
+    // on restore.
+    var resizeModeName by rememberSaveable { mutableStateOf(ResizeMode.FILL.name) }
+    val resizeMode = remember(resizeModeName) {
+        runCatching { ResizeMode.valueOf(resizeModeName) }.getOrDefault(ResizeMode.FILL)
+    }
+
+    var colorFilterName by rememberSaveable { mutableStateOf(VideoColorFilter.None.name) }
+    val colorFilter = remember(colorFilterName) {
+        runCatching { VideoColorFilter.valueOf(colorFilterName) }
+            .getOrDefault(VideoColorFilter.None)
+    }
     var errorMessage by remember(channel.id) { mutableStateOf<String?>(null) }
     var showSleepDialog by remember { mutableStateOf(false) }
 
@@ -176,10 +201,13 @@ fun PlayerScreen(
             onBackClick = onBackClick,
             resizeMode = resizeMode,
             onResizeModeToggle = {
-                resizeMode = when (resizeMode) {
-                    ResizeMode.FIT -> ResizeMode.FILL
-                    ResizeMode.FILL -> ResizeMode.ZOOM
-                    ResizeMode.ZOOM -> ResizeMode.FIT
+                // Fill -> Zoom -> Fit, cycled from whatever is on now so the first
+                // tap after a rotation continues the sequence rather than jumping
+                // back to the beginning.
+                resizeModeName = when (resizeMode) {
+                    ResizeMode.FILL -> ResizeMode.ZOOM.name
+                    ResizeMode.ZOOM -> ResizeMode.FIT.name
+                    ResizeMode.FIT -> ResizeMode.FILL.name
                 }
             },
             isFullscreen = isFullscreen,
@@ -187,7 +215,7 @@ fun PlayerScreen(
             isMuted = isMuted,
             onToggleMute = onToggleMute,
             colorFilter = colorFilter,
-            onCycleColorFilter = { colorFilter = colorFilter.next() },
+            onCycleColorFilter = { colorFilterName = colorFilter.next().name },
             modifier = Modifier.fillMaxSize()
         )
 

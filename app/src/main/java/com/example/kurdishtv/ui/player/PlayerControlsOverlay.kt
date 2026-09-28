@@ -106,10 +106,13 @@ fun PlayerControlsOverlay(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             AppIconButton(
                                 iconRes = KurdishTvIcons.ChevronLeft,
                                 contentDescription = "Back",
@@ -121,7 +124,12 @@ fun PlayerControlsOverlay(
 
                             Spacer(modifier = Modifier.width(12.dp))
 
-                            Column {
+                            // Weighted, so it takes the slack rather than its
+                            // intrinsic width. Unweighted it was the row's widest
+                            // fixed child, and on a narrow phone the three glass
+                            // buttons on the right pushed the whole bar past the
+                            // screen edge and took the channel name with it.
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = channel.name,
                                     color = colors.textPrimary,
@@ -227,7 +235,10 @@ fun PlayerControlsOverlay(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             LiveBadge()
                             if (!sleepTimerRemainingText.isNullOrEmpty()) {
                                 Spacer(modifier = Modifier.width(10.dp))
@@ -255,6 +266,10 @@ fun PlayerControlsOverlay(
                             // against a bright frame. The pill squashes on press,
                             // which is the only way to confirm a tap up here, since
                             // the whole bar fades out moments later.
+                            //
+                            // The label names the mode that is *on*, not the one the
+                            // next tap selects, so the state is readable rather than
+                            // being a preview of an action nobody has taken yet.
                             SquishyPillButton(
                                 iconRes = KurdishTvIcons.AspectRatio,
                                 label = resizeMode.label,
@@ -265,12 +280,20 @@ fun PlayerControlsOverlay(
                             // Colour correction. Cycles through the presets and is
                             // highlighted while one is active, so the current
                             // treatment is visible without opening a menu.
-                            // The label only appears once a filter is applied, and the
-                            // pill stays squashed while one is — so "a filter is on"
-                            // is carried by the outline as well as by the accent.
+                            //
+                            // The label is always present and always names the
+                            // *current* state: "Colour" when nothing is applied and
+                            // the preset's own name when one is. It used to be blank
+                            // until a filter was switched on, which collapsed the
+                            // control to a bare accent-coloured disc with no text in
+                            // it — in a bar where every other control is a labelled
+                            // pill, and floating over a video, that read as a
+                            // rendering fault rather than as a button. Naming the
+                            // state also stops the control changing width the moment
+                            // a filter is applied.
                             SquishyPillButton(
                                 iconRes = KurdishTvIcons.Palette,
-                                label = if (colorFilter.isActive) colorFilter.label else "",
+                                label = if (colorFilter.isActive) colorFilter.label else "Colour",
                                 onClick = onCycleColorFilter,
                                 containerColor = if (colorFilter.isActive) {
                                     colors.primary
