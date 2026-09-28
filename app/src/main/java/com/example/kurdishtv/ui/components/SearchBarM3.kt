@@ -28,6 +28,11 @@ import com.example.ui.theme.LocalAppColors
 fun SearchBarM3(
     query: String,
     onQueryChange: (String) -> Unit,
+    /**
+     * Reports whether the field holds focus, so the screen can stop the remote's
+     * number pad from stealing digits from someone typing a search.
+     */
+    onFocusChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
@@ -111,6 +116,9 @@ fun SearchBarM3(
             // Clear focus when the keyboard's Search key is pressed. Handled through
             // the same state the shape animation reads, so the field visibly squares
             // off again as the keyboard leaves rather than staying focused behind it.
-            .onFocusChanged { focused.value = it.isFocused }
+            .onFocusChanged {
+                focused.value = it.isFocused
+                onFocusChanged(it.isFocused)
+            }
     )
 }

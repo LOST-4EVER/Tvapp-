@@ -31,6 +31,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.kurdishtv.model.AppSettings
@@ -39,6 +44,8 @@ import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.components.AdaptiveNavigationRail
 import com.example.kurdishtv.ui.components.CategoryBar
 import com.example.kurdishtv.ui.components.ChannelCard
+import com.example.kurdishtv.ui.components.ChannelNumberOverlay
+import com.example.kurdishtv.ui.components.ChannelSidebar
 import com.example.kurdishtv.ui.components.EmptyChannelState
 import com.example.kurdishtv.ui.components.FeaturedHeroCard
 import com.example.kurdishtv.ui.components.ImportPlaylistDialog
@@ -50,6 +57,7 @@ import com.example.kurdishtv.ui.components.TopHeaderBar
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.rememberTvFocusRequester
 import com.example.kurdishtv.ui.motion.staggeredEntrance
+import com.example.kurdishtv.viewmodel.ChannelJump
 import com.example.kurdishtv.viewmodel.TvUiState
 import com.example.ui.theme.LocalAppColors
 import com.example.ui.theme.LocalIsTv
@@ -76,11 +84,51 @@ fun MainTvScreen(
      * came back lands on the card they left rather than on a grid with nothing focused.
      * See [ChannelGrid].
      */
-    focusToken: String = ""
+    focusToken: String = "",
+    /**
+     * The channel number being typed on the remote, or null when nothing is.
+     *
+     * Off [uiState] on purpose — it changes on every digit, and a field on the main
+     * state would invalidate the whole navigation graph and a grid of several
+     * hundred cards to redraw a two-digit readout. See [ChannelJump].
+     */
+    channelJump: ChannelJump? = null,
+    /**
+     * A channel the viewer *moved onto*, as opposed to opened.
+     *
+     * Arrowing down the sidebar changes what is selected — the preview pane follows
+     * along — without starting anything. Deliberately separate from [onChannelClick],
+     * which opens the player: browsing by highlight and watching a channel are two
+     * different intentions and conflating them would start a stream on every arrow
+     * press.
+     */
+    onChannelFocused: (Channel) -> Unit = {},
+    onNumericKey: (Int) -> Unit = {},
+    /**
+     * Steps the selection by [delta] channels — `+1` for the remote's CHANNEL UP.
+     *
+     * Selects, rather than opens, for the same reason a typed number selects: this
+     * is how a viewer browses, and starting a stream on every press of a key that a
+     * thumb can hold would be worse than doing nothing.
+     */
+    onStepChannel: (Int) -> Unit = {},
+    onNumericBackspace: () -> Unit = {},
+    onNumericCommit: () -> Unit = {},
+    onNumericCancel: () -> Unit = {}
 ) {
     val colors = LocalAppColors.current
     val isTv = LocalIsTv.current
     var showImportDialog by remember { mutableStateOf(false) }
+
+    // Whether the search field holds D-pad focus right now.
+    //
+    // The number pad must not steal digits from a viewer who is typing a search:
+    // pressing `4` into the search box has to put a 4 in the search box. Key
+    // events reach this screen from the focused node *after* the text field has had
+    // its chance at them, which handles most of it, but a field that has not yet
+    // taken its first character would still be overwritten — so the state is tracked
+    // explicitly rather than relied upon.
+    var searchFieldFocused by remember { mutableStateOf(false) }
     var appliedStartCategory by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -126,6 +174,52 @@ fun MainTvScreen(
         modifier = modifier
             .fillMaxSize()
             .background(colors.background)
+            // The remote's number pad.
+            //
+            // Every key on a television remote was ignored here before, which is why
+            // reaching a channel on a screen of six hundred meant arcing across the
+            // grid and counting. Digits build a channel number, and the number is a
+            // position in the list on screen — the same list the sidebar numbers.
+            //
+            // Only Key *Down* is handled. Key Up is the same physical press reported
+            // again, and acting on both would enter every digit twice.
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                // A viewer typing a search gets their digits.
+                if (searchFieldFocused) return@onKeyEvent false
+                when (event.key) {
+                    // `NumPad*` is a separate set of key codes on Android, and
+                    // several remotes send the keypad codes rather than the main
+                    // ones, so both have to be accepted.
+                    Key.Zero, Key.NumPad0 -> { onNumericKey(0); true }
+                    Key.One, Key.NumPad1 -> { onNumericKey(1); true }
+                    Key.Two, Key.NumPad2 -> { onNumericKey(2); true }
+                    Key.Three, Key.NumPad3 -> { onNumericKey(3); true }
+                    Key.Four, Key.NumPad4 -> { onNumericKey(4); true }
+                    Key.Five, Key.NumPad5 -> { onNumericKey(5); true }
+                    Key.Six, Key.NumPad6 -> { onNumericKey(6); true }
+                    Key.Seven, Key.NumPad7 -> { onNumericKey(7); true }
+                    Key.Eight, Key.NumPad8 -> { onNumericKey(8); true }
+                    Key.Nine, Key.NumPad9 -> { onNumericKey(9); true }
+                    // The dedicated channel keys, which most television remotes
+                    // carry and every one of which was ignored. They step the
+                    // selection through the list on screen.
+                    Key.ChannelUp -> { onStepChannel(1); true }
+                    Key.ChannelDown -> { onStepChannel(-1); true }
+                    // Commit early rather than waiting out the idle timer. Only while
+                    // a number is up, so OK still reaches the card it is on.
+                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter ->
+                        if (channelJump != null) { onNumericCommit(); true } else false
+                    Key.Backspace ->
+                        if (channelJump != null) { onNumericBackspace(); true } else false
+                    // Back cancels the number, and only the number. With nothing
+                    // being typed it is not consumed at all, so the system back
+                    // gesture still leaves the app as it always did.
+                    Key.Back, Key.Escape ->
+                        if (channelJump != null) { onNumericCancel(); true } else false
+                    else -> false
+                }
+            }
     ) {
         val isTabletLandscape = maxWidth >= 900.dp
         val isMediumScreen = maxWidth >= 600.dp
@@ -137,6 +231,11 @@ fun MainTvScreen(
         // the two-pane tablet layout, where the grid was squeezed into a narrow,
         // very tall column. Height has to be part of the decision.
         val isShortLandscape = maxHeight < 480.dp && !isTv
+        // The channel sidebar costs 260dp of fixed width that the grid does not get
+        // back. On a television there is always room; on a tablet the grid can
+        // afford it only once the window is genuinely wide, or the channel names
+        // start truncating — which defeats the point of a list.
+        val showChannelSidebar = isTv || maxWidth >= 1100.dp
         val gridMinCellSize = when {
             // Ten-foot UI. Every other branch here is sized for a screen held at
             // arm's length: a 132-172dp card is a comfortable cell on a tablet,
@@ -179,6 +278,8 @@ fun MainTvScreen(
                     onRetryClick = onRetryClick,
                     onOpenSettings = onOpenSettings,
                     onOpenImport = { showImportDialog = true },
+                    onSearchFocusChanged = { searchFieldFocused = it },
+                    focusChannelId = channelJump?.target?.id,
                     focusToken = focusToken
                 )
             }
@@ -198,6 +299,23 @@ fun MainTvScreen(
                             onOpenSettings = onOpenSettings
                         )
 
+                        // The channel list, beside the grid rather than instead of it.
+                        //
+                        // Wide enough to be worth the horizontal space, and no wider:
+                        // the rail and the sidebar are both fixed, so on a 1000dp
+                        // tablet a third column would leave the grid too narrow to
+                        // read a channel name in. A television always has the room.
+                        if (showChannelSidebar) {
+                            ChannelSidebar(
+                                channels = filtered,
+                                selectedChannelId = uiState.selectedChannel?.id,
+                                showLogos = settings.showLogos,
+                                onChannelClick = onChannelClick,
+                                onChannelFocused = onChannelFocused,
+                                onFavoriteToggle = onFavoriteToggle
+                            )
+                        }
+
                         Column(
                             modifier = Modifier
                                 .weight(1.15f)
@@ -211,7 +329,8 @@ fun MainTvScreen(
                                 onRetryClick = onRetryClick,
                                 onOpenSettings = onOpenSettings,
                                 onOpenImport = { showImportDialog = true },
-                                onVisibleCategories = { visibleCategories = it }
+                                onVisibleCategories = { visibleCategories = it },
+                                onSearchFocusChanged = { searchFieldFocused = it }
                             )
 
                             if (filtered.isEmpty()) {
@@ -231,7 +350,8 @@ fun MainTvScreen(
                                     minCellSize = gridMinCellSize,
                                     onChannelClick = onChannelClick,
                                     onFavoriteToggle = onFavoriteToggle,
-                                    focusToken = focusToken
+                                    focusToken = focusToken,
+                                    focusChannelId = channelJump?.target?.id
                                 )
                             }
                         }
@@ -279,7 +399,8 @@ fun MainTvScreen(
                                 onRetryClick = onRetryClick,
                                 onOpenSettings = onOpenSettings,
                                 onOpenImport = { showImportDialog = true },
-                                onVisibleCategories = { visibleCategories = it }
+                                onVisibleCategories = { visibleCategories = it },
+                                onSearchFocusChanged = { searchFieldFocused = it }
                             )
                         },
                         modifier = Modifier.weight(1f)
@@ -306,7 +427,8 @@ fun MainTvScreen(
                                     minCellSize = 160.dp,
                                     onChannelClick = onChannelClick,
                                     onFavoriteToggle = onFavoriteToggle,
-                                    focusToken = focusToken
+                                    focusToken = focusToken,
+                                    focusChannelId = channelJump?.target?.id
                                 )
                             }
                         }
@@ -327,7 +449,8 @@ fun MainTvScreen(
                             onRetryClick = onRetryClick,
                             onOpenSettings = onOpenSettings,
                             onOpenImport = { showImportDialog = true },
-                            onVisibleCategories = { visibleCategories = it }
+                            onVisibleCategories = { visibleCategories = it },
+                            onSearchFocusChanged = { searchFieldFocused = it }
                         )
                     }
                 ) { paddingValues ->
@@ -353,12 +476,25 @@ fun MainTvScreen(
                                 minCellSize = gridMinCellSize,
                                 onChannelClick = onChannelClick,
                                 onFavoriteToggle = onFavoriteToggle,
-                                focusToken = focusToken
+                                focusToken = focusToken,
+                                focusChannelId = channelJump?.target?.id
                             )
                         }
                     }
                 }
             }
+        }
+
+        // The number pad's readout, above whichever layout is showing.
+        //
+        // A sibling of the `when` rather than part of any branch, because the digits
+        // have to appear the same way in all four layouts — a viewer who has learned
+        // where it is on a television must not have to hunt for it on a tablet.
+        channelJump?.let { jump ->
+            ChannelNumberOverlay(
+                jump = jump,
+                modifier = Modifier.align(Alignment.Center)
+            )
         }
     }
 }
@@ -384,6 +520,7 @@ private fun TvTopChrome(
     onOpenSettings: () -> Unit,
     onOpenImport: () -> Unit,
     onVisibleCategories: (List<CategoryFilter>) -> Unit = {},
+    onSearchFocusChanged: (Boolean) -> Unit = {},
     compact: Boolean = false
 ) {
     Column {
@@ -398,7 +535,8 @@ private fun TvTopChrome(
         )
         SearchBarM3(
             query = uiState.searchQuery,
-            onQueryChange = onSearchQueryChanged
+            onQueryChange = onSearchQueryChanged,
+            onFocusChanged = onSearchFocusChanged
         )
         // No spacer: CategoryBar carries its own vertical content padding, and the
         // three explicit spacers this replaced added a different amount on each
@@ -435,6 +573,8 @@ private fun LandscapeCompactLayout(
     onRetryClick: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenImport: () -> Unit,
+    onSearchFocusChanged: (Boolean) -> Unit,
+    focusChannelId: String?,
     focusToken: String
 ) {
     val colors = LocalAppColors.current
@@ -454,6 +594,7 @@ private fun LandscapeCompactLayout(
                 // Vertical space is the scarce resource in this layout — a phone on
                 // its side has around 360dp of it — so the chrome gives some back
                 // before the grid ever gets a chance to use it.
+                onSearchFocusChanged = onSearchFocusChanged,
                 compact = true
             )
         }
@@ -480,6 +621,7 @@ private fun LandscapeCompactLayout(
                     minCellSize = gridMinCellSize,
                     onChannelClick = onChannelClick,
                     onFavoriteToggle = onFavoriteToggle,
+                    focusChannelId = focusChannelId,
                     focusToken = focusToken,
                     compact = true
                 )
@@ -499,6 +641,15 @@ private fun ChannelGrid(
     onChannelClick: (Channel) -> Unit,
     onFavoriteToggle: (String) -> Unit,
     focusToken: String,
+    /**
+     * A channel to move D-pad focus to, or null.
+     *
+     * Set by the remote's number pad. The grid owns the focus requester and the
+     * anchor card, so this is the only way the number pad can move the highlight —
+     * and the grid is the only thing that knows how to bring a card into a lazy
+     * layout and then hand focus to it.
+     */
+    focusChannelId: String? = null,
     compact: Boolean = false
 ) {
     // A television is driven by a D-pad, so focus is a primary state rather than a
@@ -582,6 +733,26 @@ private fun ChannelGrid(
         }
         withFrameNanos { }
         runCatching { gridFocus.requestFocus() }
+    }
+
+    // The remote's number pad, landing here as a channel id.
+    //
+    // Focus cannot be requested until the card exists: a lazy grid does not compose
+    // a row that is scrolled off screen, and `requestFocus` against a node that was
+    // never composed does nothing at all — silently. So the order is scroll, wait a
+    // frame for the card to be laid out, then re-anchor, and the existing
+    // `focusAnchorId` effect does the requesting.
+    LaunchedEffect(focusChannelId) {
+        val id = focusChannelId ?: return@LaunchedEffect
+        val index = filtered.indexOfFirst { it.id == id }
+        if (index < 0) return@LaunchedEffect
+        lastFocusedId = id
+        // This grid is taking focus deliberately, so it must not be treated as a
+        // screen that has never placed it and re-anchored somewhere else.
+        focusPlaced = true
+        runCatching { gridState.scrollToItem(index) }
+        withFrameNanos { }
+        focusAnchorId = id
     }
 
     // The entrance stagger belongs to a new *set* of channels, not to a scroll.

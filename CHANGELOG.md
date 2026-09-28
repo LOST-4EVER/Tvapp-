@@ -8,6 +8,33 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **The remote's number pad works.** Every key on a television remote was ignored
+  before, so reaching a channel on a screen of six hundred meant arcing across the
+  grid and counting. The digits now build a channel number, shown large in the middle
+  of the screen as it is typed, and a second of silence — or OK — acts on it. Numbers
+  are positions in the list **on screen**, the same list the sidebar numbers, so a
+  number never tunes a channel the viewer has filtered away or cannot see. The
+  dedicated CHANNEL UP/DOWN keys, which most remotes carry, now step the selection
+  through that list too. Both select rather than open: a number is how you *move*
+  through a list, and jumping straight to fullscreen video made every mistyped digit
+  a stream the app then had to start and tear down. Backspace edits the number and
+  Back cancels it, and with no number up neither is consumed, so the system back
+  gesture still leaves the app as it always did.
+- **A channel sidebar beside the grid.** The grid is good at finding a channel and
+  bad at choosing one — six hundred cards of artwork give no sense of what is in the
+  list, what order it is in, or what is ten rows down. The sidebar lists the channels
+  of the current category with their number, logo, name and favourite, on a
+  television or on a tablet wide enough (1100dp) that the grid does not lose the
+  space. It scrolls to keep the selected channel visible, and focusing a row selects
+  it, so arrowing down the list browses and the preview pane follows. The number in
+  each row is the number the keypad takes, which is what makes pressing `47`
+  answerable at a glance.
+- **Favouriting from the sidebar is reachable by the remote.** The heart is its own
+  D-pad stop, to the right of the name, and is reached with the right arrow. The
+  grid card's long-press is a *pointer* gesture — Compose's `clickable` acts on
+  key-down, so there is no key-down duration left for a remote to distinguish a long
+  press from a tap — which left the favourite unreachable on exactly the surface
+  where it is a primary action.
 - **The app is on the Android TV home screen.** The manifest declared the leanback
   feature and shipped a D-pad interface, but the launcher intent-filter carried only
   `android.intent.category.LAUNCHER`, so the app never appeared in the TV home
