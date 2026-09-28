@@ -41,6 +41,17 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.example.kurdishtv.network.NetworkClient
 
+/**
+ * How far ahead of the playhead the loader is allowed to read.
+ *
+ * Fifty seconds of a live stream is a lot of decoded-adjacent memory and, on a
+ * metered connection, a lot of data held for a rebuffer that may never come — for a
+ * stream that is already live, so anything past a few seconds cannot be played "late"
+ * anyway. Thirty seconds is still far more than the fifteen-second floor absorbs
+ * before playback starts, which is what actually has to be covered.
+ */
+private const val MAX_BUFFER_MS = 30000
+
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerView(
@@ -66,6 +77,20 @@ fun VideoPlayerView(
      * just come back online. Bumping this re-runs the prepare effect.
      */
     reloadKey: Int = 0,
+    /**
+     * Defer loading until playback is actually asked for.
+     *
+     * A prepared-but-paused ExoPlayer is not an idle one. It has opened the
+     * connection, and it goes on filling its buffer to [DEFAULT_BUFFER_MS] whether
+     * or not a single frame is ever shown. On the browse screen's preview pane — which
+     * is paused by design, because autoplaying a live stream with sound on every visit
+     * to the grid would be both surprising and ruinous — that meant arriving at the
+     * screen downloaded a whole live stream to a black box.
+     *
+     * The fullscreen player leaves this off: there the viewer *is* watching, and
+     * pre-loading is exactly what makes the first frames appear quickly.
+     */
+    loadOnlyWhenPlaying: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -100,7 +125,7 @@ fun VideoPlayerView(
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 15000,
-                /* maxBufferMs = */ 50000,
+                /* maxBufferMs = */ MAX_BUFFER_MS,
                 /* bufferForPlaybackMs = */ 2500,
                 /* bufferForPlaybackAfterRebufferMs = */ 5000
             )
@@ -117,33 +142,52 @@ fun VideoPlayerView(
             .setAudioAttributes(audioAttributes, true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build().apply {
-                playWhenReady = true
+                // Not `true`. Playback is now driven entirely by the load effect
+                // above, and starting out ready to play meant a preview pane began
+                // fetching before it had decided it was allowed to.
+                playWhenReady = false
             }
     }
 
-    LaunchedEffect(streamUrl, reloadKey) {
-        if (streamUrl.isNotBlank()) {
-            try {
-                isBuffering = true
-                val mediaItem = MediaItem.fromUri(streamUrl)
-                exoPlayer.setMediaItem(mediaItem)
-                exoPlayer.prepare()
-                exoPlayer.playWhenReady = isPlaying
-            } catch (e: Exception) {
-                isBuffering = false
-                onPlaybackError("Failed to prepare channel stream: ${e.message}")
-            }
-        } else {
+    // One effect for the whole load/play decision, keyed on everything that can change
+    // it. Split across two effects these two flags could disagree — `isPlaying` turning
+    // true would call `play()` on a player that had not been prepared yet, which is a
+    // no-op that leaves the stream silently dead until something else happened to
+    // re-trigger the load.
+    LaunchedEffect(streamUrl, reloadKey, isPlaying, loadOnlyWhenPlaying) {
+        if (streamUrl.isBlank()) {
             isBuffering = false
             onPlaybackError("Stream URL is empty")
+            return@LaunchedEffect
         }
-    }
 
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
-            exoPlayer.play()
-        } else {
+        if (!isPlaying) {
             exoPlayer.pause()
+            if (loadOnlyWhenPlaying) {
+                // `stop()` rather than `pause()`: pause leaves the player buffering in
+                // the background, and on a live stream there is no position worth
+                // keeping, so releasing the connection outright is both correct and the
+                // whole point. It is safe to call on a player with no media item.
+                exoPlayer.stop()
+                isBuffering = false
+            }
+            return@LaunchedEffect
+        }
+
+        try {
+            // Already prepared and holding this item — this is a resume, not a first
+            // load, so there is nothing to re-fetch and nothing to re-buffer.
+            val alreadyLoaded = exoPlayer.playbackState != Player.STATE_IDLE &&
+                exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString() == streamUrl
+            if (!alreadyLoaded) {
+                isBuffering = true
+                exoPlayer.setMediaItem(MediaItem.fromUri(streamUrl))
+                exoPlayer.prepare()
+            }
+            exoPlayer.play()
+        } catch (e: Exception) {
+            isBuffering = false
+            onPlaybackError("Failed to prepare channel stream: ${e.message}")
         }
     }
 

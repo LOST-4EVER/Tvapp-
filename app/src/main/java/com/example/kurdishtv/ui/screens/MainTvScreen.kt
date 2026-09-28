@@ -450,7 +450,8 @@ private fun LandscapeCompactLayout(
                     minCellSize = gridMinCellSize,
                     onChannelClick = onChannelClick,
                     onFavoriteToggle = onFavoriteToggle,
-                    focusToken = focusToken
+                    focusToken = focusToken,
+                    compact = true
                 )
             }
         }
@@ -467,7 +468,8 @@ private fun ChannelGrid(
     minCellSize: Dp,
     onChannelClick: (Channel) -> Unit,
     onFavoriteToggle: (String) -> Unit,
-    focusToken: String
+    focusToken: String,
+    compact: Boolean = false
 ) {
     // A television is driven by a D-pad, so focus is a primary state rather than a
     // detail: a screen where nothing holds focus is a screen where the remote does
@@ -637,6 +639,7 @@ private fun ChannelGrid(
                         activeCardId = null
                     }
                 },
+                compact = compact,
                 modifier = Modifier
                     // Placement + fade. Without it, changing category or clearing a
                     // search snapped every surviving card to a new slot at once;

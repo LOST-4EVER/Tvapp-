@@ -15,11 +15,13 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -310,7 +312,7 @@ fun Modifier.staggeredEntrance(
  * `compositionLocalOf` rather than `staticCompositionLocalOf` because the state
  * *object* changes when the setting is toggled, and readers have to see the new one.
  */
-val LocalLivePulse = compositionLocalOf { mutableFloatStateOf(ExpressiveMotion.RESTING_PULSE) }
+val LocalLivePulse = compositionLocalOf { WatchedFloat(ExpressiveMotion.RESTING_PULSE) }
 
 /**
  * The shared turn of every focus ring, in degrees.
@@ -330,39 +332,76 @@ val LocalLivePulse = compositionLocalOf { mutableFloatStateOf(ExpressiveMotion.R
  * A plain `Float` would have been worse still — see [LocalLivePulse] for why the angle
  * is published as state rather than as a number.
  */
-val LocalFocusRotation = compositionLocalOf { mutableFloatStateOf(0f) }
+val LocalFocusRotation = compositionLocalOf { WatchedFloat(0f) }
+
+/**
+ * Registers the caller as a reader of [LocalFocusRotation] while it is `active`.
+ *
+ * There is one focus ring drawn at a time, so the honest answer to "is anything
+ * watching the turn?" is almost always *no* — and an answer of no has to be able to
+ * stop the loop. See [rememberFocusRotation] for why that matters.
+ */
+@Composable
+internal fun WatchFocusRotation(active: Boolean) {
+    val rotation = LocalFocusRotation.current
+    DisposableEffect(rotation, active) {
+        if (active) rotation.watch()
+        onDispose { if (active) rotation.unwatch() }
+    }
+}
 
 /** Drives [LocalFocusRotation]. One frame loop for the whole app; see that property. */
 @Composable
-fun rememberFocusRotation(enabled: Boolean): MutableFloatState {
-    val degrees = remember { mutableFloatStateOf(0f) }
+fun rememberFocusRotation(enabled: Boolean): WatchedFloat {
+    val rotation = remember { WatchedFloat(0f) }
 
-    // Driven by a plain `withFrameNanos` loop writing one [MutableFloatState], rather
+    // Driven by a plain `withFrameNanos` loop writing one state object, rather
     // than by a `rememberInfiniteTransition`.
     //
     // A transition could not be switched off. It ran its frame callback for the life of
     // the app and the `if (enabled)` at the end threw the result away, so a viewer who
     // asked for reduced motion still paid for a continuously running animation. This
     // loop is keyed on `enabled` and simply is not there when the answer is no.
-    LaunchedEffect(enabled) {
-        if (!enabled) {
-            degrees.floatValue = 0f
+    //
+    // The second key is the important one. `enabled` only says the viewer has not
+    // switched motion *off*; it says nothing about whether anything is on screen
+    // actually reading the number. It was true on every screen, so the loop ran at
+    // display rate for the whole life of the process — including the player, where no
+    // focus ring is ever drawn, and Settings, which has none at all. A
+    // `withFrameNanos` loop is not free: it wakes the CPU sixty times a second, which
+    // on a television is the difference between a set-top box that is warm and one
+    // that is noticeably hot to the touch, and on a phone it is measurable battery.
+    //
+    // Keyed on the watcher count, the loop exists exactly while something is drawing
+    // from it, and not one frame longer.
+    //
+    // The phase comes from [WatchedFloat.epochNanos] rather than from a local `start`
+    // captured inside the loop. That detail is what keeps arrowing smooth: moving
+    // focus from one card to the next disposes one watcher and creates another, and
+    // for an instant the count passes through zero and the effect restarts. With a
+    // per-loop origin, the ring would snap back to 0° on every single arrow press —
+    // the exact stutter the slow continuous turn exists to avoid, reintroduced by the
+    // optimisation. With a shared origin it picks up at the angle it left off at.
+    LaunchedEffect(enabled, rotation.watchers.intValue) {
+        if (!enabled || !rotation.isWatched) {
+            // Deliberately *not* zeroed. Nothing is drawing the ring while it is
+            // unfocused, and zeroing it would make the next focus gain start the
+            // turn from the top rather than from where it actually was.
             return@LaunchedEffect
         }
         val period = ExpressiveMotion.ROTATION_PERIOD_MS * 1_000_000L
-        var start = 0L
         while (true) {
             withFrameNanos { now ->
-                if (start == 0L) start = now
+                val start = rotation.epoch(now)
                 // A constant angular speed. An easing curve applied to a repeating
                 // 0→360 is not a slow turn, it is a turn that stutters once per
                 // revolution — and a ring that is the only moving thing on screen is
                 // exactly where that reads as a fault.
-                degrees.floatValue = ((now - start) % period) / period.toFloat() * 360f
+                rotation.state.floatValue = ((now - start) % period) / period.toFloat() * 360f
             }
         }
     }
-    return degrees
+    return rotation
 }
 
 /**
@@ -374,29 +413,106 @@ fun rememberFocusRotation(enabled: Boolean): MutableFloatState {
  * during composition would put a recomposition on every badge, on every frame.
  */
 @Composable
-fun rememberLivePulse(enabled: Boolean): MutableFloatState {
-    val scale = remember { mutableFloatStateOf(ExpressiveMotion.RESTING_PULSE) }
+fun rememberLivePulse(enabled: Boolean): WatchedFloat {
+    val pulse = remember { WatchedFloat(ExpressiveMotion.RESTING_PULSE) }
 
-    LaunchedEffect(enabled) {
-        if (!enabled) {
-            scale.floatValue = ExpressiveMotion.RESTING_PULSE
+    // Keyed on the watcher count for the same reason as [rememberFocusRotation]: the
+    // setting says whether the viewer *wants* a pulse, not whether any badge is on
+    // screen to receive one. The player draws exactly one badge and only while its
+    // transport controls are up, so most of the time spent watching a channel there
+    // is nothing reading this number — and it was waking the CPU anyway.
+    LaunchedEffect(enabled, pulse.watchers.intValue) {
+        if (!enabled || !pulse.isWatched) {
+            // Resting, not merely unwritten: unlike the focus ring, a badge draws this
+            // value on every frame it is composed, so leaving the last breathing scale
+            // in place would freeze a dot mid-pulse at whatever size it happened to
+            // be when the last badge went away.
+            pulse.state.floatValue = ExpressiveMotion.RESTING_PULSE
             return@LaunchedEffect
         }
         val period = ExpressiveMotion.LIVE_PULSE_PERIOD_MS * 1_000_000L
         val low = ExpressiveMotion.LIVE_PULSE_MIN
         val span = ExpressiveMotion.LIVE_PULSE_MAX - low
-        var start = 0L
         while (true) {
             withFrameNanos { now ->
-                if (start == 0L) start = now
-                val phase = ((now - start) % period) / period.toFloat()
+                // Shared origin — see the note on the rotation loop above.
+                val phase = ((now - pulse.epoch(now)) % period) / period.toFloat()
                 // A cosine breath rather than a tween's easing curve: the same smooth
                 // in-and-out, with no cubic solve between the two ends.
-                scale.floatValue = low + span * (0.5f - 0.5f * cos(2f * PI.toFloat() * phase))
+                pulse.state.floatValue = low + span * (0.5f - 0.5f * cos(2f * PI.toFloat() * phase))
             }
         }
     }
-    return scale
+    return pulse
+}
+
+/** Registers the caller as a reader of [LocalLivePulse] for as long as it is composed. */
+@Composable
+internal fun WatchLivePulse() {
+    val pulse = LocalLivePulse.current
+    DisposableEffect(pulse) {
+        pulse.watch()
+        onDispose { pulse.unwatch() }
+    }
+}
+
+/**
+ * A shared app-wide animation value, and the count of things currently reading it.
+ *
+ * The distinction between "the viewer has not switched this motion off" and "something
+ * on screen is actually animating from it" is the whole reason this type exists. Almost
+ * every value the app animates on a loop is read by a surface that is usually not
+ * there: focus rings exist on exactly one element, the player's LIVE badge only while
+ * its controls are showing. A loop that cannot tell the difference between those two
+ * states runs at display rate forever, which is the most expensive kind of bug there
+ * is — it costs power constantly, shows nothing, and is invisible in a screenshot.
+ *
+ * [state] is the value, published as a [MutableFloatState] so it can be read from the
+ * draw phase; see [LocalLivePulse] for why that matters. [watchers] is a plain counter
+ * and is written only on composition and disposal, so it never invalidates a draw.
+ */
+@Stable
+class WatchedFloat internal constructor(initial: Float) {
+
+    internal val state = mutableFloatStateOf(initial)
+
+    internal val watchers = mutableIntStateOf(0)
+
+    /**
+     * The origin every loop driving this value measures its phase from.
+     *
+     * Set once, on the first frame that asks, and never reset — see [epoch].
+     */
+    private var origin: Long = 0L
+
+    /**
+     * The shared time origin, set on first use and returned unchanged thereafter.
+     *
+     * A loop that captured its own `start` would restart from zero every time the
+     * watcher count moved, which for a focus ring means a visible snap on every arrow
+     * press — the watcher count passes through zero each time focus moves between
+     * cards, so the snap would be constant. Measuring from one origin that outlives
+     * any individual loop makes a restart invisible: the value simply continues.
+     */
+    internal fun epoch(now: Long): Long {
+        if (origin == 0L) origin = now
+        return origin
+    }
+
+    internal val isWatched: Boolean get() = watchers.intValue > 0
+
+    /** The current value. Read this from the draw phase, never from composition. */
+    val floatValue: Float get() = state.floatValue
+
+    internal fun watch() {
+        watchers.intValue++
+    }
+
+    internal fun unwatch() {
+        // Guarded rather than decremented blindly: a double disposal would otherwise
+        // drive the count negative and wedge the loop off permanently.
+        if (watchers.intValue > 0) watchers.intValue--
+    }
 }
 
 /**
@@ -406,8 +522,14 @@ fun rememberLivePulse(enabled: Boolean): MutableFloatState {
  * live badge's rotation, the hero card's slow turn — reads from this one transition, so
  * the number of running animations does not grow with the number of things on screen.
  *
- * [keyframes] holds at each extreme, which reproduces the loading indicator's
+ *    [keyframes] holds at each extreme, which reproduces the loading indicator's
  * stretch-and-settle cadence instead of looping mechanically.
+ *
+ * Note the contrast with [rememberLivePulse] and [rememberFocusRotation], which are
+ * driven by `withFrameNanos` loops that stop when nothing reads them. That is not an
+ * oversight here: this one is only ever called while a loading indicator is on screen,
+ * so there is always a reader by construction, and an infinite transition is the
+ * clearer way to say "loop until I leave the composition".
  */
 @Composable
 fun rememberBounceProgress(enabled: Boolean): Float {

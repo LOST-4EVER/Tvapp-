@@ -26,6 +26,16 @@ private val StringRules: List<CategoryRule> = listOf(
     CategoryRule(CategoryFilter.RELIGIOUS, "Relig")
 )
 
+/**
+ * The same rules, indexed by the category they belong to.
+ *
+ * Every category has at most one rule today, so this maps to single-element lists —
+ * but it is a lookup rather than a scan precisely so that adding a second rule to a
+ * category later does not silently change the meaning of the existing one.
+ */
+private val RulesByCategory: Map<CategoryFilter, List<CategoryRule>> =
+    StringRules.groupBy { it.filter }
+
 object ChannelFilterEngine {
 
     fun filter(
@@ -110,9 +120,16 @@ object ChannelFilterEngine {
     /**
      * The substring tests a category implies, or an empty list when it implies
      * everything.
+     *
+     * A lookup rather than a scan. This used to be
+     * `StringRules.filter { it.filter == category }`, which allocated a new list on
+     * *every* filter call — and `filter` runs on every keystroke of the search field
+     * and on every step of the D-pad across the category rail, so the allocation was
+     * pure garbage in the two places the app most needs to be cheap. The index is built
+     * once, from a list that never changes after this file is loaded.
      */
     private fun rulesFor(category: CategoryFilter): List<CategoryRule> =
-        if (category == CategoryFilter.ALL) emptyList() else StringRules.filter { it.filter == category }
+        if (category == CategoryFilter.ALL) emptyList() else RulesByCategory[category].orEmpty()
 
     /**
      * Case-insensitive name-or-category match, without allocating.

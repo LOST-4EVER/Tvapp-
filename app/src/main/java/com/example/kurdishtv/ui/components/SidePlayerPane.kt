@@ -153,6 +153,13 @@ fun SidePlayerPane(
                         // buffering notice is the only way to show that something
                         // is happening. Left at its default it was suppressed.
                         areControlsVisible = false,
+                        // This pane is a preview that starts paused, and a paused
+                        // ExoPlayer that has been prepared is not idle: it opens the
+                        // connection and fills its buffer, so merely *visiting* the
+                        // browse screen on a tablet downloaded a live stream nobody
+                        // was watching. Not preparing until the viewer asks for it
+                        // is what makes the pause mean anything.
+                        loadOnlyWhenPlaying = true,
                         reloadKey = retryToken,
                         modifier = Modifier.fillMaxSize()
                     )
