@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -22,10 +21,11 @@ import androidx.compose.ui.input.pointer.pointerInput
  * Material 3 Expressive press feedback: the element springs down on press and bounces
  * back on release. Honours the user's reduced-motion preference.
  *
- * Also focusable, so the element is reachable with a D-pad or TV remote. Because
- * `indication = null` removes the default click ripple, focus is signalled by a small
- * springy scale-up — see [tvFocusable] and [expressiveFocusRing] for the ringed
- * variants used on larger surfaces.
+ * Also focusable, so the element is reachable with a D-pad or TV remote: the click
+ * modifier this wraps brings a focus target of its own, and that target is the one
+ * the tab order uses. Because `indication = null` removes the default click ripple,
+ * focus is signalled by a small springy scale-up — see [tvFocusable] and
+ * [expressiveFocusRing] for the ringed variants used on larger surfaces.
  *
  * @param interactionSource pass an existing source when the caller also needs to
  *   observe the press — that is how [com.example.kurdishtv.ui.components.AppIconButton]
@@ -34,7 +34,7 @@ import androidx.compose.ui.input.pointer.pointerInput
  *   somewhere else — pair it with [expressiveFocusRing], which supplies the focus
  *   behaviour and draws it.
  *
- *   Setting it false does more than skip the `focusable` modifier below, and it has to.
+ *   Setting it false does more than skip a `focusable` modifier, and it has to.
  *   `Modifier.clickable` brings a focus target of its own, so a plain `focusable = false`
  *   left every such element a D-pad stop *anyway* — and, worse, a stop that was not the
  *   one the caller's focus ring was watching, so the ring never lit. The click is
@@ -132,11 +132,25 @@ fun Modifier.bouncyClickable(
                     onClick = onClick
                 )
             }
-        )
-        .then(
-            if (focusable) Modifier.focusable(enabled = enabled, interactionSource = source)
-            else Modifier
-        )
+        )            .then(
+                // **Not** `Modifier.focusable(...)` here, which is what used to be on
+                // this line and is a D-pad bug on every control in the app.
+                //
+                // `clickable` and `combinedClickable` each bring a focus target of
+                // their own — that is the *only* way they are reachable by a remote at
+                // all. Adding a second `focusable` on top of it did not make the
+                // control more reachable; it gave it two focus targets stacked on the
+                // same 34dp box, and focus traversal picked between them. The one the
+                // viewer landed on was not necessarily the one this modifier was
+                // watching, so the press lift and the focus ring could disagree with
+                // where the highlight actually was.
+                //
+                // So: when the control is focusable, the click's own target is the
+                // target, and this modifier is a no-op. When it is not, the
+                // `focusOverride` above has already taken that target out of the tab
+                // order and lets focus fall through to a ring's target below.
+                Modifier
+            )
 }
 
 /**

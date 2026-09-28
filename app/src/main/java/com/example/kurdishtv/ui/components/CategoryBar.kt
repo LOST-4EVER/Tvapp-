@@ -38,6 +38,16 @@ fun CategoryBar(
     selectedCategory: CategoryFilter,
     onCategorySelected: (CategoryFilter) -> Unit,
     channels: List<Channel> = emptyList(),
+    /**
+     * Called with the categories that actually have channels behind them.
+     *
+     * The navigation rail needs the same answer this composable works out for itself.
+     * It used to keep its own hard-coded list, which meant the two rows of navigation
+     * disagreed: the rail offered tabs for categories the chips had hidden as empty,
+     * and omitted six of the twelve entirely. Reporting the list from the one place
+     * that computes it is what keeps them in agreement.
+     */
+    onVisibleCategories: (List<CategoryFilter>) -> Unit = {},
     modifier: Modifier = Modifier,
     /**
      * Shorten the chips for a short window.
@@ -87,6 +97,12 @@ fun CategoryBar(
             else -> CategoryFilter.entries.filter { counts[it] != 0 }
         }
     }
+
+    // Reported upward in an effect rather than during composition, so the rail is
+    // never written to from inside this composable's own body — a state write
+    // during composition is what Compose calls a side effect, and it re-runs the
+    // composition it came from.
+    LaunchedEffect(visible) { onVisibleCategories(visible) }
 
     // There are more tabs than fit on a phone, and the row starts at the beginning,
     // so a non-default selection (a restored "start category", or a tap on a tab

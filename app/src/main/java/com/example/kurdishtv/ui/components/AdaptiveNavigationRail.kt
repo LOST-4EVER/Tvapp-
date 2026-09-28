@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -68,6 +70,21 @@ import com.example.ui.theme.LocalAppColors
 fun AdaptiveNavigationRail(
     selectedCategory: CategoryFilter,
     onCategorySelected: (CategoryFilter) -> Unit,
+    /**
+     * The same list the category chips are showing.
+     *
+     * The rail used to carry its own hard-coded subset — All, News, Music, Kids,
+     * Favourites, HD — and that is a list that was wrong twice over. It offered
+     * Music and Kids on a playlist that has neither (the chips had already been fixed
+     * to hide empty tabs, so the two rows of navigation disagreed with each other and
+     * with the data), and it left out Kurdish Culture, General, Sports, Documentary,
+     * Quran and Religious — six of the twelve ways of browsing, unreachable from the
+     * rail on exactly the wide screens where the rail exists.
+     *
+     * Taking the list from the same computation removes the class of bug rather than
+     * this instance of it.
+     */
+    visibleCategories: List<CategoryFilter>,
     onOpenImport: () -> Unit,
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -94,12 +111,17 @@ fun AdaptiveNavigationRail(
                         .bouncyClickable { onRefresh() }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        SvgIcon(
-                            resId = KurdishTvIcons.Tv,
-                            contentDescription = "Kurdish TV Live",
-                            tint = colors.onPrimary,
-                            modifier = Modifier.size(25.dp)
-                        )
+                    SvgIcon(
+                        resId = KurdishTvIcons.Tv,
+                        // "Refresh channels", not the app's name. This tile is a
+                        // button — it runs [onRefresh] — and it announced itself as
+                        // the app's title, so a screen reader read out the name of
+                        // the app rather than the name of the thing you are about to
+                        // do. The same correction is applied to the header tile.
+                        contentDescription = "Refresh channels",
+                        tint = colors.onPrimary,
+                        modifier = Modifier.size(25.dp)
+                    )
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -123,31 +145,39 @@ fun AdaptiveNavigationRail(
             .background(colors.surface)
             .border(width = 1.dp, color = colors.border)
     ) {
-        val railCategories = listOf(
-            CategoryFilter.ALL,
-            CategoryFilter.NEWS,
-            CategoryFilter.MUSIC,
-            CategoryFilter.KIDS,
-            CategoryFilter.FAVORITES,
-            CategoryFilter.HD
-        )
-
         Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(bottom = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            railCategories.forEach { category ->
-                RailCategoryItem(
-                    category = category,
-                    isSelected = selectedCategory == category,
-                    onClick = { onCategorySelected(category) }
-                )
+            // The categories scroll; the actions below them do not.
+            //
+            // The rail used to be one fixed-height column with a `Spacer(weight(1f))`
+            // pushing Settings and Import to the bottom. Once the rail was given the
+            // full twelve categories that stopped being safe: on a short window the
+            // content is taller than the rail, and the list simply clipped — the lower
+            // categories became unreachable, and so did the two buttons pinned below
+            // them, with no way to scroll to any of it.
+            //
+            // Splitting it into a scrolling region and a fixed footer solves that
+            // without relying on a `weight` inside a scrollable column, where the
+            // spacer's size is not defined and collapses unpredictably when the
+            // content overflows.
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                visibleCategories.forEach { category ->
+                    RailCategoryItem(
+                        category = category,
+                        isSelected = selectedCategory == category,
+                        onClick = { onCategorySelected(category) }
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
 
             RailActionButton(
                 iconRes = KurdishTvIcons.Settings,

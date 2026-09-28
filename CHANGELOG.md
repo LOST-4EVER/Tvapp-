@@ -8,6 +8,36 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **Every control in the app had two D-pad stops on it.** `bouncyClickable` applied
+  `Modifier.focusable` on top of the `clickable` it wraps — but a click already brings
+  a focus target of its own, which is the only reason it is reachable by a remote at
+  all. So each chip, button, rail item and card had two focus targets stacked on the
+  same box, and focus traversal chose between them; the one the viewer landed on was
+  not necessarily the one the modifier was watching, so the press lift and the focus
+  ring could disagree with where the highlight actually was. The click's own target is
+  now the only one.
+- **The navigation rail and the category chips disagreed with each other.** The rail
+  carried its own hard-coded list of six categories while the chips computed theirs
+  from what actually has channels behind it. So the rail offered Music and Kids on a
+  playlist that has neither, and left six of the twelve ways of browsing —
+  Kurdish Culture, General, Sports, Documentary, Quran, Religious — unreachable from
+  the rail on exactly the wide screens where the rail exists. The rail now takes its
+  list from the same computation the chips use, which removes the class of bug rather
+  than this instance of it.
+- **The rail could not be scrolled, so its lower half was unreachable.** It was one
+  fixed-height column whose Settings and Import buttons were pinned to the bottom by
+  a weighted spacer. With the full category list that overflows a short window, and
+  the overflow was silently clipped. The categories scroll; the two actions are a
+  fixed footer. Deliberately *not* done by making the one column scrollable, because a
+  `weight` inside a scrollable column has no defined size and collapses unpredictably.
+- **Two buttons announced the app's name instead of their own action.** The header
+  brand tile and the rail's header tile both run a channel refresh, and both described
+  themselves as "Kurdish TV Live" — so a screen reader read out the name of the app
+  where the viewer needed to hear what pressing it would do. They now say "Refresh
+  channels".
+- **Deleted dead code.** Three unused loading composables (`ChannelCardSkeleton`,
+  `BouncingLoadingState`, `BouncingLoaderRow`), an unused `VectorIcon`, and four
+  unused colour constants — about 150 lines that no call site could reach.
 - **Search could not find channels whose name contains a separator.** The playlist
   parser rewrites every `-` and `_` in a raw channel name into a space, so a channel
   shown as `NRT 1` is stored under exactly that string. Typing the name the way it is

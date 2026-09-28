@@ -4,7 +4,6 @@ import androidx.compose.ui.graphics.Color
 
 // ── Core accents ──────────────────────────────────────────────────────────────
 val KurdishSunGold = Color(0xFFFFB703)
-val KurdishAmber = Color(0xFFFB8500)
 val KurdishRed = Color(0xFFD90429)
 val KurdishGreen = Color(0xFF2EC4B6)
 
@@ -20,7 +19,6 @@ val DarkSurface = Color(0xFF13151F)
 val DarkSurfaceVariant = Color(0xFF1D2130)
 val DarkSurfaceElevated = Color(0xFF262C3E)
 val DarkCardBorder = Color(0xFF2D3347)
-val DarkCardBorderGlow = Color(0x33FFB703)
 
 // ── AMOLED surfaces ───────────────────────────────────────────────────────────
 val AmoledBackground = Color(0xFF000000)
@@ -45,9 +43,7 @@ val TextTertiary = Color(0xFF8D94A2)
 
 // ── Overlays / status ─────────────────────────────────────────────────────────
 val GlassOverlay = Color(0xB313151F)
-val GlassOverlayLight = Color(0x26FFFFFF)
 val LiveRed = Color(0xFFFF1744)
-val LiveGreen = Color(0xFF00E676)
 
 // ── Tonal derivation ──────────────────────────────────────────────────────────
 // How far a container is tinted toward its accent, and how far the matching
