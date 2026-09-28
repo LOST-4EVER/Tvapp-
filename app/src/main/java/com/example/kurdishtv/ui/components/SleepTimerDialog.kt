@@ -47,7 +47,7 @@ fun SleepTimerDialog(
                     SvgIcon(
                         resId = KurdishTvIcons.Bedtime,
                         contentDescription = null,
-                        tint = colors.primary,
+                        tint = colors.onPrimaryContainer,
                         modifier = Modifier
                             .padding(8.dp)
                             .size(22.dp)

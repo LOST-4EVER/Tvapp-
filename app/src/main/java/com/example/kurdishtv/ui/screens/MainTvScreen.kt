@@ -1,5 +1,7 @@
 package com.example.kurdishtv.ui.screens
 
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +47,7 @@ import com.example.kurdishtv.ui.components.RecentChannelsRow
 import com.example.kurdishtv.ui.components.SearchBarM3
 import com.example.kurdishtv.ui.components.SidePlayerPane
 import com.example.kurdishtv.ui.components.TopHeaderBar
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.staggeredEntrance
 import com.example.kurdishtv.viewmodel.TvUiState
 import com.example.ui.theme.LocalAppColors
@@ -421,6 +424,7 @@ private fun LandscapeCompactLayout(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChannelGrid(
     filtered: List<Channel>,
@@ -469,7 +473,16 @@ private fun ChannelGrid(
                 showLogos = showLogos,
                 onClick = { onChannelClick(channel) },
                 onFavoriteToggle = { onFavoriteToggle(channel.id) },
-                modifier = Modifier.staggeredEntrance(index = index)
+                modifier = Modifier
+                    // Placement + fade. Without it, changing category or clearing a
+                    // search snapped every surviving card to a new slot at once;
+                    // with it the grid slides the cards that persist into their new
+                    // positions and cross-fades the ones that arrive.
+                    .animateItem(
+                        fadeInSpec = tween(ExpressiveMotion.DURATION_MEDIUM, easing = ExpressiveMotion.emphasized),
+                        placementSpec = ExpressiveMotion.spatialMediumOffset
+                    )
+                    .staggeredEntrance(index = index)
             )
         }
     }

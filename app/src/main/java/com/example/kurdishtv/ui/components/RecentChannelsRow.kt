@@ -54,7 +54,7 @@ fun RecentChannelsRow(
                 SvgIcon(
                     resId = KurdishTvIcons.History,
                     contentDescription = null,
-                    tint = colors.primary,
+                    tint = colors.onPrimaryContainer,
                     modifier = Modifier
                         .padding(6.dp)
                         .size(14.dp)
@@ -71,6 +71,7 @@ fun RecentChannelsRow(
         }
 
         LazyRow(
+            modifier = Modifier.edgeFade(),
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {

@@ -49,14 +49,9 @@ val GlassOverlayLight = Color(0x26FFFFFF)
 val LiveRed = Color(0xFFFF1744)
 val LiveGreen = Color(0xFF00E676)
 
-// Container tones per accent (filled tonal surfaces)
-val GoldContainer = Color(0xFF3A2E00)
-val OnGoldContainer = Color(0xFFFFE08A)
-val EmberContainer = Color(0xFF3A1D00)
-val OnEmberContainer = Color(0xFFFFD7B0)
-val RoseContainer = Color(0xFF3A0E18)
-val OnRoseContainer = Color(0xFFFFD3DC)
-val JadeContainer = Color(0xFF04332A)
-val OnJadeContainer = Color(0xFFAAEFDA)
-val AzureContainer = Color(0xFF0B2745)
-val OnAzureContainer = Color(0xFFCBE2FF)
+// ── Tonal derivation ──────────────────────────────────────────────────────────
+// How far a container is tinted toward its accent, and how far the matching
+// content colour is tinted toward white. See tonalPair() in AppColors.kt for why
+// these are derived rather than taken from a fixed per-accent table.
+const val CONTAINER_TINT = 0.30f
+const val ON_CONTAINER_TINT = 0.45f

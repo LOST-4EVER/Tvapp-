@@ -7,7 +7,6 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.ui.motion.LocalReduceMotion
@@ -42,7 +41,8 @@ fun KurdishTvTheme(
             secondaryContainer = colors.surfaceVariant,
             onSecondaryContainer = colors.textPrimary,
             tertiary = colors.tertiary,
-            onTertiary = Color.Black,
+            // Picked by measured contrast rather than assumed to be a light tone.
+            onTertiary = onColorFor(colors.tertiary),
             background = colors.background,
             onBackground = colors.textPrimary,
             surface = colors.surface,
@@ -52,7 +52,7 @@ fun KurdishTvTheme(
             surfaceContainer = colors.surfaceElevated,
             outline = colors.border,
             error = KurdishRed,
-            onError = Color.White
+            onError = onColorFor(KurdishRed)
         )
     }
 

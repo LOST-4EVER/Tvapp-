@@ -53,12 +53,14 @@ import com.example.kurdishtv.model.ThemeMode
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.SvgIcon
 import com.example.kurdishtv.ui.components.UpdateCard
+import com.example.kurdishtv.ui.components.edgeFade
 import com.example.kurdishtv.update.AppUpdate
 import com.example.kurdishtv.update.UpdateState
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 import com.example.ui.theme.appColorsFor
+import com.example.ui.theme.onColorFor
 
 @Composable
 fun SettingsScreen(
@@ -117,6 +119,11 @@ fun SettingsScreen(
                     SectionLabel("Accent color")
                     AccentSwatchRow(
                         selected = settings.accent,
+                        // With Material You on, the swatch that is visibly in use is
+                        // the wallpaper's, not the stored one. Marking the stored
+                        // accent as selected made the screen claim a colour the app
+                        // was not drawing.
+                        overridden = settings.dynamicColor && supportsDynamicColor,
                         onSelect = { accent -> onUpdate { it.copy(accent = accent) } }
                     )
 
@@ -401,7 +408,7 @@ private fun SettingsSection(
                         SvgIcon(
                             resId = iconRes,
                             contentDescription = null,
-                            tint = colors.primary,
+                            tint = colors.onPrimaryContainer,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -443,43 +450,64 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun AccentSwatchRow(
     selected: AccentColor,
+    overridden: Boolean,
     onSelect: (AccentColor) -> Unit
 ) {
     val colors = LocalAppColors.current
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        AccentColor.entries.forEach { accent ->
-            val swatch = appColorsFor(AppSettings(accent = accent)).primary
-            val isSelected = accent == selected
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .size(if (isSelected) 52.dp else 44.dp)
-                        .clip(CircleShape)
-                        .background(swatch)
-                        .border(
-                            width = if (isSelected) 3.dp else 1.dp,
-                            color = if (isSelected) colors.textPrimary else colors.border,
-                            shape = CircleShape
-                        )
-                        .bouncyClickable(scaleDown = 0.88f) { onSelect(accent) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isSelected) {
-                        SvgIcon(
-                            resId = KurdishTvIcons.Check,
-                            contentDescription = "Selected",
-                            tint = Color.Black,
-                            modifier = Modifier.size(22.dp)
-                        )
+    Column {
+        if (overridden) {
+            // Say plainly that these are not in effect. The stored accent still
+            // applies the moment Material You is switched off, so the row stays
+            // enabled and keeps the checkmark — it is just labelled as pending.
+            Text(
+                text = "Material You is on, so the app is using your wallpaper's color. " +
+                    "Turn it off below to use one of these.",
+                color = colors.textTertiary,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(bottom = 10.dp)
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AccentColor.entries.forEach { accent ->
+                val swatch = appColorsFor(AppSettings(accent = accent)).primary
+                val isSelected = accent == selected
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(if (isSelected) 52.dp else 44.dp)
+                            .clip(CircleShape)
+                            .background(swatch)
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) {
+                                    colors.textPrimary
+                                } else {
+                                    colors.border
+                                },
+                                shape = CircleShape
+                            )
+                            .bouncyClickable(scaleDown = 0.88f) { onSelect(accent) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            SvgIcon(
+                                resId = KurdishTvIcons.Check,
+                                contentDescription = "Selected",
+                                // Chosen by measured contrast, not assumed: a light
+                                // accent needs dark ink, a dark one needs light.
+                                tint = onColorFor(swatch),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = accent.displayName,
+                        color = if (isSelected) colors.textPrimary else colors.textTertiary,
+                        fontSize = 10.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    )
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = accent.displayName,
-                    color = if (isSelected) colors.textPrimary else colors.textTertiary,
-                    fontSize = 10.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                )
             }
         }
     }
@@ -532,6 +560,7 @@ private fun CategoryChipRow(
 ) {
     val colors = LocalAppColors.current
     LazyRow(
+        modifier = Modifier.edgeFade(width = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(vertical = 2.dp)
     ) {
