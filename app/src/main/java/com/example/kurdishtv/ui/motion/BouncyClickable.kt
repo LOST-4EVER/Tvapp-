@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.motion
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
@@ -51,6 +52,10 @@ import androidx.compose.ui.input.pointer.pointerInput
  *   how a D-pad user reaches an action that is deliberately kept out of the tab
  *   order. See [com.example.kurdishtv.ui.components.ChannelCard].
  */
+// `combinedClickable` — the long-press path — is still flagged experimental, where
+// `clickable` is not. Opting in here rather than at every call site keeps the
+// long-press an implementation detail of this modifier: callers never name the API.
+@OptIn(ExperimentalFoundationApi::class)
 fun Modifier.bouncyClickable(
     enabled: Boolean = true,
     scaleDown: Float = 0.93f,

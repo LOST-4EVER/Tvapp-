@@ -14,6 +14,9 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   an argument it never had, and the grid calls are well formed. The same pass also fed
   the navigator's entry id — a UUID `String` — into the grid's `Int` token, defaulted
   with `?: 0`, which is a type error as well; the token is a `String` end to end now.
+  The same pass also called `androidx.compose.runtime.awaitFrame`, which does not
+  exist, and used `combinedClickable` without the `@OptIn(ExperimentalFoundationApi::class)
+  the API still requires. All four are fixed, and the release build compiles.
 - **Typing in the search field threw focus out of it.** Focus placement was keyed on
   the channel list, so the filter narrowing on the first keystroke moved focus to a
   card and dismissed the keyboard, ending the search after one letter. The grid now
