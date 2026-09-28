@@ -23,6 +23,9 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     needs nothing rewritten in the system database.
   - The channel list comes from the same repository, parser and cache the app's own
     grid is fed by, so the two can never disagree about a name or a stream.
+  - Tuned playback runs through the same ExoPlayer configuration as the app's own
+    player, wake lock included: a live stream that lets the device drop its Wi-Fi
+    radio between segments stops for good, and the only symptom is a frozen picture.
   - `COLUMN_HIDDEN` and `COLUMN_NUMBER` are never written, so channels a viewer
     hid or renumbered in the system UI stay that way across a sync.
 - **The remote's number pad works.** Every key on a television remote was ignored
