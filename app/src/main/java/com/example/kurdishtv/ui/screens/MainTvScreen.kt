@@ -22,6 +22,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.awaitFrame
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,7 @@ import com.example.kurdishtv.ui.components.SearchBarM3
 import com.example.kurdishtv.ui.components.SidePlayerPane
 import com.example.kurdishtv.ui.components.TopHeaderBar
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.rememberTvFocusRequester
 import com.example.kurdishtv.ui.motion.staggeredEntrance
 import com.example.kurdishtv.viewmodel.TvUiState
 import com.example.ui.theme.LocalAppColors
@@ -63,7 +65,16 @@ fun MainTvScreen(
     onRemoveCustomPlaylist: (String) -> Unit,
     onRetryClick: () -> Unit,
     onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Bumped by the navigator every time this screen becomes the visible one again.
+     *
+     * A back stack keeps the browse screen composed while the player is on top of it,
+     * so returning from a video does not re-run this screen's own effects. Without
+     * something to key on, a viewer who watched a channel came back to a grid with
+     * nothing focused and had to hunt for where they were. See [ChannelGrid].
+     */
+    focusToken: Int = 0
 ) {
     val colors = LocalAppColors.current
     var showImportDialog by remember { mutableStateOf(false) }
@@ -143,7 +154,8 @@ fun MainTvScreen(
                     onFavoriteToggle = onFavoriteToggle,
                     onRetryClick = onRetryClick,
                     onOpenSettings = onOpenSettings,
-                    onOpenImport = { showImportDialog = true }
+                    onOpenImport = { showImportDialog = true },
+                    focusToken = focusToken
                 )
             }
 
@@ -193,6 +205,7 @@ fun MainTvScreen(
                                     minCellSize = gridMinCellSize,
                                     onChannelClick = onChannelClick,
                                     onFavoriteToggle = onFavoriteToggle
+                                    focusToken = focusToken
                                 )
                             }
                         }
@@ -263,6 +276,7 @@ fun MainTvScreen(
                                     minCellSize = 160.dp,
                                     onChannelClick = onChannelClick,
                                     onFavoriteToggle = onFavoriteToggle
+                                    focusToken = focusToken
                                 )
                             }
                         }
@@ -308,6 +322,7 @@ fun MainTvScreen(
                                 minCellSize = gridMinCellSize,
                                 onChannelClick = onChannelClick,
                                 onFavoriteToggle = onFavoriteToggle
+                                focusToken = focusToken
                             )
                         }
                     }
@@ -386,7 +401,8 @@ private fun LandscapeCompactLayout(
     onFavoriteToggle: (String) -> Unit,
     onRetryClick: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenImport: () -> Unit
+    onOpenImport: () -> Unit,
+    focusToken: Int
 ) {
     val colors = LocalAppColors.current
 
@@ -431,6 +447,7 @@ private fun LandscapeCompactLayout(
                     minCellSize = gridMinCellSize,
                     onChannelClick = onChannelClick,
                     onFavoriteToggle = onFavoriteToggle
+                    focusToken = focusToken
                 )
             }
         }
@@ -446,8 +463,28 @@ private fun ChannelGrid(
     isHome: Boolean,
     minCellSize: Dp,
     onChannelClick: (Channel) -> Unit,
-    onFavoriteToggle: (String) -> Unit
+    onFavoriteToggle: (String) -> Unit,
+    focusToken: Int
 ) {
+    // A television is driven by a D-pad, so focus is a primary state rather than a
+    // detail: a screen where nothing holds focus is a screen where the remote does
+    // nothing, and where the first press of any direction key lands somewhere
+    // arbitrary because focus is being picked for the first time.
+    //
+    // `rememberTvFocusRequester` has been in the motion package for two revisions and
+    // had never been called. This is that call.
+    val firstCardFocus = rememberTvFocusRequester()
+    val firstChannelId = filtered.firstOrNull()?.id
+
+    // Requested after a frame rather than during composition: the card is not in the
+    // tree until the grid has laid it out, and asking for focus before it is attached
+    // throws.
+    LaunchedEffect(firstChannelId, focusToken) {
+        if (firstChannelId == null) return@LaunchedEffect
+        awaitFrame()
+        runCatching { firstCardFocus.requestFocus() }
+    }
+
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = minCellSize),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
@@ -482,6 +519,7 @@ private fun ChannelGrid(
                     showLogos = showLogos,
                     onWatchClick = onChannelClick,
                     onFavoriteToggle = onFavoriteToggle
+                    focusToken = focusToken
                 )
             }
         }
@@ -495,6 +533,10 @@ private fun ChannelGrid(
                 showLogos = showLogos,
                 onClick = { onChannelClick(channel) },
                 onFavoriteToggle = { onFavoriteToggle(channel.id) },
+                // Exactly one card is the focus entry point. Handing the requester to
+                // every card would put a focus handle on each of several hundred
+                // rows for one job.
+                focusRequester = if (index == 0) firstCardFocus else null,
                 modifier = Modifier
                     // Placement + fade. Without it, changing category or clearing a
                     // search snapped every surviving card to a new slot at once;

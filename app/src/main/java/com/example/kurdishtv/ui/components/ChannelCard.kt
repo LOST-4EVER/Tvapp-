@@ -27,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.testTag
@@ -70,10 +72,23 @@ fun ChannelCard(
     showLogos: Boolean = true,
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Lets the grid decide which single card holds programmatic focus.
+     *
+     * Only one card is ever given one. Handing every card its own requester would
+     * mean several hundred focus handles the grid has to keep in step, for an
+     * outcome — "the first card, or wherever the viewer was" — that needs exactly
+     * one owner.
+     */
+    focusRequester: FocusRequester? = null
 ) {
     val colors = LocalAppColors.current
-    val accent = monogramAccent(channel.name)
+    // The accent is derived from the channel's name, so it is the same for the whole
+    // life of the card. Recomputing it on every recomposition meant a hash and a
+    // modulo per card per frame for as long as the grid was on show; it is also what
+    // makes `logoWell` below a stable value, so the tile is not re-measured either.
+    val accent = remember(channel.name) { monogramAccent(channel.name) }
     val reduceMotion = LocalReduceMotion.current
 
     // Focus is tracked here as well as inside the modifier, because the logo well and
@@ -91,7 +106,27 @@ fun ChannelCard(
         modifier = modifier
             .testTag("channel_card_${channel.id}")
             .fillMaxWidth()
-            .bouncyClickable(scaleDown = 0.94f, focusable = false) { onClick() }
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier
+                }
+            )
+            // `liftOnFocus = false`: `expressiveFocusRing` below already lifts this
+            // node by 1.05 while it is focused. Two lifts on one node multiply, so
+            // the card was jumping 10% instead of the 5% that was asked for — and
+            // the jump was large enough to be visible as a pop every time the D-pad
+            // moved.
+            //
+            // `onLongClick` is how a remote user reaches the favourite, now that the
+            // heart is out of the tab order. See [CardFavoriteButton].
+            .bouncyClickable(
+                scaleDown = 0.94f,
+                focusable = false,
+                liftOnFocus = false,
+                onLongClick = onFavoriteToggle
+            ) { onClick() }
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 restShape = M3ExpressivePolygons.Square,
@@ -300,7 +335,19 @@ internal fun CardFavoriteButton(
             // 34dp surface measured 48dp of content in a 34dp box: the glyph was
             // clipped away by the surface outline and the oversized hit area spilled
             // over the card's own edges, stealing taps from the channel behind it.
-            .bouncyClickable(onClick = onClick)
+            //
+            // `focusable = false` is the D-pad fix, and it is the important one.
+            // This heart sat *inside* the card's own bounds, so directional focus
+            // treated it as the nearest target to the right of every card: one press
+            // of the right arrow landed on the heart, and the next press was needed
+            // to reach the following channel. Across a grid that halved the speed of
+            // the most-used direction in the app, and made browsing a list of several
+            // hundred channels feel like it was skipping every other one.
+            //
+            // The action has not been lost. It is a long press on the card, which is
+            // the idiom every TV player uses for the secondary action on a list row,
+            // and the heart is still a tap target for touch.
+            .bouncyClickable(focusable = false, onClick = onClick)
     ) {
         Box(contentAlignment = Alignment.Center) {
             SvgIcon(

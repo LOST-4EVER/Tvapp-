@@ -247,6 +247,20 @@ fun Modifier.staggeredEntrance(
         label = "StaggerEntrance"
     )
 
+    // The layer is dropped the moment the entrance finishes.
+    //
+    // This modifier is on every item of the channel grid, and the grid is the
+    // largest list in the app — six hundred-odd channels. A `graphicsLayer` is a
+    // render node with its own display list, and a transform on it asks the
+    // compositor to treat that node as a separately composited surface. Keeping
+    // one alive per card, for the entire time the browse screen is on show, in
+    // order to hold alpha at 1 and a scale at 1, is the single most expensive
+    // thing the grid was doing when nothing was animating.
+    //
+    // `>= 1f` also drops the layer at the spring's small overshoot, which is a
+    // percent of a percent here and not worth a permanent render node.
+    if (progress >= 1f) return this
+
     return this.graphicsLayer {
         alpha = progress
         // A short rise plus a slight scale reads as "settling into place" without the
@@ -269,6 +283,41 @@ fun Modifier.staggeredEntrance(
  * thrown away.
  */
 val LocalLivePulse = compositionLocalOf { 1f }
+
+/**
+ * The shared turn of every focus ring, in degrees.
+ *
+ * The ring is the only thing on a TV screen that is allowed to move continuously,
+ * because it is the only thing that says "you are here" without being read. That
+ * makes it the most expensive kind of element to have many of.
+ *
+ * Arrowing through a grid used to create a `rememberInfiniteTransition` per card as
+ * focus arrived and tear it down as focus left, so a single press of the right arrow
+ * started and stopped a frame-callback loop, and holding the D-pad down churned one
+ * per card per step. There is one ring drawn at a time, so there is no reason for
+ * there to be more than one loop driving them.
+ *
+ * `compositionLocalOf`, not `staticCompositionLocalOf`, for the same reason as
+ * [LocalLivePulse]: this value changes every frame and a static local would not
+ * invalidate its readers, so the rings would each keep the angle they captured when
+ * they were focused.
+ */
+val LocalFocusRotation = compositionLocalOf { 0f }
+
+/** Drives [LocalFocusRotation]. One transition for the whole app; see that property. */
+@Composable
+fun rememberFocusRotation(enabled: Boolean): Float {
+    val transition = rememberInfiniteTransition(label = "FocusRingTurn")
+    val degrees by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(ExpressiveMotion.ROTATION_PERIOD_MS, easing = ExpressiveMotion.standard)
+        ),
+        label = "FocusRingDegrees"
+    )
+    return if (enabled) degrees else 0f
+}
 
 /**
  * The shared LIVE-badge pulse, or a constant when disabled.

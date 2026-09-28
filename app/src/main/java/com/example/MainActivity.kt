@@ -16,7 +16,9 @@ import com.example.kurdishtv.data.SettingsStorage
 import com.example.kurdishtv.network.NetworkClient
 import com.example.kurdishtv.network.NetworkMonitor
 import com.example.kurdishtv.repository.TvRepository
+import com.example.kurdishtv.ui.motion.LocalFocusRotation
 import com.example.kurdishtv.ui.motion.LocalLivePulse
+import com.example.kurdishtv.ui.motion.rememberFocusRotation
 import com.example.kurdishtv.ui.motion.rememberLivePulse
 import com.example.kurdishtv.ui.navigation.KurdishTvNavGraph
 import com.example.kurdishtv.update.UpdateChecker
@@ -71,7 +73,14 @@ class MainActivity : ComponentActivity() {
             KurdishTvTheme(settings = settings) {
                 // One shared pulse drives every LIVE badge in the app.
                 val livePulse = rememberLivePulse(settings.livePulse && !settings.reduceMotion)
-                CompositionLocalProvider(LocalLivePulse provides livePulse) {
+                // ...and one shared turn drives every focus ring. Both are continuous
+                // animations over a surface that can hold hundreds of elements, so the
+                // number of running frame loops must not scale with what is on screen.
+                val focusRotation = rememberFocusRotation(!settings.reduceMotion)
+                CompositionLocalProvider(
+                    LocalLivePulse provides livePulse,
+                    LocalFocusRotation provides focusRotation
+                ) {
                     KurdishTvNavGraph(
                         viewModel = viewModel,
                         settingsViewModel = settingsViewModel

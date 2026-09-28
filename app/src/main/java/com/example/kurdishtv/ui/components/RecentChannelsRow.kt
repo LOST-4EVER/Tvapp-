@@ -142,7 +142,13 @@ private fun RecentChannelChip(
         shape = chipShape,
         color = colors.surfaceVariant,
         modifier = Modifier
-            .bouncyClickable(scaleDown = 0.92f, focusable = false, onClick = onClick)
+            // The ring below owns the focus lift; see the note in `bouncyClickable`.
+            .bouncyClickable(
+                scaleDown = 0.92f,
+                focusable = false,
+                liftOnFocus = false,
+                onClick = onClick
+            )
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 restShape = M3ExpressivePolygons.Square,

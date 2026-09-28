@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.kurdishtv.ui.screens.MainTvScreen
 import com.example.kurdishtv.ui.screens.PlayerScreen
@@ -44,6 +45,10 @@ fun KurdishTvNavGraph(
         .fillMaxSize()
         .windowInsetsPadding(WindowInsets.safeDrawing)
 
+    // Changes every time the browse screen is pushed to or popped back to.
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val backStackEntryId = backStackEntry?.id ?: 0
+
     NavHost(
         navController = navController,
         startDestination = Screen.Main.route,
@@ -65,6 +70,15 @@ fun KurdishTvNavGraph(
                 onRemoveCustomPlaylist = { url -> viewModel.removeCustomPlaylist(url) },
                 onRetryClick = { viewModel.loadChannels() },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                // A navigation back stack keeps this destination composed while the
+                // player or the settings screen is on top of it, so the browse screen
+                // never "re-enters" as far as Compose is concerned and cannot know on
+                // its own that it has been shown again. The back stack entry's id
+                // changes on every visit, which makes it exactly the signal the grid
+                // needs to take D-pad focus back after the viewer comes back from a
+                // video — a grid with nothing focused is a grid the remote cannot
+                // drive.
+                focusToken = backStackEntryId,
                 modifier = insetModifier
             )
         }

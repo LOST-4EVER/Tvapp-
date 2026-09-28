@@ -1,12 +1,8 @@
 package com.example.kurdishtv.ui.motion
 
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -14,10 +10,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -94,10 +87,18 @@ fun Modifier.tvFocusable(
 
     this
         .focusable(enabled = enabled, interactionSource = interactionSource)
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
+        // As in `expressiveFocusRing`: the layer is only worth having while the
+        // element is actually lifted.
+        .then(
+            if (scale == 1f) {
+                Modifier
+            } else {
+                Modifier.graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+            }
+        )
         // Only while focused. The ring used to be applied unconditionally, which put a
         // 3dp accent outline on *every* card in the grid — the grid read as though
         // everything were selected at once, and the accent colour competed with the
@@ -116,14 +117,17 @@ fun Modifier.tvFocusable(
  *  1. the ring's outline springs from the element's own resting shape into a rounded
  *     expressive one, so gaining focus reads as the surface changing rather than as a
  *     line being switched on;
- *  2. it turns once every [rotationPeriodMillis] — slowly, so it reads as a shape
- *     rather than a blur;
+ *  2. it turns, driven by one app-wide clock ([LocalFocusRotation]) — slowly, so it
+ *     reads as a shape rather than a blur;
  *  3. the element lifts, as in [tvFocusable].
  *
  * @param ringShape the shape the ring settles into. [ShapeMorph.focusRing] by default.
  * @param restShape the shape it grows out of, usually the surface's own outline. Pass
  *   the same shape the surface is clipped with and the ring looks like the surface
  *   blooming outward.
+ * @param focusScale how far the element lifts while focused. Set this to 1f when
+ *   something else on the same node already lifts it, or the two multiply and a
+ *   "gentle 5%" turns into a 10% jump.
  */
 fun Modifier.expressiveFocusRing(
     enabled: Boolean = true,
@@ -132,7 +136,6 @@ fun Modifier.expressiveFocusRing(
     ringWidth: Dp = 2.5.dp,
     restShape: ExpressivePolygon = M3ExpressivePolygons.Square,
     ringShape: ExpressivePolygon = ShapeMorph.focusRing,
-    rotationPeriodMillis: Int = ExpressiveMotion.ROTATION_PERIOD_MS,
     onFocusChanged: (isFocused: Boolean) -> Unit = {}
 ): Modifier = composed {
     val interactionSource = remember { MutableInteractionSource() }
@@ -154,31 +157,15 @@ fun Modifier.expressiveFocusRing(
     val ringPath = remember { Path() }
     val strokeWidth = with(LocalDensity.current) { ringWidth.toPx() }
 
-    // The rotation only exists while this element actually holds focus.
+    // One app-wide turn, not one per ring.
     //
-    // A grid holds a hundred of these, and `rememberInfiniteTransition` runs a
-    // `withFrameNanos` loop for as long as it is composed. Creating one
-    // unconditionally meant a hundred frame callbacks firing for the whole time
-    // the browse screen was on show, ninety-nine of them for a ring that was not
-    // being drawn. `key` scopes the transition to the focused state so the loop is
-    // torn down the moment focus leaves, and the group is rebuilt cleanly when it
-    // comes back — which also restarts the turn, so a freshly focused card reads
-    // as having just arrived.
-    val rotation = key(isFocused) {
-        if (!isFocused) {
-            StillRotation
-        } else {
-            val transition = rememberInfiniteTransition(label = "FocusRingRotation")
-            transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(rotationPeriodMillis, easing = ExpressiveMotion.standard)
-                ),
-                label = "FocusRingDegrees"
-            )
-        }
-    }
+    // This used to be `key(isFocused) { rememberInfiniteTransition() ... }`, which was
+    // already better than an unconditional loop but still wrong for a D-pad: every
+    // arrow press tore down a `withFrameNanos` loop on the card losing focus and
+    // started a fresh one on the card gaining it, so holding a direction key down
+    // churned a frame callback per card per step. There is only ever one ring drawn,
+    // so there is only ever one loop needed. See [LocalFocusRotation].
+    val sharedRotation = LocalFocusRotation.current
     val reveal by animateFloatAsState(
         targetValue = if (isFocused) 1f else 0f,
         animationSpec = ExpressiveMotion.spatialDefault,
@@ -187,10 +174,19 @@ fun Modifier.expressiveFocusRing(
 
     this
         .focusable(enabled = enabled, interactionSource = interactionSource)
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
+        // The layer exists only while the element is lifted. Six hundred cards each
+        // holding a permanently scaled render node is the same problem as the other
+        // two layers this screen used to carry; see `bouncyClickable`.
+        .then(
+            if (scale == 1f) {
+                Modifier
+            } else {
+                Modifier.graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+            }
+        )
         .drawWithContent {
             drawContent()
             if (isFocused) {
@@ -205,7 +201,7 @@ fun Modifier.expressiveFocusRing(
                     morph.fittedPath(
                         progress = reveal,
                         size = ringSize,
-                        rotationDegrees = if (reduceMotion) 0f else rotation.value,
+                        rotationDegrees = if (reduceMotion) 0f else sharedRotation,
                         out = ringPath
                     )
                     drawPath(
@@ -221,6 +217,3 @@ fun Modifier.expressiveFocusRing(
 /** A [FocusRequester] for programmatically focusing an element, e.g. the first card. */
 @Composable
 fun rememberTvFocusRequester(): FocusRequester = remember { FocusRequester() }
-
-/** Stands in for the rotation state on the (overwhelmingly common) unfocused path. */
-private val StillRotation: State<Float> = mutableFloatStateOf(0f)

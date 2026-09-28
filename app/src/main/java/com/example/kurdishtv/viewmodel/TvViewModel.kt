@@ -188,10 +188,14 @@ class TvViewModel(
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             delay(SEARCH_DEBOUNCE_MS)
-            _uiState.update { state ->
-                if (state.searchQuery != query) return@update state
-                val filtered = ChannelFilterEngine.filter(state.channels, state.selectedCategory, query)
-                state.copy(filteredChannels = filtered)
+            val state = _uiState.value
+            if (state.searchQuery != query) return@launch
+            val filtered = withContext(Dispatchers.Default) {
+                ChannelFilterEngine.filter(state.channels, state.selectedCategory, query)
+            }
+            _uiState.update { current ->
+                if (current.searchQuery != query) current
+                else current.copy(filteredChannels = filtered)
             }
         }
     }
@@ -199,9 +203,27 @@ class TvViewModel(
     fun onCategorySelected(category: CategoryFilter) {
         // A category switch supersedes any in-flight search debounce.
         searchJob?.cancel()
-        _uiState.update { state ->
-            val filtered = ChannelFilterEngine.filter(state.channels, category, state.searchQuery)
-            state.copy(selectedCategory = category, filteredChannels = filtered)
+        // Filtering the whole catalogue is a few hundred string comparisons. That is
+        // not enough to be worth a thread hop on its own, but it does not need to run
+        // on the main thread either, and the D-pad can fire this faster than a person
+        // can read the result — arrowing across the rail re-filters on every step.
+        viewModelScope.launch {
+            val state = _uiState.value
+            if (state.selectedCategory == category) return@launch
+            val filtered = withContext(Dispatchers.Default) {
+                ChannelFilterEngine.filter(state.channels, category, state.searchQuery)
+            }
+            // Only publish if nothing moved the goalposts while it was being computed.
+            _uiState.update { current ->
+                if (current.selectedCategory == category && current.searchQuery == state.searchQuery) {
+                    current
+                } else {
+                    current.copy(
+                        selectedCategory = category,
+                        filteredChannels = filtered
+                    )
+                }
+            }
         }
     }
 
@@ -222,11 +244,30 @@ class TvViewModel(
                 val updatedRecents = state.recentChannels.map {
                     if (it.id == channelId) it.copy(isFavorite = isFav) else it
                 }
-                val filtered = ChannelFilterEngine.filter(
-                    updatedChannels,
-                    state.selectedCategory,
-                    state.searchQuery
-                )
+
+                // Only the Favourites tab actually changes membership when a heart is
+                // tapped. In the other eleven categories the channel is in the list
+                // before and after, and what changed about it is one boolean — so
+                // the same `Channel` instance with the flag flipped is substituted
+                // into the existing filtered list instead of re-deriving the list
+                // from several hundred channels.
+                //
+                // This is the action a viewer performs most often after watching
+                // something, and it is on the main thread, so the difference between
+                // "replace one element" and "refilter everything" is the difference
+                // between instant and a visible stall on a large merged playlist.
+                val filtered = if (state.selectedCategory == CategoryFilter.FAVORITES) {
+                    ChannelFilterEngine.filter(
+                        updatedChannels,
+                        state.selectedCategory,
+                        state.searchQuery
+                    )
+                } else {
+                    state.filteredChannels.map {
+                        if (it.id == channelId) it.copy(isFavorite = isFav) else it
+                    }
+                }
+
                 state.copy(
                     channels = updatedChannels,
                     filteredChannels = filtered,
