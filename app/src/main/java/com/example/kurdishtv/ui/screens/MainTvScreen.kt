@@ -480,7 +480,7 @@ private fun ChannelGrid(
                     // positions and cross-fades the ones that arrive.
                     .animateItem(
                         fadeInSpec = tween(ExpressiveMotion.DURATION_MEDIUM, easing = ExpressiveMotion.emphasized),
-                        placementSpec = ExpressiveMotion.spatialMedium
+                        placementSpec = ExpressiveMotion.spatialMediumOffset
                     )
                     .staggeredEntrance(index = index)
             )

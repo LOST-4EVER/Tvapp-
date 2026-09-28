@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.delay
 
 /**
@@ -64,6 +65,20 @@ object ExpressiveMotion {
     val snappy: SpringSpec<Float> = spring(
         dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessMediumLow
+    )
+
+    /**
+     * The same feel as [spatialMedium], typed for offsets.
+     *
+     * Lazy-list placement animations animate an [IntOffset], not a [Float], so the
+     * float token cannot be passed to them. A visibility threshold is required
+     * here: without one the spring keeps animating sub-pixel movements and the
+     * list never settles.
+     */
+    val spatialMediumOffset: SpringSpec<IntOffset> = spring(
+        dampingRatio = 0.78f,
+        stiffness = 600f,
+        visibilityThreshold = IntOffset.VisibilityThreshold
     )
 
     /** Standard emphasized easing, for enter/exit fades. */
