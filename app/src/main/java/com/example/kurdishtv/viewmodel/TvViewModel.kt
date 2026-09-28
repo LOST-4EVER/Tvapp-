@@ -77,24 +77,46 @@ class TvViewModel(
     init {
         observeNetwork()
         viewModelScope.launch {
-            loadInstantState()
-            // Cold start: a still-fresh cache short-circuits the network fetch.
-            loadChannels(forceRefresh = false)
+            // A still-fresh cache short-circuits the network fetch. The instant path
+            // reports whether that is what it found, because if it is then the
+            // follow-up load is provably a no-op: it would read the same file, apply
+            // the same favourites and filter the same list, all to arrive at exactly
+            // what is already on screen. That was a second disk read, a second JSON
+            // parse and a second pass over every channel on every single cold start.
+            if (!loadInstantState()) {
+                loadChannels(forceRefresh = false)
+            }
         }
         // Check for updates in the background so a release is noticed without the
         // user hunting for it. Failures are silent here; Settings surfaces them.
-        viewModelScope.launch { checkForUpdate(silent = true) }
+        //
+        // Throttled: the check is uncacheable by design, so running it on every
+        // launch meant a network round trip every time the app was opened. Releases
+        // do not appear and vanish, so a check every few hours finds a new build
+        // just as promptly, and an explicit check from Settings always runs.
+        viewModelScope.launch {
+            val checker = updateChecker ?: return@launch
+            if (checker.isSilentCheckDue()) {
+                // Recorded before the check, not after, so a server that is
+                // unreachable does not make every subsequent launch retry it.
+                checker.recordSilentCheck()
+                checkForUpdate(silent = true)
+            }
+        }
     }
 
     /**
      * Hydrates the UI from the on-disk cache and saved preferences. Runs on [Dispatchers.IO]
      * because it touches the file system and SharedPreferences.
+     *
+     * @return true when the list on screen came from an on-disk cache that is still
+     *   fresh, meaning a non-forced [loadChannels] would only reproduce it.
      */
-    private suspend fun loadInstantState() {
-        try {
+    private suspend fun loadInstantState(): Boolean {
+        return try {
             val instant = withContext(Dispatchers.IO) { repository.getInstantInitialChannels() }
-            if (instant.isEmpty()) return
-            val byId = instant.associateBy { it.id }
+            if (instant.channels.isEmpty()) return false
+            val byId = instant.channels.associateBy { it.id }
 
             val customUrls = withContext(Dispatchers.IO) { repository.getCustomPlaylistUrls() }
             val recentIds = withContext(Dispatchers.IO) { repository.getRecentChannelIds() }
@@ -109,20 +131,23 @@ class TvViewModel(
             withContext(Dispatchers.Default) {
                 _uiState.update { state ->
                     val filtered = ChannelFilterEngine.filter(
-                        channels = instant,
+                        channels = instant.channels,
                         category = state.selectedCategory,
                         query = state.searchQuery
                     )
                     state.copy(
-                        channels = instant,
+                        channels = instant.channels,
                         filteredChannels = filtered,
                         recentChannels = recents,
                         customPlaylistUrls = customUrls,
-                        selectedChannel = state.selectedChannel ?: instant.firstOrNull()
+                        selectedChannel = state.selectedChannel ?: instant.channels.firstOrNull()
                     )
                 }
             }
-        } catch (_: Exception) {}
+            instant.fromFreshCache
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun observeNetwork() {
@@ -131,8 +156,20 @@ class TvViewModel(
                 val wasOffline = _uiState.value.isOffline
                 _uiState.update { it.copy(isOffline = !isOnline) }
                 if (wasOffline && isOnline) {
-                    // Coming back online is exactly when stale data should be replaced.
-                    loadChannels(forceRefresh = true)
+                    // Coming back online is when stale data *may* need replacing —
+                    // but a reconnect is not itself a reason to re-download every
+                    // source. A Wi-Fi blip in the middle of a film is a two-second
+                    // outage, and forcing a refresh re-fetched all four playlists and
+                    // the update manifest and then overwrote a perfectly current
+                    // cache with the result. The freshness check does the deciding:
+                    // seconds-old data is served as-is, and only a list that is
+                    // actually stale goes back to the network.
+                    //
+                    // It also settles the thrash. `loadChannels` refuses to start
+                    // over an automatic load that is already running, so a network
+                    // that flaps offline/online repeatedly can no longer cancel and
+                    // restart a four-source download each time it wavers.
+                    loadChannels(forceRefresh = false)
                 }
             }
         }
@@ -167,6 +204,13 @@ class TvViewModel(
                 val recentIds = withContext(Dispatchers.IO) { repository.getRecentChannelIds() }
                 val byId = list.associateBy { it.id }
                 val recents = recentIds.mapNotNull { id -> byId[id] }
+                // Built here rather than inside the `update` below, which is a
+                // compare-and-set loop that can run more than once: the membership
+                // test was a linear `list.any { it.id == ... }` over the whole merged
+                // catalogue, and paying for that on every retry of a contended
+                // compare-and-set is a scan of a thousand channels to answer one
+                // yes/no question.
+                val ids = byId.keys
 
                 // Same reasoning as in [loadInstantState]: the merge can hold well over
                 // a thousand channels once the remote playlists land, and this pass and
@@ -186,7 +230,7 @@ class TvViewModel(
                         // the first entry instead of continuing from where the user
                         // was.
                         val selected = state.selectedChannel
-                            ?.takeIf { current -> list.any { it.id == current.id } }
+                            ?.takeIf { current -> ids.contains(current.id) }
                             ?: list.firstOrNull()
                         state.copy(
                             isLoading = false,

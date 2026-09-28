@@ -89,6 +89,19 @@ class ChannelFilterEngineTest {
     }
 
     @Test
+    fun `a query cannot match across the join between name and category`() {
+        // The search key is the normalised name and category in one string, so it
+        // has to carry a separator a query can never contain — otherwise "1g" would
+        // match the "1" at the end of "NRT 1" followed by the "G" of "General" and
+        // hand back a channel that has nothing to do with the query.
+        val joined = listOf(channel("NRT 1", category = "General"))
+        assertTrue(ChannelFilterEngine.filter(joined, CategoryFilter.ALL, "1g").isEmpty())
+        // ...while both halves are still individually searchable.
+        assertEquals(1, ChannelFilterEngine.filter(joined, CategoryFilter.ALL, "nrt").size)
+        assertEquals(1, ChannelFilterEngine.filter(joined, CategoryFilter.ALL, "general").size)
+    }
+
+    @Test
     fun `counts agree with filtering for every category`() {
         val counts = ChannelFilterEngine.countsByCategory(channels)
         for (filter in CategoryFilter.entries) {

@@ -47,7 +47,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private val updateChecker by lazy {
-        UpdateChecker(okHttpClient)
+        // The application context, so the check throttle survives the activity —
+        // which is the point of it: throttling per-instance would mean every
+        // launch is a first launch.
+        UpdateChecker(okHttpClient, applicationContext)
     }
 
     private val viewModel: TvViewModel by viewModels {

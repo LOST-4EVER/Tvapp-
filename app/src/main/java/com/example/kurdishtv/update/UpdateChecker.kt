@@ -1,5 +1,7 @@
 package com.example.kurdishtv.update
 
+import android.content.Context
+import android.content.SharedPreferences
 import com.example.kurdishtv.network.NetworkClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,9 +30,60 @@ import java.io.IOException
  */
 class UpdateChecker(
     private val okHttpClient: OkHttpClient,
+    context: Context? = null,
     private val releasesApiUrl: String = RELEASES_API_URL,
     private val manifestUrl: String = MANIFEST_URL
 ) {
+
+    /**
+     * When the last *silent* check ran, or 0 when it never has.
+     *
+     * Null context means no place to keep it, and then the check is always due —
+     * the pre-throttle behaviour, which is the safe answer when the state cannot
+     * be persisted.
+     */
+    private val checkState: SharedPreferences? = context?.applicationContext
+        ?.getSharedPreferences("kurdish_tv_update_check", Context.MODE_PRIVATE)
+
+    /**
+     * Whether an automatic background check is worth making now.
+     *
+     * The manifest request is sent with `Cache-Control: no-cache` on purpose,
+     * because a stale answer means missing a release. That makes it a guaranteed
+     * network round trip on every single app launch — and `no-cache` also defeats
+     * the HTTP cache, so the bytes come back over the wire however often the app
+     * is opened.
+     *
+     * A release does not appear and then vanish, so the cost of asking less often
+     * is bounded by the interval. Six hours is short enough that a build shipped in
+     * the morning is on offer by the evening, and it turns a per-launch request
+     * into roughly four a day.
+     */
+    fun isSilentCheckDue(nowMs: Long = System.currentTimeMillis()): Boolean {
+        val prefs = checkState ?: return true
+        val last = prefs.getLong(KEY_LAST_SILENT_CHECK, 0L)
+        if (last == 0L) return true
+        val age = nowMs - last
+        // A clock that moved backwards leaves a future timestamp. Treat it as due
+        // rather than as "not for another 500 years".
+        return age < 0L || age >= SILENT_CHECK_INTERVAL_MS
+    }
+
+    /**
+     * Notes that an automatic check is being made.
+     *
+     * Called *before* the request rather than after it, so that a launch where the
+     * server is unreachable does not immediately try again on the next launch. The
+     * user-facing check in Settings does not go through here and is never throttled.
+     */
+    fun recordSilentCheck(nowMs: Long = System.currentTimeMillis()) {
+        try {
+            checkState?.edit()?.putLong(KEY_LAST_SILENT_CHECK, nowMs)?.apply()
+        } catch (_: Exception) {
+            // Persistence is an optimisation; failing to record it must never
+            // stop the check from happening.
+        }
+    }
 
     /**
      * Fetches the newest release, or null when the app is already current.
@@ -245,6 +298,11 @@ class UpdateChecker(
 
         private const val DOWNLOAD_CHUNK_BYTES = 64 * 1024
         private const val PROGRESS_STEP_BYTES = 256 * 1024L
+
+        /** How long an automatic background check waits before repeating. */
+        private const val SILENT_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
+
+        private const val KEY_LAST_SILENT_CHECK = "last_silent_check_ms"
 
         /**
          * The release body records the CI run number, e.g.

@@ -16,6 +16,18 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+/**
+ * What [TvRepository.getInstantInitialChannels] produced, and where it came from.
+ *
+ * A named pair rather than a bare list because the caller has to act on the second
+ * half: only a list that came from a *fresh* cache makes a follow-up fetch
+ * redundant, and inferring that from the list itself is not possible.
+ */
+data class InitialChannels(
+    val channels: List<Channel>,
+    val fromFreshCache: Boolean
+)
+
 class TvRepository(
     private val favoriteStorage: FavoriteStorage,
     private val recentStorage: RecentStorage,
@@ -33,15 +45,39 @@ class TvRepository(
         "https://gist.githubusercontent.com/nevzatokcu/e0fc485c276b509bcbe452ce798606ff/raw/liste.m3u"
 
     /**
-     * Instantly loads channels from disk cache or catalog with zero network latency.
+     * The list to show before any network call, and where it came from.
+     *
+     * [fromFreshCache] is the part callers act on. It is true only when the list is
+     * the on-disk cache *and* that cache is young enough that a fetch would serve
+     * the same bytes back. When it is true, a subsequent non-forced
+     * [fetchChannels] is a no-op by construction, so the caller can skip it rather
+     * than re-reading the file and re-filtering the list it already has on screen.
      */
-    fun getInstantInitialChannels(): List<Channel> {
-        val cached = channelCacheStorage.getCachedChannels()
-        val channels = if (!cached.isNullOrEmpty()) cached else KurdishChannelCatalog.getDefaultChannels()
+    fun getInstantInitialChannels(): InitialChannels {
+        val cached = freshCachedChannels()
+        val channels = cached ?: KurdishChannelCatalog.getDefaultChannels()
         val favIds = favoriteStorage.getFavoriteIds()
-        return channels.map {
-            it.copy(isFavorite = favIds.contains(it.id) || favIds.contains(it.originalId))
-        }
+        return InitialChannels(
+            channels = channels.map {
+                it.copy(isFavorite = favIds.contains(it.id) || favIds.contains(it.originalId))
+            },
+            fromFreshCache = cached != null
+        )
+    }
+
+    /**
+     * The on-disk list, but only while it is still fresh enough to be served without
+     * going to the network. Null when there is no cache, when it is empty, or when
+     * it is older than [CACHE_FRESH_MS].
+     *
+     * The single place that decides this. [fetchChannels] used to inline the same
+     * age-then-read-then-check-empty sequence, and the cold-start path ran its own
+     * looser version beside it — so the two could disagree about whether the cache
+     * was usable, and a list could be read and filtered twice in the same launch.
+     */
+    private fun freshCachedChannels(): List<Channel>? {
+        if (channelCacheStorage.getCacheAgeMs() >= CACHE_FRESH_MS) return null
+        return channelCacheStorage.getCachedChannels()?.takeIf { it.isNotEmpty() }
     }
 
     /**
@@ -54,25 +90,22 @@ class TvRepository(
     suspend fun fetchChannels(forceRefresh: Boolean = true): Result<List<Channel>> =
         withContext(Dispatchers.IO) {
             if (!forceRefresh) {
-                val age = channelCacheStorage.getCacheAgeMs()
                 // 0 is ambiguous: it means "no cache" *or* "the clock moved
                 // backwards". It cannot be distinguished here, and it does not
                 // need to be — the read below is what actually decides. A fresh
                 // age only lets us *try* the cache; an empty or unreadable one
                 // falls through to the network exactly as if it had been stale.
-                if (age < CACHE_FRESH_MS) {
-                    val cached = channelCacheStorage.getCachedChannels()
-                    if (!cached.isNullOrEmpty()) {
-                        val favIds = favoriteStorage.getFavoriteIds()
-                        return@withContext Result.success(
-                            cached.map {
-                                it.copy(
-                                    isFavorite = favIds.contains(it.id) ||
-                                        favIds.contains(it.originalId)
-                                )
-                            }
-                        )
-                    }
+                val cached = freshCachedChannels()
+                if (cached != null) {
+                    val favIds = favoriteStorage.getFavoriteIds()
+                    return@withContext Result.success(
+                        cached.map {
+                            it.copy(
+                                isFavorite = favIds.contains(it.id) ||
+                                    favIds.contains(it.originalId)
+                            )
+                        }
+                    )
                 }
             }
 
