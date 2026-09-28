@@ -8,6 +8,14 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **A hole ran down the middle of the channel grid.** The logo well was a fixed
+  84dp square parked in the centre of a card that is 130dp wide on a phone and
+  wider still on a television, so more than half of every card was empty on both
+  sides of the logo. Two narrow columns of undersized tiles with a void between
+  them is what the eye lands on, and the grid read as broken rather than as
+  padded. The well now fills its card, capped so a wide television cell gets a
+  bigger logo rather than a billboard, and kept square so every row keeps the
+  same rhythm.
 - **The player's Fit/Fill/Zoom choice was forgotten.** It was `rememberSaveable`,
   which survives a rotation and nothing else: every cold start, every return visit
   and the small side player pane silently reset the picture to Fit, so the button
