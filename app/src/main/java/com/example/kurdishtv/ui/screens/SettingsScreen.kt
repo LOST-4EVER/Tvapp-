@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -645,10 +646,20 @@ private fun SettingsSwitchRow(
                     fontSize = 12.sp
                 )
             }
+            // The switch is the row's *indicator*, not a second control.
+            //
+            // `Switch` is focusable by design, so with the row already clickable this
+            // put a D-pad stop immediately inside a row that is itself a stop: arrowing
+            // across the settings list stopped twice on every switch row, and landing
+            // on the switch meant the row's own highlight was not where the remote was.
+            // `focusProperties` applies to the focus targets after it, and the switch
+            // has none of its own, so this removes the duplicate stop and nothing else
+            // — the toggle still works by touch, and the row still toggles it.
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 enabled = enabled,
+                modifier = Modifier.focusProperties { canFocus = false },
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = colors.onPrimary,
                     checkedTrackColor = colors.primary,

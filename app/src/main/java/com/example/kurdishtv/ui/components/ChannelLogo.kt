@@ -90,9 +90,12 @@ fun ChannelLogo(
         if (!showLogos) null
         else logoUrl?.takeIf { it.isNotBlank() }?.let { url ->
             val targetPx = with(density) { size.roundToPx() }.coerceAtLeast(1)
+            // No per-request crossfade: the shared [LogoLoader] already sets one as its
+            // default, and asking for it again here would build a second transition
+            // factory per request — several hundred short-lived objects for a single
+            // screenful of the grid — for a fade that is already configured.
             ImageRequest.Builder(context)
                 .data(url)
-                .crossfade(true)
                 // Logos are square tiles of a few dozen dp, but the source images
                 // are often 512-1024px. Without an explicit size, Coil decodes at
                 // full resolution and keeps a bitmap roughly 40x larger than the

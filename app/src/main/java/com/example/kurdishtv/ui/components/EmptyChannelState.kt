@@ -63,11 +63,20 @@ fun EmptyChannelState(
         modifier = modifier
             .fillMaxSize()
             .padding(32.dp)
-            .graphicsLayer {
-                scaleX = entrance
-                scaleY = entrance
-                alpha = entrance.coerceIn(0f, 1f)
-            },
+            // Attached only while the state is actually springing in. Left in place it
+            // would hold a render node at alpha 1 and scale 1 for as long as the empty
+            // state is on screen, which is the whole point of it being an empty state.
+            .then(
+                if (entrance == 1f) {
+                    Modifier
+                } else {
+                    Modifier.graphicsLayer {
+                        scaleX = entrance
+                        scaleY = entrance
+                        alpha = entrance.coerceIn(0f, 1f)
+                    }
+                }
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {

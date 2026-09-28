@@ -4,8 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -34,6 +31,7 @@ import com.example.kurdishtv.ui.components.AppIconButtonStyle
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.LiveBadge
 import com.example.kurdishtv.ui.components.SquishyPillButton
+import com.example.kurdishtv.ui.motion.tapOnly
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -61,16 +59,22 @@ fun PlayerControlsOverlay(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
-    val interactionSource = remember { MutableInteractionSource() }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onTapOverlay
-            )
+            // `tapOnly`, not `clickable`.
+            //
+            // This Box fills the screen and is the ancestor of every transport
+            // control, so as a `clickable` it was both the largest and the first focus
+            // target on the player: the remote's first press went to an invisible
+            // scrim instead of to Back or Play/Pause, and one press of any direction
+            // key was liable to land on it again. It cannot be marked with
+            // `focusProperties { canFocus = false }` either, because that would take
+            // the controls inside it out of the tab order along with it. A pointer
+            // handler creates no focus target at all, which is the only honest answer
+            // for a surface that exists to be tapped by a finger.
+            .tapOnly(onTap = onTapOverlay)
     ) {
         AnimatedVisibility(
             visible = isVisible,

@@ -82,7 +82,12 @@ fun FeaturedHeroCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .bouncyClickable(scaleDown = 0.97f, focusable = false) { onWatchClick(channel) }
+            // The ring below owns the focus lift; see the note in `bouncyClickable`.
+            .bouncyClickable(
+                scaleDown = 0.97f,
+                focusable = false,
+                liftOnFocus = false
+            ) { onWatchClick(channel) }
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 restShape = M3ExpressivePolygons.Square,

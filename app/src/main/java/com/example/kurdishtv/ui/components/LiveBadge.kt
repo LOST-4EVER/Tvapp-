@@ -8,19 +8,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.LocalLivePulse
-import com.example.kurdishtv.ui.motion.ShapeMorph
-import com.example.kurdishtv.ui.motion.rememberMorphingCorners
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -29,30 +29,26 @@ import com.example.ui.theme.LocalAppColors
  *
  * The pulse comes from a single app-wide animation ([LocalLivePulse]), so a grid full
  * of cards runs one transition rather than one per card — which matters here, because
- * the pulse drives the dot's scale *and* its outline from the same value.
+ * the pulse is read on every frame by every badge on screen.
  *
- * The dot is a plain circle that flattens very slightly as it breathes. It was a
- * lobed sun before. At 8dp an eight-lobe outline is not "recognisably round", it is a
- * smudge, and it was being rebuilt on every pulse for every visible card; a corner
- * radius is the same idea for a fraction of the cost and is legible at that size.
+ * The dot is a plain circle that scales very slightly as it breathes. It was a lobed
+ * sun before. At 8dp an eight-lobe outline is not "recognisably round", it is a
+ * smudge, and it was being rebuilt on every pulse for every visible card; a scale is
+ * the same idea for a fraction of the cost and is legible at that size.
+ *
+ * The breathe is the only thing in this composable that changes between frames, and it
+ * is applied entirely in the draw phase, so a badge never recomposes as it pulses —
+ * which matters here more than anywhere else in the app, because there is one on every
+ * card in the grid.
  */
 @Composable
 fun LiveBadge(modifier: Modifier = Modifier) {
     val colors = LocalAppColors.current
-    val pulse = LocalLivePulse.current
 
-    // Map the shared 0.85→1.25 pulse onto a 0→1 fraction. Driving the shape from the
-    // pulse rather than from a second transition is what keeps a grid of badges down
-    // to one animation.
-    val openness = ((pulse - 0.85f) / 0.40f).coerceIn(0f, 1f)
-    val dotShape = rememberMorphingCorners(
-        rest = ShapeMorph.liveRest,
-        active = ShapeMorph.liveActive,
-        isActive = openness > 0.5f,
-        // Critically damped: this morphs twice a second, and an overshooting spring
-        // at that cadence reads as a flicker rather than as a breath.
-        spec = ExpressiveMotion.effectsFast
-    )
+    // A `MutableFloatState`, not a `Float`: reading it here instead of in the draw
+    // lambda below would recompose this whole composable — surface, row, text and all —
+    // on every frame of the pulse, for every badge on screen.
+    val pulse = LocalLivePulse.current
 
     Surface(
         shape = M3ExpressiveShapes.BadgePill,
@@ -66,7 +62,18 @@ fun LiveBadge(modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .background(colors.liveRed, dotShape)
+                    // The breath, as a canvas transform applied while drawing.
+                    //
+                    // `Modifier.graphicsLayer` would need a render node for every
+                    // badge on screen — one per card, in a grid of several hundred.
+                    // The pulse is read in the draw phase either way, so no badge
+                    // recomposes as it breathes; this version also costs no render
+                    // node, just a matrix around one 8dp circle.
+                    .drawWithContent {
+                        val breath = pulse.floatValue
+                        scale(breath, breath, center) { this@drawWithContent.drawContent() }
+                    }
+                    .background(colors.liveRed, CircleShape)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(

@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.kurdishtv.ui.screens.MainTvScreen
 import com.example.kurdishtv.ui.screens.PlayerScreen
@@ -44,6 +45,13 @@ fun KurdishTvNavGraph(
         .fillMaxSize()
         .windowInsetsPadding(WindowInsets.safeDrawing)
 
+    // Identity of the destination currently on top of the back stack, handed to the
+    // browse screen as the token it keys its focus placement on. `NavBackStackEntry.id`
+    // is a UUID string — it was being fallback-initialised with `?: 0` and passed to an
+    // `Int` parameter, which does not typecheck.
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val backStackEntryId = backStackEntry?.id.orEmpty()
+
     NavHost(
         navController = navController,
         startDestination = Screen.Main.route,
@@ -65,6 +73,17 @@ fun KurdishTvNavGraph(
                 onRemoveCustomPlaylist = { url -> viewModel.removeCustomPlaylist(url) },
                 onRetryClick = { viewModel.loadChannels() },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                // What the grid needs to take D-pad focus back after the viewer comes
+                // back from a video: a grid with nothing focused is a grid the remote
+                // cannot drive.
+                //
+                // This is the id of whichever entry is on top, so it is the browse
+                // screen's own id while the browse screen is the visible one — it does
+                // not change when the viewer returns, because it is the same entry. It
+                // does not have to: navigation-compose takes a destination out of the
+                // composition as soon as it is covered, so returning re-runs the
+                // grid's effects against the focus it saved on the way out.
+                focusToken = backStackEntryId,
                 modifier = insetModifier
             )
         }

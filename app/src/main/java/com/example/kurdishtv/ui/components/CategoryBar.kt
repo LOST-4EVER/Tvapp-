@@ -65,9 +65,12 @@ fun CategoryBar(
             // tabs in and out as the merge completes.
             null
         } else {
-            CategoryFilter.entries.associateWith { category ->
-                ChannelFilterEngine.filter(channels, category, "").size
-            }
+            // One pass over the list, not one pass per category. Asking
+            // `filter(channels, category, "")` for each category in turn meant
+            // reading every channel twelve times and allocating twelve result lists,
+            // and it re-ran on every change to the channel list — which is to say, on
+            // every favourite toggle, for a number nobody looks at changing.
+            ChannelFilterEngine.countsByCategory(channels)
         }
     }
     // Keyed on the selection as well as the counts. The fallback below depends on
@@ -92,9 +95,17 @@ fun CategoryBar(
     val listState = rememberLazyListState()
     LaunchedEffect(selectedCategory, visible) {
         val index = visible.indexOf(selectedCategory)
-        if (index >= 0) {
-            listState.animateScrollToItem(index)
-        }
+        if (index < 0) return@LaunchedEffect
+        // Only when the chip is genuinely out of view.
+        //
+        // `animateScrollToItem` scrolls its target to the leading edge, so running it
+        // on every selection change dragged the whole row along as the viewer arrowed
+        // from chip to chip: the chips under the D-pad appeared to slide out from
+        // under the highlight. A chip that is already on screen needs nothing, and on
+        // a wide window that is every chip there is.
+        val onScreen = listState.layoutInfo.visibleItemsInfo.any { item -> item.index == index }
+        if (onScreen) return@LaunchedEffect
+        listState.animateScrollToItem(index)
     }
 
     LazyRow(

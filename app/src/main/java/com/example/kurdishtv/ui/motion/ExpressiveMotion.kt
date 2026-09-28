@@ -16,15 +16,19 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlinx.coroutines.delay
 
 /**
@@ -187,6 +191,16 @@ object ExpressiveMotion {
     const val ROTATION_PERIOD_MS = 6000
 
     /**
+     * The breath of the LIVE dot: the two ends of it, and one full cycle.
+     *
+     * Read by the single app-wide loop behind [rememberLivePulse], so the pulse is one
+     * number rather than one animation per badge.
+     */
+    const val LIVE_PULSE_MIN = 0.85f
+    const val LIVE_PULSE_MAX = 1.25f
+    const val LIVE_PULSE_PERIOD_MS = 1800L
+
+    /**
      * Per-item delay for a staggered grid entrance.
      *
      * Small on purpose: with dozens of cards on screen a large stagger makes the last
@@ -220,25 +234,35 @@ val LocalReduceMotion = compositionLocalOf { false }
  *
  * Pass the item's index **within the currently visible set**, not its absolute index in
  * the data, otherwise scrolling would replay the whole animation as rows recycle.
+ *
+ * @param animate whether the set is still settling. A lazy layout recycles item
+ *   compositions, so a grid that staggers unconditionally replays the entrance on
+ *   every card that scrolls into view: each one waits out its own delay before it
+ *   appears, which reads as the whole grid lagging behind the D-pad. Callers arm this
+ *   when the set changes and disarm it once the entrance has had time to play.
  */
 @Composable
 fun Modifier.staggeredEntrance(
     index: Int,
+    animate: Boolean = true,
     maxStaggeredItems: Int = ExpressiveMotion.STAGGER_MAX_ITEMS
 ): Modifier {
     val reduceMotion = LocalReduceMotion.current
-    val step = index.coerceIn(0, maxStaggeredItems) * ExpressiveMotion.STAGGER_STEP_MS
+    // Reduced motion, or a grid that has already settled, collapses the entrance to
+    // "appear where it belongs": no delay, no layer, nothing to wait for.
+    val staggered = animate && !reduceMotion
+    val step = if (staggered) {
+        index.coerceIn(0, maxStaggeredItems) * ExpressiveMotion.STAGGER_STEP_MS
+    } else {
+        0L
+    }
 
     // The delayed start is a one-shot effect, not an animation input, so the value is
     // flipped once and then left to the spring.
-    val started = remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(step) {
-        if (reduceMotion) {
-            started.floatValue = 1f
-        } else {
-            delay(step)
-            started.floatValue = 1f
-        }
+    val started = remember { mutableFloatStateOf(if (staggered) 0f else 1f) }
+    LaunchedEffect(step, staggered) {
+        if (staggered) delay(step)
+        started.floatValue = 1f
     }
 
     val progress by animateFloatAsState(
@@ -246,6 +270,20 @@ fun Modifier.staggeredEntrance(
         animationSpec = ExpressiveMotion.entranceSpring,
         label = "StaggerEntrance"
     )
+
+    // The layer is dropped the moment the entrance finishes.
+    //
+    // This modifier is on every item of the channel grid, and the grid is the
+    // largest list in the app — six hundred-odd channels. A `graphicsLayer` is a
+    // render node with its own display list, and a transform on it asks the
+    // compositor to treat that node as a separately composited surface. Keeping
+    // one alive per card, for the entire time the browse screen is on show, in
+    // order to hold alpha at 1 and a scale at 1, is the single most expensive
+    // thing the grid was doing when nothing was animating.
+    //
+    // `>= 1f` also drops the layer at the spring's small overshoot, which is a
+    // percent of a percent here and not worth a permanent render node.
+    if (progress >= 1f) return this
 
     return this.graphicsLayer {
         alpha = progress
@@ -258,39 +296,107 @@ fun Modifier.staggeredEntrance(
 }
 
 /**
- * A single shared pulse value for every LIVE badge in the app. Running one infinite
- * transition instead of one per card meaningfully cuts animation work inside the
- * channel grid.
+ * The shared pulse of every LIVE badge in the app, as a **value** rather than as a
+ * composition input, and that distinction is the whole reason for its type.
  *
- * `compositionLocalOf`, not `staticCompositionLocalOf`: this value changes on every
- * frame of the pulse animation, and a static local does not track reads. Every badge
- * would then keep rendering the value it captured at composition time, so the shared
- * pulse never actually animated — one transition was running and its result was being
- * thrown away.
+ * The number changes on every frame. Published as a `Float` it would have to be read
+ * during composition, which invalidates every reader on every frame — and every card
+ * in the grid carries a badge, so that is several hundred recompositions per frame to
+ * breathe an 8dp dot. Published as a [MutableFloatState] it can be read from the
+ * *draw* phase instead, through `Modifier.drawWithContent` or
+ * `Modifier.graphicsLayer`, where a change invalidates the drawing of the one node
+ * that read it and nothing recomposes at all.
+ *
+ * `compositionLocalOf` rather than `staticCompositionLocalOf` because the state
+ * *object* changes when the setting is toggled, and readers have to see the new one.
  */
-val LocalLivePulse = compositionLocalOf { 1f }
+val LocalLivePulse = compositionLocalOf { mutableFloatStateOf(ExpressiveMotion.RESTING_PULSE) }
 
 /**
- * The shared LIVE-badge pulse, or a constant when disabled.
+ * The shared turn of every focus ring, in degrees.
  *
- * The `remember` calls run unconditionally and the animation is simply paused when
- * disabled. An early `if (!enabled) return` before them would change how many slots
- * this composable occupies, and toggling the setting in Settings mid-session would then
- * hit Compose's "slot table changed structure" check.
+ * The ring is the only thing on a TV screen that is allowed to move continuously,
+ * because it is the only thing that says "you are here" without being read. That
+ * makes it the most expensive kind of element to have many of.
+ *
+ * Arrowing through a grid used to create a `rememberInfiniteTransition` per card as
+ * focus arrived and tear it down as focus left, so a single press of the right arrow
+ * started and stopped a frame-callback loop, and holding the D-pad down churned one
+ * per card per step. There is one ring drawn at a time, so there is no reason for
+ * there to be more than one loop driving them.
+ *
+ * `compositionLocalOf` rather than `staticCompositionLocalOf` for the same reason as
+ * [LocalLivePulse]: the state object has to be replaceable when the setting changes.
+ * A plain `Float` would have been worse still — see [LocalLivePulse] for why the angle
+ * is published as state rather than as a number.
+ */
+val LocalFocusRotation = compositionLocalOf { mutableFloatStateOf(0f) }
+
+/** Drives [LocalFocusRotation]. One frame loop for the whole app; see that property. */
+@Composable
+fun rememberFocusRotation(enabled: Boolean): MutableFloatState {
+    val degrees = remember { mutableFloatStateOf(0f) }
+
+    // Driven by a plain `withFrameNanos` loop writing one [MutableFloatState], rather
+    // than by a `rememberInfiniteTransition`.
+    //
+    // A transition could not be switched off. It ran its frame callback for the life of
+    // the app and the `if (enabled)` at the end threw the result away, so a viewer who
+    // asked for reduced motion still paid for a continuously running animation. This
+    // loop is keyed on `enabled` and simply is not there when the answer is no.
+    LaunchedEffect(enabled) {
+        if (!enabled) {
+            degrees.floatValue = 0f
+            return@LaunchedEffect
+        }
+        val period = ExpressiveMotion.ROTATION_PERIOD_MS * 1_000_000L
+        var start = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (start == 0L) start = now
+                // A constant angular speed. An easing curve applied to a repeating
+                // 0→360 is not a slow turn, it is a turn that stutters once per
+                // revolution — and a ring that is the only moving thing on screen is
+                // exactly where that reads as a fault.
+                degrees.floatValue = ((now - start) % period) / period.toFloat() * 360f
+            }
+        }
+    }
+    return degrees
+}
+
+/**
+ * The shared LIVE-badge pulse, as state. Constant while the pulse is switched off.
+ *
+ * One frame loop for the whole app, and no loop at all when the setting is off — which
+ * is what an `if (enabled)` *outside* an infinite transition could never achieve. The
+ * caller reads the returned state in the draw phase: see [LocalLivePulse]; reading it
+ * during composition would put a recomposition on every badge, on every frame.
  */
 @Composable
-fun rememberLivePulse(enabled: Boolean): Float {
-    val transition = rememberInfiniteTransition(label = "LivePulse")
-    val scale by transition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "LivePulseScale"
-    )
-    return if (enabled) scale else ExpressiveMotion.RESTING_PULSE
+fun rememberLivePulse(enabled: Boolean): MutableFloatState {
+    val scale = remember { mutableFloatStateOf(ExpressiveMotion.RESTING_PULSE) }
+
+    LaunchedEffect(enabled) {
+        if (!enabled) {
+            scale.floatValue = ExpressiveMotion.RESTING_PULSE
+            return@LaunchedEffect
+        }
+        val period = ExpressiveMotion.LIVE_PULSE_PERIOD_MS * 1_000_000L
+        val low = ExpressiveMotion.LIVE_PULSE_MIN
+        val span = ExpressiveMotion.LIVE_PULSE_MAX - low
+        var start = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (start == 0L) start = now
+                val phase = ((now - start) % period) / period.toFloat()
+                // A cosine breath rather than a tween's easing curve: the same smooth
+                // in-and-out, with no cubic solve between the two ends.
+                scale.floatValue = low + span * (0.5f - 0.5f * cos(2f * PI.toFloat() * phase))
+            }
+        }
+    }
+    return scale
 }
 
 /**

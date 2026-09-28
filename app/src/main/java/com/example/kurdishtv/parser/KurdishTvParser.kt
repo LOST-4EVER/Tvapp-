@@ -58,7 +58,11 @@ object KurdishTvParser {
         }
 
         val channels = mutableListOf<Channel>()
-        val lines = trimmed.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        // A lazy sequence rather than `lines().map { }.filter { }`. Those three calls
+        // materialise three full copies of the playlist — and the largest of the merged
+        // sources is a few thousand lines — to hand this loop one line at a time either
+        // way, so the copies bought nothing but garbage on the IO thread.
+        val lines = trimmed.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }
 
         var currentExtName: String? = null
         var currentLogo: String? = null
