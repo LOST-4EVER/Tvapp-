@@ -118,7 +118,20 @@ fun appColorsFor(settings: AppSettings, dynamicScheme: ColorScheme? = null): App
     val variant = if (amoled) AmoledSurfaceVariant else DarkSurfaceVariant
     // Containers sit on the surface, not the variant, so a chip on a raised card
     // still reads as "tinted" rather than as a second, competing surface.
-    val (container, onContainer) = tonalPair(primary, surface)
+    //
+    // The on-colour is measured rather than lerped when the accent came from the
+    // wallpaper. `tonalPair` pulls the on-colour *towards white*, which is right
+    // for the five bundled accents because they are all hand-picked light tones.
+    // A Material You primary is not hand-picked: some wallpaper palettes land on a
+    // deep primary, and lerping that towards white produced a mid tone that the
+    // dark container could not separate from. `onColorFor` picks by measured
+    // contrast instead, which is the same rule the rest of the file already uses.
+    val (container, onContainer) = if (dynamicScheme != null) {
+        val tinted = lerp(surface, primary, CONTAINER_TINT)
+        tinted to onColorFor(tinted)
+    } else {
+        tonalPair(primary, surface)
+    }
 
     return AppColors(
         background = if (amoled) AmoledBackground else DarkBackground,

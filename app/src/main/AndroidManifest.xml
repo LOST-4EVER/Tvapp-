@@ -46,11 +46,27 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
             android:label="@string/app_name"
             android:theme="@style/Theme.MyApplication"
+            android:banner="@drawable/ic_tv_banner"
             android:windowSoftInputMode="adjustResize">
+            <!--
+              Two filters, not one.
+
+              LEANBACK_LAUNCHER is what puts the app on the Android TV home screen.
+              It was missing, so the manifest below declared the leanback feature
+              and the UI was built for a D-pad, but on an actual television the app
+              could only be started from the app drawer of a launcher that happened
+              to list non-TV activities — and on stock Android TV, which is the
+              common case, there is no such list. The app was effectively
+              unlaunchable on the device it is designed for.
+
+              Both categories stay on the same filter so one install serves phones,
+              tablets and televisions.
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.software.leanback.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
 

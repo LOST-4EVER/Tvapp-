@@ -52,6 +52,7 @@ import com.example.kurdishtv.ui.motion.rememberTvFocusRequester
 import com.example.kurdishtv.ui.motion.staggeredEntrance
 import com.example.kurdishtv.viewmodel.TvUiState
 import com.example.ui.theme.LocalAppColors
+import com.example.ui.theme.LocalIsTv
 import kotlinx.coroutines.delay
 
 @Composable
@@ -78,6 +79,7 @@ fun MainTvScreen(
     focusToken: String = ""
 ) {
     val colors = LocalAppColors.current
+    val isTv = LocalIsTv.current
     var showImportDialog by remember { mutableStateOf(false) }
     var appliedStartCategory by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -134,8 +136,18 @@ fun MainTvScreen(
         // A phone in landscape is wide but short. Judging on width alone put it in
         // the two-pane tablet layout, where the grid was squeezed into a narrow,
         // very tall column. Height has to be part of the decision.
-        val isShortLandscape = maxHeight < 480.dp
+        val isShortLandscape = maxHeight < 480.dp && !isTv
         val gridMinCellSize = when {
+            // Ten-foot UI. Every other branch here is sized for a screen held at
+            // arm's length: a 132-172dp card is a comfortable cell on a tablet,
+            // but across a television it is a thumbnail, and the channel name
+            // inside it cannot be read from a sofa.
+            //
+            // This has to be tested *before* the width rules, because a TV box
+            // reports a compact width by phone standards and was being handed
+            // the two-column phone grid — the most cramped layout in the app, on
+            // the one device with the most pixels to spend.
+            isTv -> 220.dp
             isShortLandscape -> 168.dp
             isCompactWidth -> 132.dp
             maxWidth >= 900.dp -> 172.dp

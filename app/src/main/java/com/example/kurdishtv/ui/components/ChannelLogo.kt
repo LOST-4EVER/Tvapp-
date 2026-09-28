@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.ImageLoader
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.ImageRequest
@@ -144,15 +144,13 @@ fun ChannelLogo(
 
     // The monogram tile deliberately does NOT take the caller's [modifier].
     //
-    // It used to, and that was a layout bug rather than a cosmetic one: the same
-    // lambda is invoked from three different places — as this composable's own
-    // output when there is no image, and from inside `SubcomposeAsyncImage`'s
-    // `loading` and `error` slots — and the slots are composed in a *subcomposition*
-    // whose constraints are the ones Coil hands the `SubcomposeAsyncImage` node,
-    // not the ones the caller handed this function. Re-applying a caller modifier
-    // that says `fillMaxSize` inside that subcomposition means measuring a fill
-    // against a box that is itself the fill, which is how a tile ended up escaping
-    // the rounded logo well it was supposed to be sitting inside.
+    // It is a child of the box below, so the box already fills and clips it, and
+    // the caller's modifier describes the box rather than this layer. It used to
+    // be applied to the monogram itself, and when that composable was invoked
+    // from inside `SubcomposeAsyncImage`'s state slots the caller modifier was
+    // re-measured against the *subcomposition*'s constraints — measuring a
+    // `fillMaxSize` against a box that was itself a fill. That is how a tile
+    // ended up escaping the rounded logo well it was meant to be sitting in.
     //
     // Filling the space it is actually given is the only thing a fallback can
     // honestly do, and the well that owns the clip already clips it.
@@ -181,22 +179,35 @@ fun ChannelLogo(
         }
     }
 
-    if (request == null) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            fallback()
+    // The monogram is drawn first and the image on top of it, rather than swapped
+    // in through `SubcomposeAsyncImage`'s `loading`/`error` slots.
+    //
+    // `SubcomposeAsyncImage` builds a whole second composition for every state it
+    // needs, per cell. A screen of channel cards is dozens of them, and it paid
+    // that cost on every scroll of the grid — for content that is, by construction,
+    // the same two lines of monogram every time. Drawing the monogram underneath
+    // and letting the image cover it once it arrives is the same result with no
+    // subcomposition at all: while the load is in flight and if it fails, nothing
+    // is drawn over the monogram, so it shows through; when the bitmap arrives it
+    // is simply painted on top.
+    //
+    // This is also what the crossfade note in [LogoLoader] always claimed was
+    // happening. It was not — the `loading` slot replaced the composable output
+    // rather than layering over it.
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        fallback()
+
+        if (request != null) {
+            AsyncImage(
+                model = request,
+                contentDescription = channelName,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
+                imageLoader = loader
+            )
         }
-    } else {
-        SubcomposeAsyncImage(
-            model = request,
-            contentDescription = channelName,
-            contentScale = ContentScale.Fit,
-            modifier = modifier
-                .fillMaxSize()
-                .padding(contentPadding),
-            imageLoader = loader,
-            loading = { fallback() },
-            error = { fallback() }
-        )
     }
 }
 
