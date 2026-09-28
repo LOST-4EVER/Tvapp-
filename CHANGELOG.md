@@ -7,7 +7,42 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **R8 was keeping the whole of media3, which is the largest dependency in the app.**
+  `proguard-rules.pro` had `-keep class androidx.media3.** { *; }`, and R8 cannot
+  remove what a `-keep` protects — so every decoder, extractor, renderer and data
+  source for formats this app never plays (DASH, MP3, Ogg, MIDI, image sequences,
+  every codec that is not H.264/AAC) went into the APK whatever else the build
+  stripped. Media3 ships its own consumer rules covering the component tables it
+  resolves reflectively, so the app's rule is now simply absent and the rest of
+  media3 is shrinkable. This is the single largest APK-size win available.
+- **Two dependencies were on the runtime classpath and never used.** Every glyph in
+  the app is a hand-written vector drawable, so `compose.material.icons.core` was
+  dead weight; and no `HttpLoggingInterceptor` is constructed anywhere, so
+  `logging.interceptor` was dead weight too. Both are commented out with the reason
+  rather than deleted, matching how the rest of the dependency block is kept.
+- **The channel-logo memory cache was sized for a hundred bitmaps.** The cache holds
+  *decoded* images, so a logo at the 512px ceiling is 1 MB; 20% of a large heap is
+  far more than the grid ever has on screen, and is memory the OS will not hand to
+  anything else while the app is alive. Sized for what is visible plus a screenful
+  of scroll-back. The 48 MB *disk* cache is where the long tail belongs and is
+  unchanged.
+
 ### Fixed
+- **Logos re-decoded every time the grid scrolled between card sizes.** The Coil
+  request's target size was the caller's own *draw* size, which quietly made decode
+  resolution a function of the layout: the same channel's logo was a different
+  cached bitmap on the compact landscape card than on the full-size one, so moving
+  between them decoded the image again instead of hitting the cache — several
+  hundred times a screenful, in exactly the gesture the app asks viewers to make
+  most. Decode sizes are now bucketed to powers of two, so a grid laying out at
+  137dp and one at 141dp share bitmaps, and a logo is never decoded below the size it
+  is drawn at.
+- **Every logo in the grid animated its own fade-in.** The crossfade was a loader
+  default, so scrolling produced a rolling wave of per-frame alpha animations, each
+  holding a render node open — the most expensive animation in the app and the one
+  nobody asked for. Off; the monogram fallback is already on screen underneath, so a
+  logo that simply appears reads as faster, not slower.
 - **Every control in the app had two D-pad stops on it.** `bouncyClickable` applied
   `Modifier.focusable` on top of the `clickable` it wraps — but a click already brings
   a focus target of its own, which is the only reason it is reachable by a remote at
