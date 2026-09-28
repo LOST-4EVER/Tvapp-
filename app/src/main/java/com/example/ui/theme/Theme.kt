@@ -26,9 +26,11 @@ fun KurdishTvTheme(
     // `uiMode` is in `MainActivity`'s `configChanges`, so a device that is docked
     // or undocked does not recreate the activity; reading the configuration here
     // (rather than caching the answer in a field) is what lets the value change.
-    val isTv = remember(LocalConfiguration.current) {
-        LocalConfiguration.current.isTvMode()
-    }
+    // Read into a local first: `remember`'s calculation lambda is a plain block,
+    // so reading `LocalConfiguration.current` *inside* it is a composable call in
+    // a non-composable context.
+    val configuration = LocalConfiguration.current
+    val isTv = remember(configuration) { configuration.isTvMode() }
 
     // Material You (Android 12+): pull the accent from the user's wallpaper palette.
     // Falls back to the bundled accent on older releases or if extraction fails.
