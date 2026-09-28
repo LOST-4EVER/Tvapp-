@@ -87,7 +87,11 @@ fun MainTvScreen(
     // rail that composes before the first `CategoryBar` pass — which is what happens
     // on a wide screen, where the rail precedes the chrome in the tree — is never
     // briefly empty.
-    var visibleCategories by remember { mutableStateOf(CategoryFilter.entries) }
+    //
+    // Typed as `List` rather than left to inference: `CategoryFilter.entries` is an
+    // `EnumEntries`, and a `List` of a different length coming back from `CategoryBar`
+    // cannot be assigned to it.
+    var visibleCategories by remember { mutableStateOf<List<CategoryFilter>>(CategoryFilter.entries) }
 
     // Apply the preferred landing category once, after stored settings have loaded.
     LaunchedEffect(settingsLoaded, settings.startCategory) {

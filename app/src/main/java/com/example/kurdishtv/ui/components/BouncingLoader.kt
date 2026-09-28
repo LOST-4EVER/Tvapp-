@@ -9,16 +9,16 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.theme.ExpressiveMorph
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
-import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.kurdishtv.ui.theme.fittedPath
+import com.example.ui.theme.LocalAppColors
 
 /**
  * Material 3 Expressive loading indicator.
