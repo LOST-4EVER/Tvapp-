@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
+import com.example.kurdishtv.ui.components.AppIconButton
+import com.example.kurdishtv.ui.components.AppIconButtonStyle
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.LiveBadge
 import com.example.kurdishtv.ui.components.SvgIcon
@@ -98,22 +98,14 @@ fun PlayerControlsOverlay(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = colors.glass,
-                            modifier = Modifier
-                                .size(44.dp)
-                                .bouncyClickable { onBackClick() }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                SvgIcon(
-                                    resId = KurdishTvIcons.ChevronLeft,
-                                    contentDescription = "Back",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
+                        AppIconButton(
+                            iconRes = KurdishTvIcons.ChevronLeft,
+                            contentDescription = "Back",
+                            onClick = onBackClick,
+                            style = AppIconButtonStyle.Glass,
+                            size = 44.dp,
+                            iconSize = 24.dp
+                        )
 
                         Spacer(modifier = Modifier.width(12.dp))
 
@@ -136,23 +128,26 @@ fun PlayerControlsOverlay(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OverlayIconButton(
+                        AppIconButton(
                             iconRes = if (isMuted) KurdishTvIcons.VolumeOff else KurdishTvIcons.VolumeUp,
-                            description = if (isMuted) "Unmute" else "Mute",
-                            active = isMuted,
-                            onClick = onToggleMute
+                            contentDescription = if (isMuted) "Unmute" else "Mute",
+                            onClick = onToggleMute,
+                            style = AppIconButtonStyle.Glass,
+                            active = isMuted
                         )
-                        OverlayIconButton(
+                        AppIconButton(
                             iconRes = KurdishTvIcons.Bedtime,
-                            description = "Sleep timer",
-                            active = !sleepTimerRemainingText.isNullOrEmpty(),
-                            onClick = onOpenSleepTimer
+                            contentDescription = "Sleep timer",
+                            onClick = onOpenSleepTimer,
+                            style = AppIconButtonStyle.Glass,
+                            active = !sleepTimerRemainingText.isNullOrEmpty()
                         )
-                        OverlayIconButton(
+                        AppIconButton(
                             iconRes = if (channel.isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
-                            description = "Favorite",
-                            active = channel.isFavorite,
-                            onClick = onFavoriteToggle
+                            contentDescription = "Favorite",
+                            onClick = onFavoriteToggle,
+                            style = AppIconButtonStyle.Glass,
+                            active = channel.isFavorite
                         )
                     }
                 }
@@ -163,60 +158,35 @@ fun PlayerControlsOverlay(
                     horizontalArrangement = Arrangement.spacedBy(28.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        // Circle, not Burst: a spiked silhouette over live video
-                        // reads as a glitch and its points straddle the frame edge.
-                        shape = CircleShape,
-                        color = colors.glass,
-                        modifier = Modifier
-                            .size(56.dp)
-                            .border(1.dp, colors.border, CircleShape)
-                            .bouncyClickable(scaleDown = 0.86f, onClick = onPreviousChannel)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            SvgIcon(
-                                resId = KurdishTvIcons.ChevronLeft,
-                                contentDescription = "Previous channel",
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
+                    AppIconButton(
+                        iconRes = KurdishTvIcons.ChevronLeft,
+                        contentDescription = "Previous channel",
+                        onClick = onPreviousChannel,
+                        style = AppIconButtonStyle.Glass,
+                        size = 56.dp,
+                        iconSize = 28.dp,
+                        scaleDown = 0.86f
+                    )
 
-                    Surface(
-                        shape = CircleShape,
-                        color = colors.primary,
-                        modifier = Modifier
-                            .size(74.dp)
-                            .bouncyClickable(scaleDown = 0.88f, onClick = onPlayPauseToggle)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            SvgIcon(
-                                resId = if (isPlaying) KurdishTvIcons.Pause else KurdishTvIcons.PlayRes,
-                                contentDescription = if (isPlaying) "Pause" else "Play",
-                                tint = colors.onPrimary,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
-                    }
+                    AppIconButton(
+                        iconRes = if (isPlaying) KurdishTvIcons.Pause else KurdishTvIcons.PlayRes,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        onClick = onPlayPauseToggle,
+                        style = AppIconButtonStyle.Filled,
+                        size = 74.dp,
+                        iconSize = 36.dp,
+                        scaleDown = 0.88f
+                    )
 
-                    Surface(
-                        shape = CircleShape,
-                        color = colors.glass,
-                        modifier = Modifier
-                            .size(56.dp)
-                            .border(1.dp, colors.border, CircleShape)
-                            .bouncyClickable(scaleDown = 0.86f, onClick = onNextChannel)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            SvgIcon(
-                                resId = KurdishTvIcons.ChevronRight,
-                                contentDescription = "Next channel",
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
+                    AppIconButton(
+                        iconRes = KurdishTvIcons.ChevronRight,
+                        contentDescription = "Next channel",
+                        onClick = onNextChannel,
+                        style = AppIconButtonStyle.Glass,
+                        size = 56.dp,
+                        iconSize = 28.dp,
+                        scaleDown = 0.86f
+                    )
                 }
 
                 // ── Bottom action bar ─────────────────────────────────────────
@@ -315,51 +285,17 @@ fun PlayerControlsOverlay(
                             }
                         }
 
-                        Surface(
-                            shape = CircleShape,
-                            color = colors.glass,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .bouncyClickable(onClick = onFullscreenToggle)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                SvgIcon(
-                                    resId = if (isFullscreen) KurdishTvIcons.FullscreenExit else KurdishTvIcons.Fullscreen,
-                                    contentDescription = "Fullscreen",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
+                        AppIconButton(
+                            iconRes = if (isFullscreen) KurdishTvIcons.FullscreenExit else KurdishTvIcons.Fullscreen,
+                            contentDescription = "Fullscreen",
+                            onClick = onFullscreenToggle,
+                            style = AppIconButtonStyle.Glass,
+                            size = 40.dp,
+                            iconSize = 20.dp
+                        )
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun OverlayIconButton(
-    iconRes: Int,
-    description: String,
-    active: Boolean,
-    onClick: () -> Unit
-) {
-    val colors = LocalAppColors.current
-    Surface(
-        shape = CircleShape,
-        color = if (active) colors.primary.copy(alpha = 0.28f) else colors.glass,
-        modifier = Modifier
-            .size(44.dp)
-            .bouncyClickable(onClick = onClick)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            SvgIcon(
-                resId = iconRes,
-                contentDescription = description,
-                tint = if (active) colors.primary else Color.White,
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }

@@ -30,6 +30,24 @@ import kotlin.math.sin
  *
  * [AppShapes] feeds the standard Material components so that every button, card and
  * dialog picks up an expressive corner treatment without call-site changes.
+ *
+ * ── Where expressive geometry belongs ─────────────────────────────────────
+ *
+ * The lobed family ([Burst], [Sunny], [Boom], the cookies, the clovers) is a
+ * *decorative* vocabulary, and it only works where nothing has to be read off the
+ * surface. It was previously used on icon buttons, section headers and cards that
+ * carry text, where it produced three visible defects:
+ *
+ *  - a spiked silhouette whose points straddle the element's neighbour, so adjacent
+ *    controls visually merge;
+ *  - an uneven bounding box, which pushes the glyph or label out of the safe area
+ *    (a 12-lobe Burst on a 40dp tile does not have 40dp of usable centre);
+ *  - a concave corner that clips the first and last characters of a line of text.
+ *
+ * So the rule is: **a surface that holds a glyph, a label or a touch target uses
+ * the rounded-corner scale below; a surface that holds only animation uses the
+ * lobed family.** The only lobed call sites left are the loading dots, which have
+ * no content at all.
  */
 object M3ExpressiveShapes {
 
@@ -121,8 +139,9 @@ object M3ExpressiveShapes {
     val Heart: Shape = heartShape()
 
     // ── App tokens ───────────────────────────────────────────────────────────
-    // Kept so existing call sites across the app keep compiling and now resolve to
-    // genuinely expressive geometry rather than plain rounded rectangles.
+    // These are the tokens call sites are expected to use. They are all
+    // `RoundedCornerShape` with a consistent, predictable scale, so a label inside
+    // one of them is never clipped and adjacent surfaces keep a constant rhythm.
     val ExtraLargeRounded: Shape = RoundedCornerShape(32.dp)
     val LargeCard: Shape = RoundedCornerShape(26.dp)
     val MediumCard: Shape = RoundedCornerShape(20.dp)

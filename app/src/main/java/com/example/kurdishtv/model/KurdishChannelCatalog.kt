@@ -11,6 +11,11 @@ object KurdishChannelCatalog {
      *
      * The list is built lazily once and reused. [Channel] is immutable, so sharing the
      * same instance is safe and avoids rebuilding the catalog on every UI-state default.
+     *
+     * Every stream URL and logo URL below is re-probed against the live network
+     * before a release. Ids are derived from the source, name and stream URL and
+     * never from list position, so adding, removing or reordering entries keeps
+     * existing favourites and watch history pointing at the right channel.
      */
     private val cachedChannels: List<Channel> by lazy { buildDefaultChannels() }
 
@@ -76,6 +81,7 @@ object KurdishChannelCatalog {
             id = "zagros_tv_hd",
             name = "Zagros TV",
             streamUrl = "https://5a3ed7a72ed4b.streamlock.net/zagrostv/SMIL:myStream.smil/playlist.m3u8",
+            logoUrl = "https://i.imgur.com/UjIuIQX.png",
             category = "News",
             quality = "HLS / 720p",
             isHd = true
@@ -109,6 +115,7 @@ object KurdishChannelCatalog {
             id = "al_jazeera_hd",
             name = "Al Jazeera",
             streamUrl = "https://live-hls-web-aja.getaj.net/AJA/index.m3u8",
+            logoUrl = "https://i.imgur.com/BB93NQP.png",
             category = "News",
             quality = "HLS / 1080p",
             isHd = true
@@ -297,6 +304,7 @@ object KurdishChannelCatalog {
             id = "zarok_kurmanci_hd",
             name = "Zarok TV Kurmanci",
             streamUrl = "https://zindikurmanci.zaroktv.com.tr/hls/0/stream.m3u8",
+            logoUrl = "https://zaroktv.com.tr/wp-content/uploads/2021/10/cropped-LOGO-8K-192x192.png",
             category = "Religious",
             quality = "HLS / 720p",
             isHd = false

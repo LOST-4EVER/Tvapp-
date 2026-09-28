@@ -380,18 +380,18 @@ private fun SettingsSection(
 ) {
     val colors = LocalAppColors.current
     Surface(
-        shape = M3ExpressiveShapes.Clover,
+        shape = M3ExpressiveShapes.LargeCard,
         color = colors.surface,
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, colors.border, M3ExpressiveShapes.Clover)
+            .border(1.dp, colors.border, M3ExpressiveShapes.LargeCard)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     // A soft cookie rather than the spiked Burst, which made every
                     // section header look like a cog instead of an icon tile.
-                    shape = M3ExpressiveShapes.FourSidedCookie,
+                    shape = M3ExpressiveShapes.MediumCard,
                     color = colors.primaryContainer
                 ) {
                     Box(

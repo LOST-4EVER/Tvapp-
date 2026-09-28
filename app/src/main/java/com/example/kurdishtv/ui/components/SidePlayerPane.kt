@@ -36,7 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
-import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoPlayerView
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
@@ -57,11 +56,11 @@ fun SidePlayerPane(
 
     Surface(
         color = colors.surface,
-        shape = M3ExpressiveShapes.Clover,
+        shape = M3ExpressiveShapes.LargeCard,
         modifier = modifier
             .fillMaxHeight()
             .padding(16.dp)
-            .border(1.dp, colors.border, M3ExpressiveShapes.Clover)
+            .border(1.dp, colors.border, M3ExpressiveShapes.LargeCard)
     ) {
         Column(
             modifier = Modifier

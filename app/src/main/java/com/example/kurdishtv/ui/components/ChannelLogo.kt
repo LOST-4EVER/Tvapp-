@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -9,6 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -24,7 +27,6 @@ import coil.memory.MemoryCache
 import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
-import com.example.ui.theme.LocalAppColors
 import java.io.File
 
 /**
@@ -64,8 +66,10 @@ private object LogoLoader {
  * Channel logo with a graceful fallback.
  *
  * Plenty of channels in the merged remote playlists point at a `tvg-logo` that
- * 404s. Previously that rendered an empty tile; it now degrades to the channel's
- * initials, which stays readable and looks deliberate.
+ * 404s, and a handful in the curated catalog ship without one at all. Previously
+ * that rendered an empty tile; it now degrades to the channel's initials on a
+ * per-channel accent, so a missing logo reads as a designed monogram rather than
+ * a hole in the grid.
  */
 @Composable
 fun ChannelLogo(
@@ -74,19 +78,9 @@ fun ChannelLogo(
     showLogos: Boolean,
     modifier: Modifier = Modifier,
     contentPadding: Dp = 18.dp,
-    size: Dp = 96.dp,
-    /**
-     * Extra inset on the leading edge of the logo box.
-     *
-     * The LIVE badge and favourite button float over the top of the tile. With
-     * a uniform padding the logo was centred in the full box and the badge sat
-     * on top of it, so a wide logo was visibly cut. Reserving this much at the
-     * top keeps the artwork clear of both controls.
-     */
-    topContentPadding: Dp = 0.dp
+    size: Dp = 96.dp
 ) {
     val context = LocalContext.current
-    val colors = LocalAppColors.current
     val loader = remember(context) { LogoLoader.get(context) }
     // Coil sizes are in pixels, so the dp the tile is drawn at has to be converted
     // against the current density.
@@ -111,15 +105,24 @@ fun ChannelLogo(
     }
 
     val fallback: @Composable () -> Unit = {
+        // Derived from the channel name, so the same channel keeps the same colour
+        // across refreshes, reorderings and devices.
+        val accent = remember(channelName) { monogramAccent(channelName) }
         Box(
-            modifier = modifier.fillMaxSize(),
+            modifier = modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        listOf(accent.copy(alpha = 0.26f), accent.copy(alpha = 0.07f))
+                    )
+                ),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = initialsOf(channelName),
-                color = colors.primary.copy(alpha = 0.75f),
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
+                color = accent,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center,
                 maxLines = 1
             )
@@ -135,17 +138,40 @@ fun ChannelLogo(
             contentScale = ContentScale.Fit,
             modifier = modifier
                 .fillMaxSize()
-                .padding(
-                    start = contentPadding,
-                    end = contentPadding,
-                    top = contentPadding + topContentPadding,
-                    bottom = contentPadding
-                ),
+                .padding(contentPadding),
             imageLoader = loader,
             loading = { fallback() },
             error = { fallback() }
         )
     }
+}
+
+/**
+ * A small, fixed set of accents used for logo-less channels.
+ *
+ * Hues are spread around the wheel and all sit at similar perceived lightness on
+ * the dark surfaces, so two adjacent cards never end up with one vivid tile and
+ * one that disappears. Fixed rather than fully generated so the grid reads as a
+ * palette instead of a colour wheel.
+ */
+private val MonogramAccents = listOf(
+    Color(0xFFF2B33D), // gold
+    Color(0xFF4FC3A1), // jade
+    Color(0xFF5AA9F0), // azure
+    Color(0xFFF07A9A), // rose
+    Color(0xFFEE8A4C), // ember
+    Color(0xFF9C8CF0), // violet
+    Color(0xFF4FC0D4), // turquoise
+    Color(0xFFD8C05A) // sand
+)
+
+/** Stable per-channel accent, chosen from a hash of the name. */
+private fun monogramAccent(seed: String): Color {
+    // String.hashCode is specified by the JDK, so this is stable across processes
+    // and app restarts — the same channel always gets the same colour.
+    val hash = seed.hashCode().let { if (it == Int.MIN_VALUE) 0 else it }
+    val index = ((hash % MonogramAccents.size) + MonogramAccents.size) % MonogramAccents.size
+    return MonogramAccents[index]
 }
 
 /** Up to two initials, e.g. "Kurdistan 24" -> "K2". */

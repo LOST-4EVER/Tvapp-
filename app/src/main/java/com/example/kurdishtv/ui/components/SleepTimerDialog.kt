@@ -36,12 +36,12 @@ fun SleepTimerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = M3ExpressiveShapes.Clover,
+        shape = M3ExpressiveShapes.ExtraLargeRounded,
         containerColor = colors.surface,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    shape = M3ExpressiveShapes.Burst,
+                    shape = M3ExpressiveShapes.MediumCard,
                     color = colors.primaryContainer
                 ) {
                     SvgIcon(
