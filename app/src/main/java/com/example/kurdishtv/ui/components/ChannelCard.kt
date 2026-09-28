@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -293,13 +295,31 @@ private fun ChannelLogoWell(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 10.dp),
+            .padding(horizontal = 10.dp)
+            .padding(bottom = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .size(84.dp)
+                // The well fills the card instead of sitting in the middle of it as a
+                // small tile. It was a fixed 84dp square inside a cell that runs from
+                // roughly 120dp on a phone to 200dp on a television, so on most of the
+                // grid well over half of every card was empty on both sides of the
+                // logo — and because those two narrow columns of undersized tiles are
+                // what the eye lands on, the dead space between them read as a hole
+                // running down the middle of the grid rather than as card padding.
+                //
+                // `widthIn` is applied *before* `fillMaxWidth` on purpose: a width
+                // constraint after a fill is a no-op, because the fill has already
+                // pinned min and max to the parent's width, and the cap would then be
+                // coerced straight back to that same width. Ordered this way the cap
+                // really does bound the well, and a wide television cell gets a
+                // larger logo instead of a billboard.
+                .widthIn(max = 132.dp)
+                .fillMaxWidth()
+                // Square, and therefore the same height at every cell width, which is
+                // what keeps each row of the grid the same rhythm.
+                .aspectRatio(1f)
                 .clip(wellShape)
                 .background(colors.surfaceElevated, wellShape)
                 // Glow on top of the tile, not under it. These two used to be in
@@ -322,8 +342,11 @@ private fun ChannelLogoWell(
                 logoUrl = channel.logoUrl,
                 showLogos = showLogos,
                 contentPadding = 9.dp,
-                // Decode for the tile this is drawn in, not at source resolution.
-                size = 84.dp
+                // Decode for the largest tile this can be drawn in, not at source
+                // resolution. Slightly over the draw size on a narrow cell, which is
+                // the safe direction to err in; decoding under it is what makes a
+                // logo look soft on a television.
+                size = 132.dp
             )
         }
     }
