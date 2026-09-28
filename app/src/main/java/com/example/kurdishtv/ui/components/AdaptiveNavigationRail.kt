@@ -36,7 +36,6 @@ import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.rememberMorphingCorners
-import com.example.kurdishtv.ui.motion.rememberMorphingPolygon
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -165,7 +164,7 @@ fun AdaptiveNavigationRail(
     }
 }
 
-/** One rail destination: an Expressive indicator, a glyph, and a label. */
+/** One rail destination: a selection indicator, a glyph, and a label. */
 @Composable
 private fun RailCategoryItem(
     category: CategoryFilter,
@@ -175,14 +174,11 @@ private fun RailCategoryItem(
     val colors = LocalAppColors.current
     var isFocused by remember(category) { mutableStateOf(false) }
 
-    val indicatorShape: Shape = rememberMorphingPolygon(
+    val indicatorShape: Shape = rememberMorphingCorners(
         rest = ShapeMorph.indicatorRest,
         active = ShapeMorph.indicatorActive,
         isActive = isSelected,
-        spec = ExpressiveMotion.spatialDefault,
-        // The quarter turn is what stops this reading as a cross-fade between two
-        // outlines: the indicator arrives having turned, not merely changed.
-        rotationWhileActive = 45f
+        spec = ExpressiveMotion.spatialDefault
     )
     val containerShape = rememberMorphingCorners(
         rest = M3ExpressiveShapes.Corners.largeCard,

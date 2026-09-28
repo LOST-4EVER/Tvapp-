@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -167,25 +166,15 @@ fun MainTvScreen(
                                 .weight(1.15f)
                                 .fillMaxHeight()
                         ) {
-                            OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
-                            TopHeaderBar(
-                                channelCount = filtered.size,
-                                isLoading = uiState.isLoading,
-                                onOpenImport = { showImportDialog = true },
-                                onRefresh = onRetryClick,
-                                onOpenSettings = onOpenSettings
-                            )
-                            SearchBarM3(
-                                query = uiState.searchQuery,
-                                onQueryChange = onSearchQueryChanged
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            CategoryBar(
-                                selectedCategory = uiState.selectedCategory,
+                            TvTopChrome(
+                                uiState = uiState,
+                                filteredCount = filtered.size,
+                                onSearchQueryChanged = onSearchQueryChanged,
                                 onCategorySelected = onCategorySelected,
-                                channels = uiState.channels
+                                onRetryClick = onRetryClick,
+                                onOpenSettings = onOpenSettings,
+                                onOpenImport = { showImportDialog = true }
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
 
                             if (filtered.isEmpty()) {
                                 EmptyChannelState(
@@ -240,27 +229,15 @@ fun MainTvScreen(
                         containerColor = colors.background,
                         snackbarHost = { SnackbarHost(snackbarHostState) },
                         topBar = {
-                            Column {
-                                OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
-                                TopHeaderBar(
-                                    channelCount = filtered.size,
-                                    isLoading = uiState.isLoading,
-                                    onOpenImport = { showImportDialog = true },
-                                    onRefresh = onRetryClick,
-                                    onOpenSettings = onOpenSettings
-                                )
-                                SearchBarM3(
-                                    query = uiState.searchQuery,
-                                    onQueryChange = onSearchQueryChanged
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                CategoryBar(
-                                    selectedCategory = uiState.selectedCategory,
-                                    onCategorySelected = onCategorySelected,
-                                    channels = uiState.channels
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                            }
+                            TvTopChrome(
+                                uiState = uiState,
+                                filteredCount = filtered.size,
+                                onSearchQueryChanged = onSearchQueryChanged,
+                                onCategorySelected = onCategorySelected,
+                                onRetryClick = onRetryClick,
+                                onOpenSettings = onOpenSettings,
+                                onOpenImport = { showImportDialog = true }
+                            )
                         },
                         modifier = Modifier.weight(1f)
                     ) { paddingValues ->
@@ -298,27 +275,15 @@ fun MainTvScreen(
                     containerColor = colors.background,
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     topBar = {
-                        Column {
-                            OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
-                            TopHeaderBar(
-                                channelCount = filtered.size,
-                                isLoading = uiState.isLoading,
-                                onOpenImport = { showImportDialog = true },
-                                onRefresh = onRetryClick,
-                                onOpenSettings = onOpenSettings
-                            )
-                            SearchBarM3(
-                                query = uiState.searchQuery,
-                                onQueryChange = onSearchQueryChanged
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            CategoryBar(
-                                selectedCategory = uiState.selectedCategory,
-                                onCategorySelected = onCategorySelected,
-                                channels = uiState.channels
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                        }
+                        TvTopChrome(
+                            uiState = uiState,
+                            filteredCount = filtered.size,
+                            onSearchQueryChanged = onSearchQueryChanged,
+                            onCategorySelected = onCategorySelected,
+                            onRetryClick = onRetryClick,
+                            onOpenSettings = onOpenSettings,
+                            onOpenImport = { showImportDialog = true }
+                        )
                     }
                 ) { paddingValues ->
                     Box(
@@ -353,6 +318,51 @@ fun MainTvScreen(
 }
 
 /**
+ * The pinned chrome above the channel grid: offline state, brand row, search, and
+ * the category chips.
+ *
+ * This is the app's only piece of permanent top-level navigation, and it used to be
+ * written out four times — once per layout branch below — with slightly different
+ * spacer heights in each. That is how the four layouts drifted apart: a change to the
+ * header or the search field had to be made four times and three of them were easy to
+ * forget, so a wide tablet and a phone ended up with different vertical rhythm for
+ * the same content. One definition, four call sites.
+ */
+@Composable
+private fun TvTopChrome(
+    uiState: TvUiState,
+    filteredCount: Int,
+    onSearchQueryChanged: (String) -> Unit,
+    onCategorySelected: (CategoryFilter) -> Unit,
+    onRetryClick: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenImport: () -> Unit
+) {
+    Column {
+        OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
+        TopHeaderBar(
+            channelCount = filteredCount,
+            isLoading = uiState.isLoading,
+            onOpenImport = onOpenImport,
+            onRefresh = onRetryClick,
+            onOpenSettings = onOpenSettings
+        )
+        SearchBarM3(
+            query = uiState.searchQuery,
+            onQueryChange = onSearchQueryChanged
+        )
+        // No spacer: CategoryBar carries its own vertical content padding, and the
+        // three explicit spacers this replaced added a different amount on each
+        // layout for no reason.
+        CategoryBar(
+            selectedCategory = uiState.selectedCategory,
+            onCategorySelected = onCategorySelected,
+            channels = uiState.channels
+        )
+    }
+}
+
+/**
  * Single-pane layout for short landscape windows (a phone held sideways).
  *
  * The header, search and category chips share one row so the grid gets the full
@@ -381,25 +391,15 @@ private fun LandscapeCompactLayout(
         containerColor = colors.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            Column {
-                OfflineBanner(isOffline = uiState.isOffline, onRetry = onRetryClick)
-                TopHeaderBar(
-                    channelCount = filtered.size,
-                    isLoading = uiState.isLoading,
-                    onOpenImport = onOpenImport,
-                    onRefresh = onRetryClick,
-                    onOpenSettings = onOpenSettings
-                )
-                SearchBarM3(
-                    query = uiState.searchQuery,
-                    onQueryChange = onSearchQueryChanged
-                )
-                CategoryBar(
-                    selectedCategory = uiState.selectedCategory,
-                    onCategorySelected = onCategorySelected,
-                    channels = uiState.channels
-                )
-            }
+            TvTopChrome(
+                uiState = uiState,
+                filteredCount = filtered.size,
+                onSearchQueryChanged = onSearchQueryChanged,
+                onCategorySelected = onCategorySelected,
+                onRetryClick = onRetryClick,
+                onOpenSettings = onOpenSettings,
+                onOpenImport = onOpenImport
+            )
         }
     ) { paddingValues ->
         Box(
@@ -450,6 +450,24 @@ private fun ChannelGrid(
     ) {
         val heroChannel = uiState.selectedChannel ?: filtered.firstOrNull()
 
+        // Recents come first when they exist.
+        //
+        // The hero was unconditionally above everything, which meant that for anyone
+        // who had actually watched something, the first screenful of the app was an
+        // advert for a channel they had not asked for, and the thing they *had* asked
+        // for — pick up where you left off — was below the fold. Resume is the more
+        // likely intent than browse, so it gets the better position; the hero follows
+        // as the catalogue's anchor, and is skipped entirely once someone has recents
+        // and is browsing, rather than competing with them for the first glance.
+        if (isHome && uiState.recentChannels.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }, key = "recent_channels_section") {
+                RecentChannelsRow(
+                    recentChannels = uiState.recentChannels,
+                    onChannelClick = onChannelClick
+                )
+            }
+        }
+
         if (isHome && heroChannel != null) {
             item(span = { GridItemSpan(maxLineSpan) }, key = "featured_hero_section") {
                 FeaturedHeroCard(
@@ -457,15 +475,6 @@ private fun ChannelGrid(
                     showLogos = showLogos,
                     onWatchClick = onChannelClick,
                     onFavoriteToggle = onFavoriteToggle
-                )
-            }
-        }
-
-        if (isHome && uiState.recentChannels.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }, key = "recent_channels_section") {
-                RecentChannelsRow(
-                    recentChannels = uiState.recentChannels,
-                    onChannelClick = onChannelClick
                 )
             }
         }

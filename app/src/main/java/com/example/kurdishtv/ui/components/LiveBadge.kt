@@ -19,8 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.LocalLivePulse
-import com.example.kurdishtv.ui.motion.rememberMorphingPolygon
-import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
+import com.example.kurdishtv.ui.motion.ShapeMorph
+import com.example.kurdishtv.ui.motion.rememberMorphingCorners
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -29,29 +29,25 @@ import com.example.ui.theme.LocalAppColors
  *
  * The pulse comes from a single app-wide animation ([LocalLivePulse]), so a grid full
  * of cards runs one transition rather than one per card — which matters here, because
- * the pulse now drives a shape morph as well as a scale.
+ * the pulse drives the dot's scale *and* its outline from the same value.
  *
- * That is the point: the dot is not merely bigger at the peak of the pulse, it opens
- * from a circle into a very slightly lobed sun and rocks a few degrees as it does. A
- * dot that only scales reads as a heartbeat; a dot that changes outline reads as
- * *live*, and the two are indistinguishable in a still screenshot but not in
- * peripheral vision, which is how a television is actually watched.
- *
- * Both signals are derived from the same shared value, so the extra shape cost per
- * card is one polygon rebuild on an eight-lobe outline.
+ * The dot is a plain circle that flattens very slightly as it breathes. It was a
+ * lobed sun before. At 8dp an eight-lobe outline is not "recognisably round", it is a
+ * smudge, and it was being rebuilt on every pulse for every visible card; a corner
+ * radius is the same idea for a fraction of the cost and is legible at that size.
  */
 @Composable
 fun LiveBadge(modifier: Modifier = Modifier) {
     val colors = LocalAppColors.current
     val pulse = LocalLivePulse.current
 
-    // Map the shared 0.85→1.25 pulse onto a 0→1 morph fraction. Driving the shape from
-    // the pulse rather than from a second transition is what keeps a grid of badges
-    // down to one animation.
+    // Map the shared 0.85→1.25 pulse onto a 0→1 fraction. Driving the shape from the
+    // pulse rather than from a second transition is what keeps a grid of badges down
+    // to one animation.
     val openness = ((pulse - 0.85f) / 0.40f).coerceIn(0f, 1f)
-    val dotShape = rememberMorphingPolygon(
-        rest = M3ExpressivePolygons.Circle,
-        active = M3ExpressivePolygons.VerySunny,
+    val dotShape = rememberMorphingCorners(
+        rest = ShapeMorph.liveRest,
+        active = ShapeMorph.liveActive,
         isActive = openness > 0.5f,
         // Critically damped: this morphs twice a second, and an overshooting spring
         // at that cadence reads as a flicker rather than as a breath.
@@ -65,17 +61,14 @@ fun LiveBadge(modifier: Modifier = Modifier) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
         ) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    // The lobed shape is what makes this safe: a 12-lobe burst at 8dp
-                    // was an unreadable blob, but an eight-lobe sun with a corner
-                    // radius of 0.085 is still recognisably round at that size.
                     .background(colors.liveRed, dotShape)
             )
-            Spacer(modifier = Modifier.width(5.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "LIVE",
                 color = Color.White,

@@ -105,7 +105,7 @@ fun CategoryBar(
                 label = "CategoryPillBackground"
             )
             val contentColor by animateColorAsState(
-                targetValue = if (isSelected) colors.onPrimary else colors.textPrimary,
+                targetValue = if (isSelected) colors.onPrimary else colors.textSecondary,
                 animationSpec = ExpressiveMotion.effectsColor,
                 label = "CategoryPillContent"
             )
@@ -115,9 +115,10 @@ fun CategoryBar(
                 label = "CategoryPillElevation"
             )
 
-            // The pill's silhouette animates on selection, so the change is legible
-            // without relying on colour alone — which matters on a television, where a
-            // tint shift across a dim room is much harder to catch than a shape change.
+            // The chip is a true pill — a 50% corner radius — so it is a pill whatever
+            // the label length is. Selection is carried by fill, label weight and
+            // elevation together, which survives being read at an angle across a room
+            // in a way a tint shift on its own does not.
             val pillShape = rememberMorphingPillShape(
                 selected = isSelected,
                 reduceMotion = reduceMotion
@@ -139,7 +140,7 @@ fun CategoryBar(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     SvgIcon(
                         resId = categoryIcon(category),

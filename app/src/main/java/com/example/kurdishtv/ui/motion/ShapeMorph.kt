@@ -11,7 +11,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.kurdishtv.ui.theme.ExpressiveMorph
 import com.example.kurdishtv.ui.theme.ExpressivePolygon
-import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.MorphingPolygonShape
 
 /**
@@ -24,46 +23,63 @@ import com.example.kurdishtv.ui.theme.MorphingPolygonShape
  *
  * Two families of shape are animated here, and the split is not arbitrary:
  *
+ *  - [rememberMorphingCorners] morphs between two corner-radius scales. This is what
+ *    **every interactive surface in the app uses** — chips, buttons, icon buttons, the
+ *    rail, the logo well, the live dot. Material lists rounded corners as a
+ *    spatial-spring property, so animating them is not a compromise; it is the spec's
+ *    own suggestion.
  *  - [rememberMorphingPolygon] morphs between two [ExpressivePolygon]s. It is
- *    expressive — cookies, clovers, bursts — and it belongs on surfaces that hold no
- *    glyph, no label and no touch target, because a lobed silhouette on a surface you
- *    have to read pushes text out of the safe area and makes neighbouring controls
- *    look merged.
- *  - [rememberMorphingCorners] morphs between two corner-radius scales. It is
- *    restrained, and it is what every labelled surface uses. Material lists rounded
- *    corners as a spatial-spring property, so animating them is not a compromise; it
- *    is the spec's own suggestion.
+ *    expressive — cookies, clovers, bursts — and it is now confined to surfaces that
+ *    hold no glyph, no label and no touch target.
+ *
+ * ## Why the polygon library came off the controls
+ *
+ * The Expressive vocabulary used to sit under essentially every control: chips were a
+ * `Pill` polygon, icon buttons a `Circle` morphing to a `Pentagon`, favourites a
+ * `Heart`. It failed, visibly and repeatedly, because the hand-rolled rounded-polygon
+ * path builder is only approximately correct away from right angles, and a control is
+ * exactly where that error is most visible:
+ *
+ *  - the arc's second control point swung across the shape instead of around the
+ *    corner, turning chips and buttons into pointed lenses;
+ *  - a *lobed* silhouette on a surface carrying a 13sp label pushes the text out of
+ *    its own safe area and makes neighbouring controls read as merged;
+ *  - a malformed outline is also a malformed **clip**, so a `Surface` clipped its own
+ *    glyph away and the control rendered as an empty disc — which is what the header
+ *    and the card hearts were doing.
+ *
+ * The corner scale has none of those failure modes, and it is the shape system
+ * Material itself ships. The expressive library is still here and still animates, on
+ * the focus ring and the loading sequence, where nothing is clipped and nothing has to
+ * be read.
  */
 object ShapeMorph {
 
     /**
-     * Resting and active shapes for a filter chip.
+     * Resting and active corner radii for a filter chip.
      *
-     * A pill that flattens slightly when selected. A full morph to a lobed cookie was
-     * tried and rejected: chips are wide, and a seven-lobed shape stretched across a
-     * 140dp-wide chip stops reading as a chip at all.
+     * Chips use a percent radius rather than these — see [rememberMorphingPillShape].
+     * These are here for the fixed-height surfaces that want to round further when
+     * they are selected.
      */
-    val chipRest: ExpressivePolygon = M3ExpressivePolygons.Pill
-    val chipActive: ExpressivePolygon = M3ExpressivePolygons.Pill.scaled(1f, 0.82f)
+    val chipRest: CornerScale = CornerScale.uniform(14.dp)
+    val chipActive: CornerScale = CornerScale.uniform(20.dp)
 
-    /** A plain circle and a rounded square: the clearest possible shape-as-state change. */
-    val buttonRest: ExpressivePolygon = M3ExpressivePolygons.Circle
-    val buttonPressed: ExpressivePolygon = M3ExpressivePolygons.Square
+    /** A circle at rest, squaring off as it is held. */
+    val buttonRest: CornerScale = CornerScale.uniform(20.dp)
+    val buttonPressed: CornerScale = CornerScale.uniform(11.dp)
 
-    /** The rail's selection indicator, and a slowly turning version of it. */
-    val indicatorRest: ExpressivePolygon = M3ExpressivePolygons.Pill
-    val indicatorActive: ExpressivePolygon = M3ExpressivePolygons.VerySunny
+    /** The rail's selection indicator. */
+    val indicatorRest: CornerScale = CornerScale.uniform(14.dp)
+    val indicatorActive: CornerScale = CornerScale.uniform(20.dp)
 
-    /** The outline drawn around whatever currently holds D-pad focus. */
-    val focusRing: ExpressivePolygon = M3ExpressivePolygons.Cookie9Sided
+    /** The tile a channel's logo sits in: a rounded square that opens when focused. */
+    val logoRest: CornerScale = CornerScale.uniform(20.dp)
+    val logoActive: CornerScale = CornerScale.uniform(28.dp)
 
-    /** The tile a channel's logo sits in: a plain square at rest, organic when focused. */
-    val logoRest: ExpressivePolygon = M3ExpressivePolygons.Square
-    val logoActive: ExpressivePolygon = M3ExpressivePolygons.Puffy
-
-    /** The live dot: a circle that opens into a very slightly lobed sun as it pulses. */
-    val liveRest: ExpressivePolygon = M3ExpressivePolygons.Circle
-    val liveActive: ExpressivePolygon = M3ExpressivePolygons.VerySunny
+    /** The live dot: 4dp on an 8dp dot is a circle, flattening to 2dp as it pulses. */
+    val liveRest: CornerScale = CornerScale.uniform(4.dp)
+    val liveActive: CornerScale = CornerScale.uniform(2.dp)
 }
 
 /**
@@ -104,25 +120,22 @@ fun rememberMorphingPolygon(
 }
 
 /**
- * A pill whose silhouette changes when it becomes selected.
+ * A true pill — a corner radius of 50% of the shorter side.
  *
- * Kept as a named helper because the category bar is the one place in the app where a
- * shape morph carries real meaning: the selected tab has to be identifiable from
- * across a room, and on a television that is often the only cue available.
+ * A percent radius is the whole point. It is resolution-independent, so the same token
+ * is a pill on a 40dp chip and a stadium on a 200dp one, and it cannot drift out of
+ * proportion the way a fixed dp radius does once the label length changes. It is also
+ * exactly what Material's own `Pill` is, so nothing here is a reinvention.
+ *
+ * Selection is deliberately *not* carried by the outline. A chip that changes fill,
+ * label weight and elevation already reads as selected from across a room, and a chip
+ * whose silhouette also moves only adds motion to read past a label.
  */
 @Composable
 fun rememberMorphingPillShape(
     selected: Boolean,
     reduceMotion: Boolean = LocalReduceMotion.current
-): Shape = rememberMorphingPolygon(
-    rest = ShapeMorph.chipRest,
-    active = ShapeMorph.chipActive,
-    isActive = selected,
-    spec = if (reduceMotion) ExpressiveMotion.effectsDefault else ExpressiveMotion.spatialDefault,
-    // A small turn, not a quarter. The chip is wide and holds a label, so a large
-    // rotation visibly distorts the text; a slight lean is enough to read as motion.
-    rotationWhileActive = 12f
-)
+): Shape = RoundedCornerShape(percent = 50)
 
 /**
  * A rounded-rectangle shape whose four corner radii animate between two states.
@@ -169,6 +182,16 @@ data class CornerScale(
         bottomEnd = bottomEnd,
         bottomStart = bottomStart
     )
+
+    /**
+     * A radius expressed as a fraction of the shorter side.
+     *
+     * 50 is a pill, 25 is a rounded square. [CornerScale] itself stores `Dp`, because
+     * a fixed radius is what the animatable surfaces want; percent is the escape hatch
+     * for a control whose height is not known at the call site, or where one token has
+     * to be a pill at one size and a squircle at another.
+     */
+    fun percent(fraction: Int): Shape = RoundedCornerShape(percent = fraction)
 
     companion object {
         /** Every corner the same. */

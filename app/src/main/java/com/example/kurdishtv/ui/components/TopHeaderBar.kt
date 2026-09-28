@@ -26,8 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.bouncyClickable
-import com.example.kurdishtv.ui.motion.rememberMorphingPolygon
-import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
+import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -49,15 +49,15 @@ fun TopHeaderBar(
         label = "HeaderLogoScale"
     )
 
-    // The brand tile only ever holds a glyph, so unlike the surfaces below it this is
-    // allowed to be a lobed shape — and a rounded square is the correct resting state
-    // because it matches the logo tiles in the grid the user is about to look at.
-    val brandShape = rememberMorphingPolygon(
-        rest = M3ExpressivePolygons.Square,
-        active = M3ExpressivePolygons.VerySunny,
+    // The brand tile holds a glyph, so it stays on the corner scale. Its resting
+    // radius matches the logo tiles in the grid below it, which is what ties the
+    // header and the content together; while a refresh is in flight the corners open
+    // a little, so the header says "working" without a spinner over the grid.
+    val brandShape = rememberMorphingCorners(
+        rest = M3ExpressiveShapes.Corners.logoTile,
+        active = M3ExpressiveShapes.Corners.cardFocused,
         isActive = isLoading,
-        spec = ExpressiveMotion.spatialDefault,
-        rotationWhileActive = 30f
+        spec = ExpressiveMotion.spatialDefault
     )
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
