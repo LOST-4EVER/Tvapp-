@@ -469,14 +469,35 @@ class TvViewModel(
     /**
      * Opens the system installer for a downloaded APK.
      *
-     * Returns false when the device still needs the "allow from this source"
-     * permission, so the caller can route the user to that settings screen.
+     * Returns false when the install could not be started. Each failure gets its
+     * own message because the fix is different in every case: a missing file needs
+     * a re-download, an ungranted "allow from this source" needs the settings
+     * screen, and a changed signing key needs an uninstall.
      */
     fun installUpdate(update: AppUpdate, filePath: String): Boolean {
         val context = appContext ?: return false
         val file = File(filePath)
         if (!file.exists()) {
             _updateState.value = UpdateState.Failed("The downloaded update is missing, please retry")
+            return false
+        }
+        if (!ApkInstaller.canRequestPackageInstalls(context)) {
+            _updateState.value = UpdateState.Failed(
+                "Android needs permission to install this update. Tap Install again to open that setting."
+            )
+            return false
+        }
+        if (!ApkInstaller.isSignedBySameCertificate(context, file)) {
+            // Android reports this only from inside its own installer, as
+            // "package conflicts with an existing package", which reads like a
+            // corrupt download. It is actually a different signing key, which
+            // only an uninstall can clear.
+            _updateState.value = UpdateState.Failed(
+                "This update is signed with a different key than the app already on this " +
+                    "device, so Android cannot upgrade over it. Uninstall Kurdish TV Live, " +
+                    "then install the update. Uninstalling clears your favourites and " +
+                    "watch history."
+            )
             return false
         }
         val started = ApkInstaller.install(context, file)

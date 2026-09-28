@@ -46,10 +46,10 @@ fun FeaturedHeroCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(M3ExpressiveShapes.Sunny)
-            .border(1.5.dp, colors.border, M3ExpressiveShapes.Sunny)
+            .clip(M3ExpressiveShapes.ExtraLargeRounded)
+            .border(1.5.dp, colors.border, M3ExpressiveShapes.ExtraLargeRounded)
             .bouncyClickable(scaleDown = 0.97f) { onWatchClick(channel) },
-        shape = M3ExpressiveShapes.Sunny,
+        shape = M3ExpressiveShapes.ExtraLargeRounded,
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {

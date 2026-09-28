@@ -46,12 +46,12 @@ fun ImportPlaylistDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = M3ExpressiveShapes.Clover,
+        shape = M3ExpressiveShapes.ExtraLargeRounded,
         containerColor = colors.surface,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    shape = M3ExpressiveShapes.Burst,
+                    shape = M3ExpressiveShapes.MediumCard,
                     color = colors.primaryContainer
                 ) {
                     SvgIcon(
@@ -153,7 +153,7 @@ fun ImportPlaylistDialog(
                     LazyColumn(modifier = Modifier.height(120.dp)) {
                         items(customUrls.toList()) { url ->
                             Surface(
-                                shape = M3ExpressiveShapes.Cookie,
+                                shape = M3ExpressiveShapes.SmallCard,
                                 color = colors.surfaceVariant,
                                 modifier = Modifier
                                     .fillMaxWidth()

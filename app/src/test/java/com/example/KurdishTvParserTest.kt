@@ -1,7 +1,5 @@
 package com.example
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
 import com.example.kurdishtv.parser.KurdishTvParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull

@@ -62,7 +62,7 @@ fun EmptyChannelState(
         verticalArrangement = Arrangement.Center
     ) {
         Surface(
-            shape = M3ExpressiveShapes.Sunny,
+            shape = M3ExpressiveShapes.LargeCard,
             color = colors.surfaceVariant
         ) {
             Column(

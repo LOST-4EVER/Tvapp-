@@ -190,7 +190,7 @@ fun PlayerScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
-                    shape = M3ExpressiveShapes.Clover,
+                    shape = M3ExpressiveShapes.LargeCard,
                     color = colors.surface,
                     modifier = Modifier.padding(24.dp)
                 ) {

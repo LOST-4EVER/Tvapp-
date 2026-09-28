@@ -47,7 +47,10 @@ fun AdaptiveNavigationRail(
                 modifier = Modifier.padding(top = 16.dp, bottom = 10.dp)
             ) {
                 Surface(
-                    shape = M3ExpressiveShapes.Sunny,
+                    // Rounded square, matching the logo tiles in the grid. The
+                    // 8-lobed Sunny silhouette had no flat area to centre the glyph
+                    // on, so the mark drifted off-centre inside its own tile.
+                    shape = M3ExpressiveShapes.MediumCard,
                     color = colors.primary,
                     modifier = Modifier
                         .size(48.dp)
@@ -153,22 +156,15 @@ private fun RailActionButton(
     description: String,
     onClick: () -> Unit
 ) {
-    val colors = LocalAppColors.current
-    Surface(
-        shape = M3ExpressiveShapes.Burst,
-        color = colors.surfaceElevated,
-        modifier = Modifier
-            .size(40.dp)
-            .border(1.dp, colors.border, M3ExpressiveShapes.Burst)
-            .bouncyClickable { onClick() }
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            SvgIcon(
-                resId = iconRes,
-                contentDescription = description,
-                tint = colors.primary,
-                modifier = Modifier.size(19.dp)
-            )
-        }
-    }
+    // A 12-lobe Burst here rendered as a spiked star: its points overlapped the
+    // rail items above it, and with a gear glyph inside it was impossible to tell
+    // the button from its icon.
+    AppIconButton(
+        iconRes = iconRes,
+        contentDescription = description,
+        onClick = onClick,
+        style = AppIconButtonStyle.Tonal,
+        size = 40.dp,
+        iconSize = 19.dp
+    )
 }

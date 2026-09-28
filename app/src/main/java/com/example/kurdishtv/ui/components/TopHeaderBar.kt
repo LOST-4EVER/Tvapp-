@@ -1,8 +1,6 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -39,6 +38,7 @@ fun TopHeaderBar(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
+
     // While a refresh is in flight the logo gently breathes, so the header reads as
     // alive without needing a blocking spinner over the grid.
     val logoScale by animateFloatAsState(
@@ -47,17 +47,19 @@ fun TopHeaderBar(
         label = "HeaderLogoScale"
     )
 
-    // On narrow screens the title, the action row and the channel count cannot all
-    // fit on one line, so the title is capped and the secondary line is dropped
-    // rather than letting the text slide under the buttons.
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-            val isNarrow = maxWidth < 420.dp
-            val titleMaxWidth = if (isNarrow) 132.dp else 220.dp
+        // On narrow screens the title, the action row and the channel count cannot all
+        // fit on one line, so the title is capped and the secondary line is dropped
+        // rather than letting the text slide under the buttons.
+        val isNarrow = maxWidth < 420.dp
+        val titleMaxWidth = if (isNarrow) 132.dp else 220.dp
+        val gutter = if (isNarrow) 12.dp else 20.dp
+        val logoSize = if (isNarrow) 40.dp else 46.dp
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (isNarrow) 12.dp else 20.dp, vertical = 14.dp),
+                .padding(horizontal = gutter, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -65,13 +67,14 @@ fun TopHeaderBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f, fill = false)
             ) {
+                // The brand tile is the one place a bold shape still reads correctly:
+                // a rounded square, matching the logo tiles in the grid below it, so
+                // the header and the content share a geometry.
                 Surface(
-                    // The 8-lobed Sunny silhouette pushed the TV glyph out of
-                    // centre and out of the safe area on small screens.
-                    shape = CircleShape,
+                    shape = M3ExpressiveShapes.MediumCard,
                     color = colors.primary,
                     modifier = Modifier
-                        .size(if (isNarrow) 40.dp else 46.dp)
+                        .size(logoSize)
                         .graphicsLayer {
                             scaleX = logoScale
                             scaleY = logoScale
@@ -120,54 +123,28 @@ fun TopHeaderBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                HeaderIconButton(
+                AppIconButton(
                     iconRes = KurdishTvIcons.Settings,
-                    description = "Settings",
-                    onClick = onOpenSettings
+                    contentDescription = "Settings",
+                    onClick = onOpenSettings,
+                    style = AppIconButtonStyle.Tonal
                 )
-                HeaderIconButton(
+                AppIconButton(
                     iconRes = KurdishTvIcons.AddLink,
-                    description = "Import IPTV playlist",
-                    onClick = onOpenImport
+                    contentDescription = "Import IPTV playlist",
+                    onClick = onOpenImport,
+                    style = AppIconButtonStyle.Tonal
                 )
-                HeaderIconButton(
+                AppIconButton(
                     iconRes = KurdishTvIcons.Refresh,
-                    description = "Reload channels",
-                    onClick = onRefresh
+                    contentDescription = "Reload channels",
+                    onClick = onRefresh,
+                    style = AppIconButtonStyle.Tonal
                 )
                 if (isLoading) {
                     BouncingLoader(size = 26.dp, dotCount = 5)
                 }
             }
         }
-        }
     }
-
-    @Composable
-    private fun HeaderIconButton(
-        iconRes: Int,
-        description: String,
-        onClick: () -> Unit
-    ) {
-        val colors = LocalAppColors.current
-        // A circle, not Burst. The 12-lobed spiked shape rendered as a star that
-        // overlapped the neighbouring buttons and read as a gear/cog, which is
-        // exactly what the Settings icon inside it looked like it was.
-        Surface(
-            shape = CircleShape,
-            color = colors.surfaceElevated,
-            modifier = Modifier
-                .size(40.dp)
-                .border(1.dp, colors.border, CircleShape)
-                .bouncyClickable { onClick() }
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                SvgIcon(
-                    resId = iconRes,
-                    contentDescription = description,
-                    tint = colors.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
+}

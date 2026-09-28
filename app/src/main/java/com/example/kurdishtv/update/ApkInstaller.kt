@@ -3,6 +3,8 @@ package com.example.kurdishtv.update
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -22,6 +24,56 @@ object ApkInstaller {
 
     private const val TAG = "ApkInstaller"
     private const val AUTHORITY = "com.aistudio.kurdishtv.live.fileprovider"
+
+    /**
+     * Whether [apk] is signed by the same certificate as the copy of this app
+     * currently installed on the device.
+     *
+     * Android refuses to upgrade an app whose signing key changed, and it reports
+     * that only inside the system installer's own dialog — as "App not installed
+     * as package conflicts with an existing package", with no hint that an
+     * uninstall is what is actually needed. Checking the certificates up front
+     * lets the app say the useful thing instead.
+     *
+     * Returns true when the question cannot be answered (the archive is unreadable,
+     * the package is not installed, or the platform will not expose signatures),
+     * so an inconclusive check never blocks an install that would have worked.
+     */
+    fun isSignedBySameCertificate(context: Context, apk: File): Boolean {
+        if (!apk.exists()) return true
+        val installed = signingInfo(context, context.packageName) ?: return true
+        val candidate = signingInfo(context, apk.absolutePath) ?: return true
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val a = installed.signingInfo ?: return true
+            val b = candidate.signingInfo ?: return true
+            // apkContentsSigners is the *current* signer set, so a key that was
+            // rotated through the v3 lineage still compares equal to itself.
+            return a.apkContentsSigners.contentEquals(b.apkContentsSigners)
+        }
+
+        @Suppress("DEPRECATION")
+        val a = installed.signatures ?: return true
+        @Suppress("DEPRECATION")
+        val b = candidate.signatures ?: return true
+        return a.size == b.size && a.contentEquals(b)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun signingInfo(context: Context, source: String): PackageInfo? = try {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        if (source == context.packageName) {
+            context.packageManager.getPackageInfo(source, flags)
+        } else {
+            context.packageManager.getPackageArchiveInfo(source, flags)
+        }
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
+    }
 
     /**
      * Launches the install prompt for [apk].

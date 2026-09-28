@@ -83,11 +83,11 @@ fun RecentChannelsRow(
                 key = { _, item -> item.id }
             ) { _, channel ->
                 Surface(
-                    shape = M3ExpressiveShapes.FourSidedCookie,
+                    shape = M3ExpressiveShapes.MediumCard,
                     color = colors.surfaceVariant,
                     modifier = Modifier
-                        .background(colors.surfaceVariant, M3ExpressiveShapes.FourSidedCookie)
-                        .border(1.dp, colors.border, M3ExpressiveShapes.FourSidedCookie)
+                        .background(colors.surfaceVariant, M3ExpressiveShapes.MediumCard)
+                        .border(1.dp, colors.border, M3ExpressiveShapes.MediumCard)
                         .bouncyClickable(scaleDown = 0.92f) { onChannelClick(channel) }
                 ) {
                     Row(

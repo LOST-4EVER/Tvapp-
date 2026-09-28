@@ -74,42 +74,46 @@ fun ChannelCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
+            // The status row is its own band rather than an overlay on the artwork.
+            // Floating the badge and the heart on top of the logo meant every wide
+            // logo was partly hidden behind them, and the only way to avoid it was
+            // to inset the artwork by an arbitrary amount that only worked for one
+            // logo aspect ratio.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.surfaceVariant)
+                    .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LiveBadge()
+
+                CardFavoriteButton(
+                    isFavorite = channel.isFavorite,
+                    onClick = onFavoriteToggle
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(112.dp)
+                    .height(96.dp)
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(colors.surfaceVariant, colors.surface)
                         )
-                    )
+                    ),
+                contentAlignment = Alignment.Center
             ) {
                 ChannelLogo(
                     channelName = channel.name,
                     logoUrl = channel.logoUrl,
                     showLogos = showLogos,
-                    contentPadding = 12.dp,
-                    // Reserve the strip the LIVE badge and heart button occupy,
-                    // so a wide logo is not drawn underneath them.
-                    topContentPadding = 22.dp,
+                    contentPadding = 10.dp,
                     // Decode for the tile this is drawn in, not at source resolution.
-                    size = 112.dp
+                    size = 96.dp
                 )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    LiveBadge()
-
-                    CardFavoriteButton(
-                        isFavorite = channel.isFavorite,
-                        onClick = onFavoriteToggle
-                    )
-                }
             }
 
             Column(
@@ -155,7 +159,11 @@ fun ChannelCard(
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = if (channel.isHd) "1080p" else "720p",
+                            // Prefer the label the source published over the boolean:
+                            // a couple of channels are flagged HD but publish 720p,
+                            // and the card was contradicting itself.
+                            text = channel.quality.substringAfterLast('/').trim()
+                                .ifBlank { if (channel.isHd) "1080p" else "720p" },
                             color = colors.primary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold

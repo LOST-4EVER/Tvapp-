@@ -226,13 +226,21 @@ fun BouncingLoaderRow(
     }
 }
 
-/** The shapes the dot cycles through; the sequence alternates soft and faceted. */
+/**
+ * The shapes the dot cycles through.
+ *
+ * This is the only place in the app where a lobed silhouette is correct: the dots
+ * carry no glyph, no label and no touch target, so there is nothing to clip or to
+ * mis-centre. The sequence stays within the soft, low-sharpness end of the library
+ * — the pointed `Flower` and `PuffyDiamond` were dropped because at 6dp a spike is
+ * indistinguishable from an aliasing artefact.
+ */
 private fun expressiveShapeSequence(): List<Shape> = listOf(
     M3ExpressiveShapes.Circle,
     M3ExpressiveShapes.FourLeafClover,
     M3ExpressiveShapes.SixSidedCookie,
     M3ExpressiveShapes.SevenSidedCookie,
-    M3ExpressiveShapes.Flower,
+    M3ExpressiveShapes.Puffy,
     M3ExpressiveShapes.NineSidedCookie,
-    M3ExpressiveShapes.PuffyDiamond
+    M3ExpressiveShapes.TwelveSidedCookie
 )

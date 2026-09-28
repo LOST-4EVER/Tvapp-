@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -70,8 +72,21 @@ fun CategoryBar(
         }
     }
 
+    // There are more tabs than fit on a phone, and the row starts at the beginning,
+    // so a non-default selection (a restored "start category", or a tap on a tab
+    // further right) could be entirely off-screen with nothing to suggest it
+    // existed. Bring it into view whenever the selection changes.
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedCategory, visible) {
+        val index = visible.indexOf(selectedCategory)
+        if (index >= 0) {
+            listState.animateScrollToItem(index)
+        }
+    }
+
     LazyRow(
         modifier = modifier,
+        state = listState,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp)
     ) {

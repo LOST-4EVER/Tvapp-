@@ -5,8 +5,6 @@ import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.model.ChannelFilterEngine
 import com.example.kurdishtv.parser.KurdishTvParser
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExampleUnitTest {

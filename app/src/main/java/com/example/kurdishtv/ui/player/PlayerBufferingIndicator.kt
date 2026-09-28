@@ -45,11 +45,11 @@ fun PlayerBufferingIndicator(
     )
 
     Surface(
-        shape = M3ExpressiveShapes.Cookie,
+        shape = M3ExpressiveShapes.ExtraLargeRounded,
         color = colors.surface.copy(alpha = 0.90f),
         modifier = modifier
             .scale(pulseScale)
-            .border(1.dp, colors.border, M3ExpressiveShapes.Cookie)
+            .border(1.dp, colors.border, M3ExpressiveShapes.ExtraLargeRounded)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),

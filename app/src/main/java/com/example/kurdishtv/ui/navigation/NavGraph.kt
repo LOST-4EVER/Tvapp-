@@ -107,11 +107,14 @@ fun KurdishTvNavGraph(
                 onCheckForUpdate = { viewModel.checkForUpdate() },
                 onDownloadUpdate = { update -> viewModel.downloadUpdate(update) },
                 onInstallUpdate = { update, path ->
-                    // Android 8+ requires a per-app "allow from this source" grant
-                    // before the installer will accept a sideloaded package.
-                    if (viewModel.needsInstallPermission()) {
-                        viewModel.openInstallPermissionSettings()
-                    } else if (!viewModel.installUpdate(update, path)) {
+                    // Only the "allow from this source" case can be fixed by
+                    // sending the user to settings. Every other failure (missing
+                    // file, changed signing key, no installer) is already reported
+                    // in the update card, and bouncing the user into a settings
+                    // screen that cannot help is worse than saying what went wrong.
+                    if (!viewModel.installUpdate(update, path) &&
+                        viewModel.needsInstallPermission()
+                    ) {
                         viewModel.openInstallPermissionSettings()
                     }
                 },
