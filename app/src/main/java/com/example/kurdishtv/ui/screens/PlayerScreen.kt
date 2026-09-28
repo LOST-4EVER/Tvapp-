@@ -28,7 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.SleepTimerDialog
@@ -56,6 +56,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun PlayerScreen(
     channel: Channel,
+    settings: AppSettings,
     autoplay: Boolean,
     autoHideControls: Boolean,
     sleepTimerMinutes: Int,
@@ -67,6 +68,8 @@ fun PlayerScreen(
     onNextChannel: () -> Unit,
     onPreviousChannel: () -> Unit,
     onFavoriteToggle: (String) -> Unit,
+    onResizeModeChange: (ResizeMode) -> Unit,
+    onColorFilterChange: (VideoColorFilter) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -83,35 +86,17 @@ fun PlayerScreen(
     var isControlsVisible by remember { mutableStateOf(true) }
     var isFullscreen by remember { mutableStateOf(true) }
 
-    // How the video fills the screen, and which correction is on it, are choices the
-    // viewer made *for this stream*. Rotating the phone — or the system reclaiming
-    // the activity — used to throw both away and silently put the picture back the
-    // way it was before they were made.
+    // How the video fills the screen, and which correction is on it, live in
+    // [AppSettings] now. They used to be `rememberSaveable` here, which survived a
+    // rotation and nothing else: a cold start — or returning tomorrow, or opening
+    // the small picture-in-browse pane — silently reset both, so the FIT/FILL
+    // button had to be pressed again every single time. The choice is about the
+    // viewer's screen, not about one stream, so it is a preference like any other.
     //
-    // The default is [ResizeMode.FILL], not FIT. Almost every channel in the
-    // catalogue is 16:9, and this screen is a phone held upright, so FIT letterboxes
-    // a 16:9 frame inside a 9:19.5 screen and gives the viewer a picture roughly a
-    // third of the height of the display, marooned between two black bands that
-    // nothing else on the screen occupies. FILL puts the video edge to edge and
-    // crops the sides, which is what every other live and short-form player does in
-    // portrait, and it makes the transport controls sit against the picture rather
-    // than against dead space. FIT and ZOOM are one tap away for the streams where
-    // the whole frame matters — a 4:3 channel, or a pillarboxed source.
-    //
-    // Enums are not Bundle-supported, so the saveable state holds the entry's `name`
-    // and the enum is resolved from it. A name that no longer resolves (an app
-    // update that renames an entry) falls back to the default rather than throwing
-    // on restore.
-    var resizeModeName by rememberSaveable { mutableStateOf(ResizeMode.FILL.name) }
-    val resizeMode = remember(resizeModeName) {
-        runCatching { ResizeMode.valueOf(resizeModeName) }.getOrDefault(ResizeMode.FILL)
-    }
-
-    var colorFilterName by rememberSaveable { mutableStateOf(VideoColorFilter.None.name) }
-    val colorFilter = remember(colorFilterName) {
-        runCatching { VideoColorFilter.valueOf(colorFilterName) }
-            .getOrDefault(VideoColorFilter.None)
-    }
+    // A name that no longer resolves (an app update that renames an entry) falls
+    // back to the default rather than throwing.
+    val resizeMode = settings.resizeMode
+    val colorFilter = settings.videoColorFilter
     var errorMessage by remember(channel.id) { mutableStateOf<String?>(null) }
     var showSleepDialog by remember { mutableStateOf(false) }
 
@@ -201,21 +186,23 @@ fun PlayerScreen(
             onBackClick = onBackClick,
             resizeMode = resizeMode,
             onResizeModeToggle = {
-                // Fill -> Zoom -> Fit, cycled from whatever is on now so the first
-                // tap after a rotation continues the sequence rather than jumping
-                // back to the beginning.
-                resizeModeName = when (resizeMode) {
-                    ResizeMode.FILL -> ResizeMode.ZOOM.name
-                    ResizeMode.ZOOM -> ResizeMode.FIT.name
-                    ResizeMode.FIT -> ResizeMode.FILL.name
-                }
+                // Fill -> Zoom -> Fit, cycled from whatever is on now. The choice is
+                // written through to [AppSettings], so it survives a cold start and
+                // is picked up by the side player pane as well.
+                onResizeModeChange(
+                    when (resizeMode) {
+                        ResizeMode.FILL -> ResizeMode.ZOOM
+                        ResizeMode.ZOOM -> ResizeMode.FIT
+                        ResizeMode.FIT -> ResizeMode.FILL
+                    }
+                )
             },
             isFullscreen = isFullscreen,
             onFullscreenToggle = { isFullscreen = !isFullscreen },
             isMuted = isMuted,
             onToggleMute = onToggleMute,
             colorFilter = colorFilter,
-            onCycleColorFilter = { colorFilterName = colorFilter.next().name },
+            onCycleColorFilter = { onColorFilterChange(colorFilter.next()) },
             modifier = Modifier.fillMaxSize()
         )
 

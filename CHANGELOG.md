@@ -8,6 +8,25 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **The player's Fit/Fill/Zoom choice was forgotten.** It was `rememberSaveable`,
+  which survives a rotation and nothing else: every cold start, every return visit
+  and the small side player pane silently reset the picture to Fit, so the button
+  had to be pressed again each time. The resize mode and the video colour filter
+  are preferences now — persisted with the rest of the settings, read back by the
+  fullscreen player and applied to the side pane too, which hard-coded Fit and
+  contradicted the setting the viewer had just made.
+- **A slow category switch could overwrite a newer one.** The guard that was
+  meant to discard stale results was inverted: it skipped the publish when nothing
+  had moved, and published when it had — so a slow pass for the tab you left could
+  land after the tab you chose and repaint the grid with the old one. The
+  selection is now applied immediately and the result only when it is still the
+  newest request.
+- **The channels list was audited rather than assumed.** All 101 catalogue streams
+  were probed live: every one returns HTTP 200 with a real HLS manifest, and there
+  are no duplicate ids, names or stream URLs, and no category filed under a filter
+  nothing matches. The per-card colour comes from a stable hash of the channel's
+  name over a fixed eight-colour palette; simulated against the catalogue it
+  distributes 6–17 channels per colour, with no clustering.
 - **The app did not compile.** The previous pass added a `focusToken` argument to four
   `ChannelGrid` call sites and to `FeaturedHeroCard`, which does not take one, and three
   of the calls were missing the comma before it. `FeaturedHeroCard` no longer receives

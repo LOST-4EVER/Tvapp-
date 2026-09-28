@@ -217,25 +217,35 @@ class TvViewModel(
     fun onCategorySelected(category: CategoryFilter) {
         // A category switch supersedes any in-flight search debounce.
         searchJob?.cancel()
+        // Already showing it, and the filtered list tracks it: nothing to compute.
+        if (_uiState.value.selectedCategory == category) return
+        // The selection is applied immediately so the chip row and the grid header
+        // agree with what was pressed, and the filtered list follows when it is
+        // computed. Publishing the selection only together with the result meant a
+        // slow filter let the UI claim a category it was not yet showing.
+        _uiState.update { it.copy(selectedCategory = category) }
         // Filtering the whole catalogue is a few hundred string comparisons. That is
         // not enough to be worth a thread hop on its own, but it does not need to run
         // on the main thread either, and the D-pad can fire this faster than a person
         // can read the result — arrowing across the rail re-filters on every step.
         viewModelScope.launch {
             val state = _uiState.value
-            if (state.selectedCategory == category) return@launch
             val filtered = withContext(Dispatchers.Default) {
                 ChannelFilterEngine.filter(state.channels, category, state.searchQuery)
             }
-            // Only publish if nothing moved the goalposts while it was being computed.
+            // Only publish if this is still the newest request: same category, and
+            // the query that was in force when this pass started. The guard used to
+            // be inverted — it published when the world HAD moved — so a slower,
+            // older pass could land after a newer one and overwrite the newer
+            // category with its own, leaving the grid showing the wrong tab. A query
+            // that moved is the search job's to publish, not this one's.
             _uiState.update { current ->
-                if (current.selectedCategory == category && current.searchQuery == state.searchQuery) {
-                    current
+                if (current.selectedCategory == category &&
+                    current.searchQuery == state.searchQuery
+                ) {
+                    current.copy(filteredChannels = filtered)
                 } else {
-                    current.copy(
-                        selectedCategory = category,
-                        filteredChannels = filtered
-                    )
+                    current
                 }
             }
         }
