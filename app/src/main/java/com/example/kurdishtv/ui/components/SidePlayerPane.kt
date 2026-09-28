@@ -125,7 +125,7 @@ fun SidePlayerPane(
                     .weight(1f, fill = true),
                 contentAlignment = Alignment.Center
             ) {
-                Card16x9(
+                VideoFrame(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f)
@@ -267,10 +267,16 @@ fun SidePlayerPane(
     }
 }
 
+/**
+ * The black 16:9 frame the video is letterboxed into.
+ *
+ * Kept as its own composable so the error overlay can sit on top of the frame
+ * without either of them owning the other's layout.
+ */
 @Composable
-private fun Card16x9(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun VideoFrame(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val colors = LocalAppColors.current
-    androidx.compose.material3.Surface(
+    Surface(
         shape = M3ExpressiveShapes.LogoTile,
         color = Color.Black,
         modifier = modifier

@@ -21,7 +21,13 @@ object KurdishChannelCatalog {
 
     fun getDefaultChannels(): List<Channel> = cachedChannels
 
-    private fun buildDefaultChannels(): List<Channel> = listOf(
+    // The catalog is split across small per-section builders instead of one giant
+    // listOf() call: a single expression with 100+ arguments is far more than the
+    // compiler resolves happily in one go, and a single bad entry then took the
+    // whole file down with a wall of unrelated errors.
+
+    // News — 12 channels
+    private fun sectionNews(): List<Channel> = listOf(
         // ── News ────────────────────────────────────────────────────────────────
         Channel(
             id = "rudaw_tv_hd",
@@ -129,6 +135,10 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         ),
+    )
+
+    // General — 5 channels
+    private fun sectionGeneral(): List<Channel> = listOf(
 
         // ── General ─────────────────────────────────────────────────────────────
         Channel(
@@ -176,6 +186,10 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         ),
+    )
+
+    // Kurdish culture — 12 channels
+    private fun sectionKurdishCulture(): List<Channel> = listOf(
 
         // ── Kurdish culture ─────────────────────────────────────────────────────
         Channel(
@@ -282,6 +296,10 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         ),
+    )
+
+    // Religious and kids — 3 channels
+    private fun sectionReligious(): List<Channel> = listOf(
 
         // ── Music ───────────────────────────────────────────────────────────────
         // No curated music entries: every stable Kurdish music source we could verify
@@ -318,6 +336,10 @@ object KurdishChannelCatalog {
             quality = "HLS / 720p",
             isHd = false
         ),
+    )
+
+    // Quran — 2 channels
+    private fun sectionQuran(): List<Channel> = listOf(
 
         // ── Quran ───────────────────────────────────────────────────────────────
         Channel(
@@ -337,6 +359,10 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         ),
+    )
+
+    // Iraq & Kurdistan expansion — 24 channels
+    private fun sectionIraqKurdistanExpansion(): List<Channel> = listOf(
 
         // The previous "Iraqia Sports" entry was removed: every sports path on
         // imn-live.esite-lab.com now 404s, so it could never start. Sports is
@@ -564,6 +590,10 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         ),
+    )
+
+    // Iraq & Kurdistan expansion, continued — 9 channels
+    private fun sectionIraqKurdistanExpansion2(): List<Channel> = listOf(
         Channel(
             id = "iraq_future",
             name = "Iraq Future",
@@ -645,6 +675,10 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         )
+    )
+
+    // Harvested channels — 24 channels
+    private fun sectionHarvestedChannels(): List<Channel> = listOf(
         // ── Harvested channels ────────────────────────────────────────────────────
         // Every entry below was found in the app's own live sources plus public
         // community playlists, then verified end to end: the master playlist
@@ -870,6 +904,10 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         ),
+    )
+
+    // Harvested channels, continued — 10 channels
+    private fun sectionHarvestedChannels2(): List<Channel> = listOf(
         Channel(
             id = "euro_kurd",
             name = "Euro Kurd",
@@ -952,4 +990,15 @@ object KurdishChannelCatalog {
             isHd = true
         ),
     )
+
+    private fun buildDefaultChannels(): List<Channel> =
+        sectionNews() +
+            sectionGeneral() +
+            sectionKurdishCulture() +
+            sectionReligious() +
+            sectionQuran() +
+            sectionIraqKurdistanExpansion() +
+            sectionIraqKurdistanExpansion2() +
+            sectionHarvestedChannels() +
+            sectionHarvestedChannels2()
 }
