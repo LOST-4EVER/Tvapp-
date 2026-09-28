@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -303,8 +302,14 @@ internal fun CardFavoriteButton(
         modifier = Modifier
             .size(34.dp)
             .border(1.dp, colors.border, shape)
+            // The click lives on the Surface, not on an `IconButton` inside it.
+            // `IconButton` enforces a 48dp minimum touch target, so nesting one in a
+            // 34dp surface measured 48dp of content in a 34dp box: the glyph was
+            // clipped away by the surface outline and the oversized hit area spilled
+            // over the card's own edges, stealing taps from the channel behind it.
+            .bouncyClickable(onClick = onClick)
     ) {
-        IconButton(onClick = onClick) {
+        Box(contentAlignment = Alignment.Center) {
             SvgIcon(
                 resId = if (isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
                 contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",

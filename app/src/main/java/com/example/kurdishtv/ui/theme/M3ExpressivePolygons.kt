@@ -85,15 +85,36 @@ object M3ExpressivePolygons {
     /** A diagonal oval — long axis on the 45°. */
     val Oval: ExpressivePolygon = Circle.scaled(1f, 0.64f).rotated(-45f)
 
-    /** A capsule. */
-    val Pill: ExpressivePolygon = ExpressivePolygon.fromAuthoredPoints(
-        points = listOf(
-            Offset(0.961f, 0.039f) to ExpressiveCorner(0.426f),
-            Offset(1.001f, 0.428f) to ExpressiveCorner.None,
-            Offset(1.000f, 0.609f) to ExpressiveCorner(1f)
-        ),
-        reps = 2,
-        mirroring = true
+    /**
+     * A capsule: a stadium, i.e. a rectangle whose four corners are all rounded at
+     * exactly half the short side.
+     *
+     * Authored procedurally rather than from points. This was previously a
+     * `fromAuthoredPoints(..., mirroring = true)` definition, and it did not
+     * survive contact with the reference library's mirroring rules: the three
+     * authored points span about 57° of a 90° section, so the generated vertex ring
+     * put a *sharp* corner at the left and right extremes and left a wedge missing
+     * from the top and bottom. It rendered as a lopsided lens with points on its
+     * sides rather than as a capsule.
+     *
+     * That mattered far more than one broken shape usually would, because `Pill` is
+     * the shape behind essentially every button, chip and pill in the app: the
+     * category bar, every `Button` and `OutlinedButton`, the LIVE badge row's
+     * companions, the sleep-timer chips. A definition that cannot be reasoned about
+     * is not worth keeping here.
+     *
+     * The procedural form is exact, not an approximation. A rectangle corner has an
+     * interior angle of 90°, so the turn angle is 90° too, the tangent length is
+     * `r · tan(45°) = r`, and a radius of half the short side puts the two tangent
+     * points of each corner exactly on the ends of its edge. Each corner is then a
+     * true quarter circle — and because the result is fitted to the box it is drawn
+     * in, a capsule on a square button is a circle, which is what Material's own
+     * `Pill` does too.
+     */
+    val Pill: ExpressivePolygon = ExpressivePolygon.rect(
+        width = 2f,
+        height = 1f,
+        perCorner = List(4) { ExpressiveCorner(0.5f) }
     )
 
     // ── Directional / pointed ────────────────────────────────────────────────
@@ -363,15 +384,29 @@ object M3ExpressivePolygons {
         mirroring = true
     )
 
+    /**
+     * A heart, authored as six explicit vertices rather than four mirrored ones.
+     *
+     * The previous four-point mirrored version put its bottom tip at y = 0.946 with
+     * a 0.129 radius, mirrored to a second vertex almost on top of it at the top
+     * centre. Both are acute, and the edge-budget clamp in [buildRoundedPolygonPath]
+     * hands an acute corner only as much radius as half of its shortest adjacent
+     * edge — so the clamp reduced both to a few thousandths of the shape. That is
+     * why the silhouette rendered as a needle cleft over a spike. Spreading the
+     * same outline over six wider corners gives the clamp enough edge to spend, and
+     * the tip comes out round.
+     */
     val Heart: ExpressivePolygon = ExpressivePolygon.fromAuthoredPoints(
         points = listOf(
-            Offset(0.500f, 0.268f) to ExpressiveCorner(0.016f),
-            Offset(0.792f, -0.066f) to ExpressiveCorner(0.958f),
-            Offset(1.064f, 0.276f) to ExpressiveCorner(1f),
-            Offset(0.501f, 0.946f) to ExpressiveCorner(0.129f)
+            Offset(0.500f, 0.330f) to ExpressiveCorner(0.10f),  // cleft
+            Offset(0.820f, 0.190f) to ExpressiveCorner(0.55f),  // right lobe
+            Offset(1.000f, 0.560f) to ExpressiveCorner(0.55f),  // right flank
+            Offset(0.500f, 1.000f) to ExpressiveCorner(0.55f),  // bottom tip
+            Offset(0.000f, 0.560f) to ExpressiveCorner(0.55f),  // left flank
+            Offset(0.180f, 0.190f) to ExpressiveCorner(0.55f)   // left lobe
         ),
         reps = 1,
-        mirroring = true
+        mirroring = false
     )
 
     /**
