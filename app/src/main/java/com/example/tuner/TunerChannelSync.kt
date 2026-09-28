@@ -3,6 +3,7 @@ package com.example.tuner
 import android.content.ContentValues
 import android.content.Context
 import android.media.tv.TvContract
+import android.media.tv.TvInputManager
 import android.net.Uri
 import com.example.R
 import com.example.kurdishtv.data.ChannelCacheStorage
@@ -93,17 +94,14 @@ class TunerChannelSync(
      */
     private val mutex = Mutex()
 
-    suspend fun sync(forceRefresh: Boolean = false, inputIdOverride: String? = null): TunerSyncResult =
-        mutex.withLock { withContext(Dispatchers.IO) { syncLocked(forceRefresh, inputIdOverride) } }
+    suspend fun sync(forceRefresh: Boolean = false): TunerSyncResult =
+        mutex.withLock { withContext(Dispatchers.IO) { syncLocked(forceRefresh) } }
 
-    private suspend fun syncLocked(
-        forceRefresh: Boolean,
-        inputIdOverride: String?
-    ): TunerSyncResult {
+    private suspend fun syncLocked(forceRefresh: Boolean): TunerSyncResult {
         val app = context.applicationContext
-        val inputId = inputIdOverride ?: rememberInputId(app)
-        if (inputId.isNullOrBlank()) {
-            return TunerSyncResult(0, 0, "The system has not told us our tuner id yet")
+        val inputId = tunerId(app)
+        if (inputId == null) {
+            return TunerSyncResult(0, 0, "The system has not given this app a tuner id")
         }
 
         val channels = try {
@@ -151,6 +149,24 @@ class TunerChannelSync(
         }
 
         return TunerSyncResult(published = published, removed = removed)
+    }
+
+    /**
+     * The id the system assigned this app's tuner, or null if it has not.
+     *
+     * Read from the platform rather than derived from the package name, because the
+     * system is what decides it. A hand-made id that merely *looks* right publishes
+     * channels the system will never associate with the tuner it asked for, and the
+     * symptom is a tuner that appears in the list with nothing behind it.
+     */
+    private fun tunerId(context: Context): String? = try {
+        context.getSystemService(TvInputManager::class.java)
+            ?.tunerUuid
+            ?.toString()
+            ?.takeIf { it.isNotBlank() }
+    } catch (e: Exception) {
+        NetworkClient.logDebug("Could not read this app's tuner id", e)
+        null
     }
 
     /**
@@ -244,9 +260,6 @@ class TunerChannelSync(
 
         private const val CHANNEL_URI_SCHEME = "kurdishtv"
 
-        private const val INPUT_ID_PREFS = "kurdish_tv_tuner"
-        private const val KEY_INPUT_ID = "input_id"
-
         /** The per-channel URI the system hands back to `Session.onTune`. */
         fun channelUri(number: Long): Uri = Uri.parse("$CHANNEL_URI_SCHEME://channel/$number")
 
@@ -254,29 +267,6 @@ class TunerChannelSync(
         fun channelNumberOf(uri: Uri): Long {
             if (!CHANNEL_URI_SCHEME.equals(uri.scheme, ignoreCase = true)) return 0L
             return uri.lastPathSegment?.toLongOrNull() ?: 0L
-        }
-
-        /** The tuner id the system assigned, as learned on a previous run. */
-        fun rememberInputId(context: Context): String? = try {
-            context.applicationContext
-                .getSharedPreferences(INPUT_ID_PREFS, Context.MODE_PRIVATE)
-                .getString(KEY_INPUT_ID, null)
-                ?.takeIf { it.isNotBlank() }
-        } catch (_: Exception) {
-            null
-        }
-
-        fun rememberInputId(context: Context, inputId: String) {
-            try {
-                context.applicationContext
-                    .getSharedPreferences(INPUT_ID_PREFS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(KEY_INPUT_ID, inputId)
-                    .apply()
-            } catch (_: Exception) {
-                // Not being able to remember it only costs a sync on first
-                // launch each time. It must never stop the current one.
-            }
         }
 
         /** The file the tuner's channel numbers live in. */

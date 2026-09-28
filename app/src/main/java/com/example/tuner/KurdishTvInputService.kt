@@ -43,15 +43,13 @@ import kotlinx.coroutines.launch
  * **URI** to play, and separately tells it which surface to draw on and what volume
  * to use:
  *
- * 1. `onCreateSession` — the system names the session and tells us which tuner id it
- *    considers us to be.
+ * 1. `onCreateSession` — the system asks for a session and names it.
  * 2. `onTune(uri)` — "can you play this?" The URI is the one this app published in
- *    the channel's own row, so it carries the channel number back to
- *    [TunerChannelStore] and from there to the stream URL.
+ *    the channel's own row, so it carries the channel number back to * [TunerChannelStore] and from there to the stream URL.
  * 3. `onSetSurface(surface)` — the surface to render on, replaceable at any time.
  *
- * There is no "what is playing" query, no video-size negotiation and no session-end
- * handshake to drive: the system owns all of that.
+ * There is no "what is playing" query and no video-size negotiation to drive: the
+ * system owns both.
  */
 @OptIn(UnstableApi::class)
 class KurdishTvInputService : TvInputService() {
@@ -61,76 +59,43 @@ class KurdishTvInputService : TvInputService() {
     private val sync by lazy { TunerChannelSync(this, store) }
     private val sessions = HashMap<String, TunerSession>()
 
-    /**
-     * The tuner id the system assigned us.
-     *
-     * Learned from the first session the system asks for and remembered across
-     * restarts, so the second run onwards can publish before any session exists.
-     * The id belongs to the *system* — it is what the TV provider keys our channel
-     * rows against, and a hand-made value that merely looks right writes channels
-     * the system will never show.
-     */
-    @Volatile
-    private var inputId: String? = null
-
     override fun onCreate() {
         super.onCreate()
-        val known = TunerChannelSync.rememberInputId(this)
-        if (known != null) {
-            inputId = known
-            publish()
-        }
-        // With no id yet — the first run on this device — publishing waits for
-        // `onCreateSession`, which is the first point the system tells us what we
-        // are. Rows from a previous install are still on disk, so the picker is
-        // never empty in the meantime.
+        // Fire and forget: the picker does not block on us, and the channel numbers
+        // from the last good sync are already on disk, so the list is never empty.
+        publish()
     }
 
     override fun onDestroy() {
         scope.cancel()
         synchronized(sessions) {
-            sessions.values.forEach { it.release() }
+            sessions.values.forEach { it.onRelease() }
             sessions.clear()
         }
         super.onDestroy()
     }
 
     /**
-     * The system is creating a session, and has told us which tuner we are.
-     *
-     * The two-argument form is overridden rather than the one-argument form
-     * precisely because it carries the input id; the framework's default
-     * implementation just forwards to the other, so nothing is lost by handling it
-     * here.
+     * The system is creating a session.
      *
      * Everything expensive is left to [TunerSession.onTune]. This is called on the
      * main thread while the channel list is opening, so work done here is work
      * added to a spinner the viewer is already watching.
      */
-    override fun onCreateSession(inputId: String, sessionId: String): TvInputService.Session? {
-        if (this.inputId == null) {
-            this.inputId = inputId
-            TunerChannelSync.rememberInputId(this, inputId)
-            // The picker may already be on screen waiting for rows, and on a first
-            // run there is nothing published until this fires.
-            publish()
-        }
+    override fun onCreateSession(sessionId: String): TvInputService.Session? {
         val session = TunerSession(this, store, sessionId)
         synchronized(sessions) { sessions[sessionId] = session }
         return session
     }
 
-    /** Fire and forget: the picker does not block on us, and the channel numbers are already on disk. */
     private fun publish() {
-        val id = inputId ?: return
-        scope.launch { sync.sync(inputIdOverride = id) }
+        scope.launch { sync.sync() }
     }
 }
 
 /**
  * One playing channel.
- *
- * A session lives from the moment the viewer opens a channel until they leave it,
+ * * A session lives from the moment the viewer opens a channel until they leave it,
  * which on a television is minutes to hours, and it owns an [ExoPlayer] for that
  * whole time. The service holds a reference so it can hand the player back when the
  * system tears the service down, which it is free to do at any point.
@@ -140,7 +105,7 @@ private class TunerSession(
     private val service: TvInputService,
     private val store: TunerChannelStore,
     sessionId: String
-) : TvInputService.Session(sessionId) {
+) : TvInputService.Session(service, sessionId) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var player: ExoPlayer? = null
@@ -203,7 +168,15 @@ private class TunerSession(
         if (enabled) NetworkClient.logDebug("Captions requested, but this tuner has none")
     }
 
-    fun release() {
+    /**
+     * The framework has finished with this session.
+     *
+     * Guaranteed for every session the system asked for, which makes it the one
+     * place the player has to be handed back. Without it the decoder and the socket
+     * stay open until the process dies, which on a television that is left switched
+     * on is a real, invisible cost.
+     */
+    override fun onRelease() {
         if (released) return
         released = true
         scope.cancel()
