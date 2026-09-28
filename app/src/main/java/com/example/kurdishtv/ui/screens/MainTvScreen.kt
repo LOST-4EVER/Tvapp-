@@ -82,6 +82,13 @@ fun MainTvScreen(
     var appliedStartCategory by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Which categories the chips decided to show, handed to the navigation rail so
+    // both rows of navigation describe the same set. Seeded with every category so a
+    // rail that composes before the first `CategoryBar` pass — which is what happens
+    // on a wide screen, where the rail precedes the chrome in the tree — is never
+    // briefly empty.
+    var visibleCategories by remember { mutableStateOf(CategoryFilter.entries) }
+
     // Apply the preferred landing category once, after stored settings have loaded.
     LaunchedEffect(settingsLoaded, settings.startCategory) {
         if (settingsLoaded && !appliedStartCategory) {
@@ -169,6 +176,7 @@ fun MainTvScreen(
                         AdaptiveNavigationRail(
                             selectedCategory = uiState.selectedCategory,
                             onCategorySelected = onCategorySelected,
+                            visibleCategories = visibleCategories,
                             onOpenImport = { showImportDialog = true },
                             onRefresh = onRetryClick,
                             onOpenSettings = onOpenSettings
@@ -186,7 +194,8 @@ fun MainTvScreen(
                                 onCategorySelected = onCategorySelected,
                                 onRetryClick = onRetryClick,
                                 onOpenSettings = onOpenSettings,
-                                onOpenImport = { showImportDialog = true }
+                                onOpenImport = { showImportDialog = true },
+                                onVisibleCategories = { visibleCategories = it }
                             )
 
                             if (filtered.isEmpty()) {
@@ -236,6 +245,7 @@ fun MainTvScreen(
                     AdaptiveNavigationRail(
                         selectedCategory = uiState.selectedCategory,
                         onCategorySelected = onCategorySelected,
+                        visibleCategories = visibleCategories,
                         onOpenImport = { showImportDialog = true },
                         onRefresh = onRetryClick,
                         onOpenSettings = onOpenSettings
@@ -252,7 +262,8 @@ fun MainTvScreen(
                                 onCategorySelected = onCategorySelected,
                                 onRetryClick = onRetryClick,
                                 onOpenSettings = onOpenSettings,
-                                onOpenImport = { showImportDialog = true }
+                                onOpenImport = { showImportDialog = true },
+                                onVisibleCategories = { visibleCategories = it }
                             )
                         },
                         modifier = Modifier.weight(1f)
@@ -299,7 +310,8 @@ fun MainTvScreen(
                             onCategorySelected = onCategorySelected,
                             onRetryClick = onRetryClick,
                             onOpenSettings = onOpenSettings,
-                            onOpenImport = { showImportDialog = true }
+                            onOpenImport = { showImportDialog = true },
+                            onVisibleCategories = { visibleCategories = it }
                         )
                     }
                 ) { paddingValues ->
@@ -355,6 +367,7 @@ private fun TvTopChrome(
     onRetryClick: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenImport: () -> Unit,
+    onVisibleCategories: (List<CategoryFilter>) -> Unit = {},
     compact: Boolean = false
 ) {
     Column {
@@ -378,6 +391,7 @@ private fun TvTopChrome(
             selectedCategory = uiState.selectedCategory,
             onCategorySelected = onCategorySelected,
             channels = uiState.channels,
+            onVisibleCategories = onVisibleCategories,
             compact = compact
         )
     }

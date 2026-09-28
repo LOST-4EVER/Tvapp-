@@ -135,7 +135,13 @@ fun TopHeaderBar(
                     Box(contentAlignment = Alignment.Center) {
                         SvgIcon(
                             resId = KurdishTvIcons.Tv,
-                            contentDescription = "Kurdish TV Live",
+                            // Names the *action*, not the app. This tile is a refresh
+                            // button — it runs [onRefresh] — and it announced itself as
+                            // the app's title, so a screen reader read out "Kurdish TV
+                            // Live" where the viewer needed to hear what pressing it
+                            // would do. The brand is already the window title and the
+                            // text beside this tile.
+                            contentDescription = "Refresh channels",
                             tint = colors.onPrimary,
                             modifier = Modifier.size(if (isNarrow) 22.dp else 25.dp)
                         )
