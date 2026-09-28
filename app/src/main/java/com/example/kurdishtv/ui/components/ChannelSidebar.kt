@@ -36,7 +36,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
-import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
@@ -227,7 +226,10 @@ private fun ChannelSidebarRow(
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .clip(CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.28f)))
+                    // The same rounded square the rail's logo tile uses, rather than
+                    // a circle: a channel's logo is a rectangle far more often than
+                    // it is a roundel, and clipping it to one crops the sides off.
+                    .clip(M3ExpressiveShapes.MediumCard)
             ) {
                 ChannelLogo(
                     channelName = channel.name,
