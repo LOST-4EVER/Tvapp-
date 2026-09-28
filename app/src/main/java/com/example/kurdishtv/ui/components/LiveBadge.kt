@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.LocalLivePulse
+import com.example.kurdishtv.ui.motion.WatchLivePulse
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -49,6 +50,14 @@ fun LiveBadge(modifier: Modifier = Modifier) {
     // lambda below would recompose this whole composable — surface, row, text and all —
     // on every frame of the pulse, for every badge on screen.
     val pulse = LocalLivePulse.current
+
+    // Declaring that this badge is on screen and wants to be pulsed is what lets the
+    // app-wide pulse loop know there is a reader at all. Without it the loop could not
+    // tell "the viewer has the pulse switched on" from "a badge is actually breathing",
+    // so it ran at display rate for the whole life of the process — including on the
+    // player, where the only badge is inside a control bar that is usually hidden, and
+    // in Settings, which has none.
+    WatchLivePulse()
 
     Surface(
         shape = M3ExpressiveShapes.BadgePill,

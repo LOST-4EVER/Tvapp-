@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +44,7 @@ import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.SleepTimerDialog
 import com.example.kurdishtv.ui.components.SvgIcon
+import com.example.kurdishtv.ui.motion.tapOnly
 import com.example.kurdishtv.ui.player.PlayerControlsOverlay
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoColorFilter
@@ -211,7 +211,17 @@ fun PlayerScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.94f))
-                    .clickable { isControlsVisible = true },
+                    // `tapOnly`, for the same reason the transport scrim uses it: as a
+                    // `clickable` this fills the screen, sits *above* the controls, and
+                    // so becomes the largest and first focus target on the player. A
+                    // remote user whose stream had just failed pressed OK — to retry —
+                    // and the press was swallowed by an invisible scrim that only
+                    // revealed the controls, leaving them pressing a second time to do
+                    // what they had asked for. It cannot be marked with
+                    // `focusProperties { canFocus = false }` either, for the same
+                    // reason: that applies to every focus target below it, and the
+                    // Retry and Next-channel buttons are below it.
+                    .tapOnly { isControlsVisible = true },
                 contentAlignment = Alignment.Center
             ) {
                 Surface(

@@ -8,15 +8,47 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
-- **A hole ran down the middle of the channel grid.** The logo well was a fixed
-  84dp square parked in the centre of a card that is 130dp wide on a phone and
-  wider still on a television, so more than half of every card was empty on both
-  sides of the logo. Two narrow columns of undersized tiles with a void between
-  them is what the eye lands on, and the grid read as broken rather than as
-  padded. The well now fills its card, capped so a wide television cell gets a
-  bigger logo rather than a billboard, and kept square so every row keeps the
-  same rhythm.
-- **The player's Fit/Fill/Zoom choice was forgotten.** It was `rememberSaveable`,
+- **Two animations ran at 60fps for the whole life of the app, drawing nothing.** The
+  LIVE-badge pulse and the focus-ring turn are `withFrameNanos` loops, and both were
+  keyed only on whether the viewer had switched motion *off* — which says nothing
+  about whether anything on screen is actually reading the number. So the loops ran
+  continuously on the player, where no focus ring is ever drawn, in Settings, which
+  has none, and whenever no element held focus at all. A frame callback that wakes the
+  CPU sixty times a second for nothing is pure battery, and it is the kind of bug that
+  is invisible in a screenshot. Both clocks are now demand-driven: a `WatchedFloat`
+  carries a count of its readers, badges and focused rings register while they are
+  composed, and the loop exists exactly while something is drawing from it.
+- **Visiting the browse screen on a tablet downloaded a live stream to a black box.**
+  The preview pane is paused by design, but a *prepared* ExoPlayer is not idle — it
+  opens the connection and fills its buffer whether or not a frame is ever shown, so
+  merely arriving at the screen pulled down a whole live channel. The player now
+  defers loading until playback is asked for on that pane, and releases the
+  connection outright when it is paused rather than fetching into the background.
+  The fullscreen player still pre-loads, which is what makes its first frames appear
+  quickly.
+- **The player's error screen swallowed the remote's first press.** The full-screen
+  "channel unavailable" overlay was a `clickable`, which makes it the largest and
+  first focus target on the player — and it sits above the controls. A viewer whose
+  stream had just failed pressed OK to retry and the press was eaten by an invisible
+  scrim that only revealed the controls, so they had to press a second time to do
+  what they had asked for. It cannot simply be marked unfocusable, because that
+  applies to every focus target below it and Retry sits below it; it now uses the
+  pointer-handler `tapOnly` the transport scrim already uses, which creates no focus
+  target at all.
+- **A phone on its side showed barely one row of channels.** The logo well is square
+  and as wide as its cell, so it set the whole card height, and at full size a single
+  row plus a sliver was all that fitted — worse than the portrait layout it is meant
+  to accompany. The card now has a compact form for short windows, shrinking the well
+  and tightening the spacing to buy back a second row while keeping the name and
+  category line.
+- **The buffer held 50 seconds of a live stream.** Anything that far ahead of a live
+  playhead cannot be played "late" anyway, so it was memory and data spent on a
+  rebuffer that may never come. Down to 30 seconds, still well above what the
+  15-second floor needs to start playback.
+- **Every search keystroke and every step of the D-pad across the category rail
+  allocated a list.** `rulesFor` was `StringRules.filter { ... }` — a fresh list per
+  call, in the two places the app most needs to be cheap. Now a lookup, indexed once.
+- **The player's picture shape was forgotten.** It was `rememberSaveable`,
   which survives a rotation and nothing else: every cold start, every return visit
   and the small side player pane silently reset the picture to Fit, so the button
   had to be pressed again each time. The resize mode and the video colour filter

@@ -88,7 +88,18 @@ fun ChannelCard(
      * Reports D-pad focus back to the grid, so the grid can remember which card the
      * viewer was on and put focus back there the next time this screen is shown.
      */
-    onFocusChanged: (isFocused: Boolean) -> Unit = {}
+    onFocusChanged: (isFocused: Boolean) -> Unit = {},
+    /**
+     * Squeeze the card for a short window.
+     *
+     * A phone on its side has around 360dp of height, most of which the chrome has
+     * already taken. The logo well is square and as wide as its cell, so on a
+     * full-size card it sets the card's whole height — and at that size a single row
+     * plus a sliver was all that fitted, which is a worse browse experience than the
+     * portrait layout it is supposed to be a companion to. Shrinking the well is what
+     * buys back a second row; the name and the category line are what have to survive.
+     */
+    compact: Boolean = false
 ) {
     val colors = LocalAppColors.current
     // The accent is derived from the channel's name, so it is the same for the whole
@@ -177,7 +188,12 @@ fun ChannelCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, end = 8.dp, top = 9.dp, bottom = 8.dp),
+                        .padding(
+                            start = if (compact) 10.dp else 12.dp,
+                            end = if (compact) 6.dp else 8.dp,
+                            top = if (compact) 6.dp else 9.dp,
+                            bottom = if (compact) 6.dp else 8.dp
+                        ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -194,13 +210,18 @@ fun ChannelCard(
                     accent = accent,
                     showLogos = showLogos,
                     isActive = isFocused,
-                    allowAnimation = !reduceMotion
+                    allowAnimation = !reduceMotion,
+                    compact = compact
                 )
 
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, end = 12.dp, bottom = 11.dp)
+                        .padding(
+                            start = if (compact) 10.dp else 12.dp,
+                            end = if (compact) 10.dp else 12.dp,
+                            bottom = if (compact) 8.dp else 11.dp
+                        )
                 ) {
                     Text(
                         text = channel.name,
@@ -211,7 +232,7 @@ fun ChannelCard(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(if (compact) 5.dp else 8.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -277,6 +298,7 @@ private fun ChannelLogoWell(
     showLogos: Boolean,
     isActive: Boolean,
     allowAnimation: Boolean,
+    compact: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
@@ -315,7 +337,7 @@ private fun ChannelLogoWell(
                 // coerced straight back to that same width. Ordered this way the cap
                 // really does bound the well, and a wide television cell gets a
                 // larger logo instead of a billboard.
-                .widthIn(max = 132.dp)
+                .widthIn(max = if (compact) 72.dp else 132.dp)
                 .fillMaxWidth()
                 // Square, and therefore the same height at every cell width, which is
                 // what keeps each row of the grid the same rhythm.
@@ -341,12 +363,12 @@ private fun ChannelLogoWell(
                 channelName = channel.name,
                 logoUrl = channel.logoUrl,
                 showLogos = showLogos,
-                contentPadding = 9.dp,
+                contentPadding = if (compact) 6.dp else 9.dp,
                 // Decode for the largest tile this can be drawn in, not at source
                 // resolution. Slightly over the draw size on a narrow cell, which is
                 // the safe direction to err in; decoding under it is what makes a
                 // logo look soft on a television.
-                size = 132.dp
+                size = if (compact) 72.dp else 132.dp
             )
         }
     }

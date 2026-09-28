@@ -142,6 +142,14 @@ fun Modifier.expressiveFocusRing(
     val isFocused by interactionSource.collectIsFocusedAsState()
     val reduceMotion = LocalReduceMotion.current
 
+    // Only a *focused* element draws a ring, so only a focused one is a reader of the
+    // shared turn. Registering that here is what lets the loop behind
+    // [rememberFocusRotation] stop: there is one ring drawn at a time, and for most of
+    // a session — in Settings, on the player, before the viewer has touched the remote
+    // at all — there is no reader, so there is no reason to be waking the CPU sixty
+    // times a second to compute an angle nobody is drawing.
+    WatchFocusRotation(isFocused)
+
     val currentOnFocusChanged by rememberUpdatedState(onFocusChanged)
     LaunchedEffect(isFocused) { currentOnFocusChanged(isFocused) }
 
