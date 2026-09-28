@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.kurdishtv.data.SettingsStorage
 import com.example.kurdishtv.model.AppSettings
+import com.example.kurdishtv.ui.player.ResizeMode
+import com.example.kurdishtv.ui.player.VideoColorFilter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +59,26 @@ class SettingsViewModel(
         editGeneration++
         _settings.value = next
         viewModelScope.launch(Dispatchers.IO) { storage.save(next) }
+    }
+
+    /**
+     * Updates only the player-related settings, merging into the current state.
+     *
+     * The player writes its resize mode and colour filter through here rather
+     * than through [update], which replaces the whole object from `_settings.value`:
+     * a preferences edit landing between the player's read and write would
+     * otherwise be reverted by the player's save.
+     */
+    fun updatePlayerPreferences(
+        resizeMode: ResizeMode? = null,
+        videoColorFilter: VideoColorFilter? = null
+    ) {
+        update { current ->
+            current.copy(
+                resizeMode = resizeMode ?: current.resizeMode,
+                videoColorFilter = videoColorFilter ?: current.videoColorFilter
+            )
+        }
     }
 
     fun resetToDefaults() {

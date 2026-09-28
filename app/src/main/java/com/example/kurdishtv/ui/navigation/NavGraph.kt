@@ -100,6 +100,7 @@ fun KurdishTvNavGraph(
             if (selectedChannel != null) {
                 PlayerScreen(
                     channel = selectedChannel,
+                    settings = settings,
                     autoplay = settings.autoplay,
                     autoHideControls = settings.autoHideControls,
                     sleepTimerMinutes = uiState.sleepTimerMinutes,
@@ -111,6 +112,12 @@ fun KurdishTvNavGraph(
                     onNextChannel = { viewModel.selectNextChannel() },
                     onPreviousChannel = { viewModel.selectPreviousChannel() },
                     onFavoriteToggle = { id -> viewModel.onFavoriteToggled(id) },
+                    onResizeModeChange = { mode ->
+                        settingsViewModel.updatePlayerPreferences(resizeMode = mode)
+                    },
+                    onColorFilterChange = { filter ->
+                        settingsViewModel.updatePlayerPreferences(videoColorFilter = filter)
+                    },
                     onBackClick = { navController.popBackStack() }
                 )
             }

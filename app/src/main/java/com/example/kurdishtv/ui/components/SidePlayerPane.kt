@@ -55,7 +55,14 @@ fun SidePlayerPane(
     channel: Channel?,
     onFullscreenClick: (Channel) -> Unit,
     onFavoriteToggle: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * The viewer's saved picture shape, shown here so the small pane agrees with
+     * the fullscreen player. It used to be hard-coded to FIT, which meant the
+     * pane contradicted the setting the viewer had just made in the player —
+     * and since the pane's frame is also 16:9 it had no reason to.
+     */
+    resizeMode: ResizeMode = ResizeMode.FILL
 ) {
     if (channel == null) return
     val colors = LocalAppColors.current
@@ -140,7 +147,7 @@ fun SidePlayerPane(
                     VideoPlayerView(
                         streamUrl = channel.streamUrl,
                         isPlaying = isPlaying,
-                        resizeMode = ResizeMode.FIT,
+                        resizeMode = resizeMode,
                         onPlaybackError = { errorMessage = it },
                         // No transport overlay is drawn on this pane, so the
                         // buffering notice is the only way to show that something

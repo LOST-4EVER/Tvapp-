@@ -7,6 +7,8 @@ import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.MotionLevel
 import com.example.kurdishtv.model.ThemeMode
+import com.example.kurdishtv.ui.player.ResizeMode
+import com.example.kurdishtv.ui.player.VideoColorFilter
 
 /** Persists [AppSettings] in SharedPreferences. */
 class SettingsStorage(context: Context) {
@@ -24,7 +26,12 @@ class SettingsStorage(context: Context) {
                 showLogos = prefs.getBoolean(KEY_SHOW_LOGOS, true),
                 autoHideControls = prefs.getBoolean(KEY_AUTO_HIDE, true),
                 livePulse = prefs.getBoolean(KEY_LIVE_PULSE, true),
-                dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
+                dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
+                resizeMode = enumOrDefault(prefs.getString(KEY_RESIZE_MODE, null), ResizeMode.FILL),
+                videoColorFilter = enumOrDefault(
+                    prefs.getString(KEY_VIDEO_FILTER, null),
+                    VideoColorFilter.None
+                )
             )
         } catch (_: Exception) {
             AppSettings()
@@ -43,6 +50,8 @@ class SettingsStorage(context: Context) {
                 .putBoolean(KEY_AUTO_HIDE, settings.autoHideControls)
                 .putBoolean(KEY_LIVE_PULSE, settings.livePulse)
                 .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColor)
+                .putString(KEY_RESIZE_MODE, settings.resizeMode.name)
+                .putString(KEY_VIDEO_FILTER, settings.videoColorFilter.name)
                 .apply()
         } catch (_: Exception) {}
     }
@@ -60,5 +69,7 @@ class SettingsStorage(context: Context) {
         private const val KEY_AUTO_HIDE = "auto_hide_controls"
         private const val KEY_LIVE_PULSE = "live_pulse"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
+        private const val KEY_RESIZE_MODE = "player_resize_mode"
+        private const val KEY_VIDEO_FILTER = "player_video_filter"
     }
 }
