@@ -311,7 +311,7 @@ class PolygonShape(
         workPath.rewind()
         workPath.addPath(basePath)
         fitToBox(workPath, bounds, size, workMatrix)
-        return Outline.Generic(workPath)
+        return Outline.Generic(workPath.snapshot())
     }
 }
 
@@ -347,9 +347,26 @@ class MorphingPolygonShape(
 
         polygon.path(out = workPath)
         fitToBox(workPath, bounds, size, workMatrix)
-        return Outline.Generic(workPath)
+        return Outline.Generic(workPath.snapshot())
     }
 }
+
+/**
+ * A private copy of this path.
+ *
+ * [Shape.createOutline] may be called several times for the same node — a clip, a
+ * background, a border and a graphics layer each ask for their own outline — and
+ * each caller keeps the result until the frame is drawn. Handing all of them the
+ * *same* mutable [Path] instance is a contract violation: the second caller refits
+ * [workPath] to its own size, so the first caller's outline is silently rewritten
+ * out from under it. That is what made a shared shape such as
+ * [M3ExpressiveShapes.Pill] — one object used by every button and chip in the app —
+ * clip some of its callers with another caller's geometry.
+ *
+ * `workPath` stays as the reusable build buffer; only the result is copied, which
+ * is a memcpy rather than a second run of the path maths.
+ */
+private fun Path.snapshot(): Path = Path().also { it.addPath(this) }
 
 /**
  * Interpolates between two polygons that may have different vertex counts.
@@ -602,7 +619,7 @@ private fun buildRoundedPolygonPath(
     val arcStart = ArrayList<Offset>(n)
     val arcEnd = ArrayList<Offset>(n)
     val entry = ArrayList<Offset>(n)
-    val radius = FloatArray(n)
+    val kappaPerCorner = FloatArray(n)
 
     for (i in 0 until n) {
         val centre = vertices[i]
@@ -615,23 +632,45 @@ private fun buildRoundedPolygonPath(
 
         val corner = corners[i]
         val smoothing = corner.smoothing.coerceIn(0f, 1f)
-        val cosTheta = (dirIn.x * dirOut.x + dirIn.y * dirOut.y).coerceIn(-1f, 1f)
-        val theta = acos(cosTheta)
-        // A corner of radius r turns through theta, and the tangent points sit
-        // r·tan(theta/2) back from the vertex. Storing the arc radius separately is
-        // what keeps the cubic's control length correct after the clamp below.
-        val tanHalf = tan(theta / 2f)
+        // `acos(dirIn · dirOut)` is the polygon's *interior* angle at this vertex.
+        // What a corner rounding needs is the angle the outline *turns* through,
+        // which is its supplement. Expressed without touching PI:
+        //
+        //   tan(turn / 2) = tan((PI - interior) / 2) = cot(interior / 2)
+        //
+        // Using the interior angle here was the single biggest geometry bug in this
+        // file, and it was invisible at right angles because the two are equal
+        // there. At a square corner (90°) nothing changes, so Square and the whole
+        // rounded-rectangle family looked right. At every other angle it was wrong
+        // by a large factor: a 16-gon has an interior angle of 157.5°, so a corner
+        // of radius r was given a tangent length of r·tan(78.75°) ≈ 5r instead of
+        // r·tan(11.25°) ≈ 0.2r. The edge-budget clamp below then swallowed the
+        // difference, so the corner silently became "as round as the edge allows"
+        // rather than "radius r" — which is what turned every star, cookie, flower
+        // and burst in the library into an over-rounded blob.
+        val theta = acos((dirIn.x * dirOut.x + dirIn.y * dirOut.y).coerceIn(-1f, 1f))
+        val tanQuarterInterior = tan(theta / 4f)
+        val tanHalfInterior = tan(theta / 2f)
+        // cot(interior / 2), guarded: an interior angle of 0 is a spike, where
+        // `1 / 0` would otherwise turn a zero radius into NaN.
+        val tanHalf = if (corner.radius > 0f && tanHalfInterior > 1e-6f) {
+            1f / tanHalfInterior
+        } else {
+            0f
+        }
         // The rounding and its smoothing run share the two adjacent edges. Budgeting
         // half of each edge keeps the straight run between neighbouring corners
         // non-negative even for a very round corner on a very short edge.
         val budgetIn = 0.5f * lenIn / (1f + smoothing)
         val budgetOut = 0.5f * lenOut / (1f + smoothing)
-        val t = if (tanHalf < 1e-3f) {
+        val t = if (tanHalf <= 0f) {
             0f
         } else {
             min(corner.radius * tanHalf, min(budgetIn, budgetOut)).coerceAtLeast(0f)
         }
-        val arcRadius = if (t > 0f && tanHalf > 1e-3f) t / tanHalf else 0f
+        val arcRadius = if (t > 0f) t / tanHalf else 0f
+        // tan(turn / 4) = tan(PI/4 - interior/4) = (1 - q) / (1 + q), q = tan(interior/4)
+        kappaPerCorner[i] = 4f / 3f * ((1f - tanQuarterInterior) / (1f + tanQuarterInterior)) * arcRadius
 
         val a = centre + dirIn * t
         val b = centre + dirOut * t
@@ -640,7 +679,6 @@ private fun buildRoundedPolygonPath(
         arcStart += a
         arcEnd += b
         entry += a - dirIn * (t * smoothing)
-        radius[i] = arcRadius
     }
 
     out.moveTo(entry[0].x, entry[0].y)
@@ -649,9 +687,7 @@ private fun buildRoundedPolygonPath(
         val b = arcEnd[i]
         val dirIn = tangentIn[i]
         val dirOut = tangentOut[i]
-        val arcRadius = radius[i]
-        val cosTheta = (dirIn.x * dirOut.x + dirIn.y * dirOut.y).coerceIn(-1f, 1f)
-        val kappa = 4f / 3f * tan(acos(cosTheta) / 4f) * arcRadius
+        val kappa = kappaPerCorner[i]
         val smooth = (entry[i] - a).getDistance()
 
         if (smooth > 1e-4f) {
@@ -661,12 +697,18 @@ private fun buildRoundedPolygonPath(
             // Arc and trailing flank share one cubic: starting at `a` and finishing at
             // the corner's exit point, tangent to the edge on both sides.
             val arcC1 = a + dirIn * kappa
-            val arcC2 = b + dirOut * (smooth * 0.35f)
+            val arcC2 = b - dirOut * (smooth * 0.35f)
             val b0 = b + dirOut * smooth
             out.cubicTo(arcC1.x, arcC1.y, arcC2.x, arcC2.y, b0.x, b0.y)
         } else {
+            // A cubic leaves `b` travelling along `dirOut`, so its second control
+            // point has to sit *behind* `b` on that line. Adding `kappa` instead
+            // pushes it forward, into the interior of the shape, and the arc swings
+            // back across the polygon instead of around the corner -- which turned
+            // every rounded corner into a lens-shaped bulge and is why pills and
+            // chips rendered as pointed leaves.
             val arcC1 = a + dirIn * kappa
-            val arcC2 = b + dirOut * kappa
+            val arcC2 = b - dirOut * kappa
             out.cubicTo(arcC1.x, arcC1.y, arcC2.x, arcC2.y, b.x, b.y)
         }
 
