@@ -13,6 +13,31 @@ object KurdishTvParser {
     private val tvgLogoRegex = """tvg-logo="([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
     private val groupTitleRegex = """group-title="([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
 
+    /** A run of non-space characters in an already-trimmed, already-collapsed name. */
+    private val wordRegex = "[^ ]+".toRegex()
+
+    /**
+     * Words the playlists carry in whatever case, and the spelling they are shown in.
+     *
+     * Data rather than a `when` in [formatChannelName]: the mapping never changes at
+     * runtime, so a lookup table is both faster (a hash probe instead of a linear
+     * chain of string equals) and impossible to get out of step with the list of
+     * words that are meant to be canonicalised.
+     */
+    private val CanonicalWords: Map<String, String> = mapOf(
+        "tv" to "TV",
+        "hd" to "HD",
+        "4k" to "4K",
+        "sd" to "SD",
+        "nrt" to "NRT",
+        "ktv" to "KTV",
+        "ava" to "AVA",
+        "trt" to "TRT",
+        "kurdistan24" to "Kurdistan 24",
+        "kurdsat" to "KurdSat",
+        "kurdmax" to "KurdMax"
+    )
+
     fun parseJson(content: String, sourceTag: String = "json"): List<Channel> {
         val channels = mutableListOf<Channel>()
         try {
@@ -113,28 +138,35 @@ object KurdishTvParser {
         return deduplicate(channels)
     }
 
+    /**
+     * Normalises a playlist's raw name into the form the app displays and searches.
+     *
+     * The three steps are ordered so that each one makes the next one cheaper: the
+     * separators are flattened to single spaces, the runs are collapsed, and the
+     * ends are trimmed — after which the string is guaranteed to contain no leading,
+     * trailing or repeated space.
+     *
+     * That guarantee is what lets the word pass be a single regex substitution.
+     * It used to be `split(" ").filter { it.isNotBlank() }.joinToString(" ")`, which
+     * re-did the work the collapse and trim had already done: it allocated a list of
+     * every word in the name, another list of the non-blank ones, and a string to
+     * join them back together — to arrive at the identical string. This runs once
+     * per channel per source, and the largest merged playlists run to a few thousand
+     * channels, so that was several thousand throwaway lists on every refresh.
+     */
     fun formatChannelName(rawName: String): String {
-        var clean = rawName
+        val flattened = rawName
             .replace("-", " ")
             .replace("_", " ")
             .replace(whitespaceRegex, " ")
             .trim()
 
-        clean = clean.split(" ").filter { it.isNotBlank() }.joinToString(" ") { word ->
-            when (word.lowercase(Locale.ROOT)) {
-                "tv" -> "TV"
-                "hd" -> "HD"
-                "4k" -> "4K"
-                "sd" -> "SD"
-                "nrt" -> "NRT"
-                "ktv" -> "KTV"
-                "ava" -> "AVA"
-                "trt" -> "TRT"
-                "kurdistan24" -> "Kurdistan 24"
-                "kurdsat" -> "KurdSat"
-                "kurdmax" -> "KurdMax"
-                else -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
-            }
+        if (flattened.isEmpty()) return "Kurdish Channel"
+
+        val clean = wordRegex.replace(flattened) { match ->
+            val word = match.value
+            CanonicalWords[word.lowercase(Locale.ROOT)]
+                ?: word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
         }
         return clean.ifBlank { "Kurdish Channel" }
     }
@@ -235,11 +267,21 @@ object KurdishTvParser {
         return "Kurdish Channel"
     }
 
+    /**
+     * The two attribute readers use `groups[1].value` rather than
+     * `groupValues[1]`.
+     *
+     * `groupValues` builds a `List<String>` of *every* group in the match — and with
+     * it the entire matched text as element zero — to hand back one string. That is
+     * two throwaway lists for every `#EXTINF:` line in every playlist, several
+     * thousand times per refresh, to read one attribute. Reading the group directly
+     * allocates nothing but the value.
+     */
     private fun parseTvgLogo(line: String): String? =
-        tvgLogoRegex.find(line)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
+        tvgLogoRegex.find(line)?.groups[1]?.value?.trim()?.takeIf { it.isNotBlank() }
 
     private fun parseGroupTitle(line: String): String? =
-        groupTitleRegex.find(line)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
+        groupTitleRegex.find(line)?.groups[1]?.value?.trim()?.takeIf { it.isNotBlank() }
 
     fun getFallbackChannels(): List<Channel> = KurdishChannelCatalog.getDefaultChannels()
 

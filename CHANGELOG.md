@@ -89,8 +89,53 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Dead code.** `CategoryFilter` carried a translated name for all twelve entries
   that nothing ever read; the two settings rows and the settings cards also shared a
   hand-rolled chip control that is now the generic one both use.
+- **The background update check ran on every single launch.** The manifest request is
+  sent with `Cache-Control: no-cache` on purpose, because a stale answer means missing
+  a release — which also makes it a guaranteed network round trip every time the app
+  was opened, and defeats the HTTP cache besides. A release does not appear and then
+  vanish, so the automatic check is now throttled to once every six hours, recorded
+  *before* the request so an unreachable server does not make each launch retry it.
+  The explicit check in Settings is never throttled.
+- **A search allocated four thousand strings per keystroke.** Matching normalised the
+  query once but rebuilt every channel's normalised name and category on every keypress
+  — two allocations each, over a thousand channels — to answer one question and then
+  throw them all away. The per-channel key is now built once per channel list and
+  reused, so a keystroke is one substring test per channel and allocates nothing. It
+  is held behind a `WeakReference` so the memo does not keep a discarded list alive,
+  and the name and category are joined by a separator a query can never contain, so
+  `1g` still cannot match across "NRT 1" into "General".
+- **Channel name formatting rebuilt every name from scratch.** `formatChannelName`
+  flattened separators, collapsed runs of whitespace and trimmed — guaranteeing no
+  leading, trailing or repeated space — and then ran `split(" ").filter { … }` and
+  `joinToString(" ")` to do that same work again, allocating a list of every word, a
+  list of the non-blank ones, and a string to join them, to arrive at the identical
+  string. It is now a single substitution, and the eleven canonical spellings are a
+  lookup table rather than a chain of string comparisons.
+- **Two throwaway lists per playlist line.** `parseTvgLogo` and `parseGroupTitle` used
+  `groupValues[1]`, which materialises every group in the match plus the whole matched
+  text as element zero, to read one attribute. Both now read the group directly.
 
 ### Fixed
+- **The app reported itself online on a network that could not reach anything.**
+  `NetworkMonitor` had two different definitions of "online": the callback required
+  `NET_CAPABILITY_INTERNET` *and* `NET_CAPABILITY_VALIDATED`, while the startup check
+  and `isCurrentlyOnline()` accepted `INTERNET` alone. On a captive network — hotel
+  or airport Wi-Fi, or a router that has lost its uplink — the app opened convinced it
+  was online, started a four-source fetch against a login portal, and only flipped to
+  "offline" once the system's own validation completed. The banner appeared after the
+  requests had already failed. Both paths now use one check.
+- **A reconnect re-downloaded every source even when the data was seconds old.** The
+  offline-to-online transition forced a refresh unconditionally, so a two-second Wi-Fi
+  blip in the middle of a film re-fetched all four playlists and the update manifest
+  and then overwrote a perfectly current cache with the result. The freshness check
+  now decides, as it does everywhere else: recent data is served as-is and only a
+  genuinely stale list goes back to the network. As a side effect a flapping network
+  can no longer cancel and restart a download on every waver.
+- **Every cold start read, parsed and filtered the channel cache twice.** The instant
+  path hydrated the UI from the cache, and the load that followed immediately read the
+  same file again and filtered the same list to arrive at the same answer. The instant
+  path now reports whether the list came from a cache that is still fresh, and when it
+  did the second pass is skipped — it was provably a no-op.
 - **Logos re-decoded every time the grid scrolled between card sizes.** The Coil
   request's target size was the caller's own *draw* size, which quietly made decode
   resolution a function of the layout: the same channel's logo was a different

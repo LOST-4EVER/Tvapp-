@@ -29,9 +29,7 @@ class NetworkMonitor(context: Context) {
                 network: Network,
                 networkCapabilities: NetworkCapabilities
             ) {
-                val hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-                trySend(hasInternet)
+                trySend(isUsable(networkCapabilities))
             }
         }
 
@@ -57,6 +55,28 @@ class NetworkMonitor(context: Context) {
         val cm = connectivityManager ?: return true
         val activeNetwork = cm.activeNetwork ?: return false
         val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return isUsable(capabilities)
     }
+
+    /**
+     * Whether a set of capabilities describes a network that can actually reach the
+     * internet.
+     *
+     * `NET_CAPABILITY_INTERNET` alone only means the network *claims* to be able to
+     * reach the internet. On a hotel or airport Wi-Fi that is captive — the request
+     * is intercepted and redirected to a login page — and on a router that has lost
+     * its uplink it is simply stale. `NET_CAPABILITY_VALIDATED` is the system having
+     * actually probed it, so requiring it is the difference between "we think" and
+     * "we know".
+     *
+     * This is one function on purpose. The startup check and the callback used to
+     * disagree — the callback required INTERNET *and* VALIDATED while the startup
+     * check accepted INTERNET alone — so on a captive network the app opened
+     * convinced it was online, started a four-source fetch against a login portal,
+     * and then flipped to "offline" the first time the system's own validation
+     * completed. The banner appeared after the requests had already failed.
+     */
+    private fun isUsable(capabilities: NetworkCapabilities): Boolean =
+        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
 }

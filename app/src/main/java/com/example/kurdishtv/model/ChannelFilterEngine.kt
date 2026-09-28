@@ -1,5 +1,6 @@
 package com.example.kurdishtv.model
 
+import java.lang.ref.WeakReference
 import java.util.Locale
 
 /**
@@ -55,8 +56,13 @@ object ChannelFilterEngine {
         val rules = rulesFor(category)
         val needsFlags = category == CategoryFilter.FAVORITES || category == CategoryFilter.HD
 
+        // Built once per distinct channel list and reused by every keystroke after
+        // the first. Null when the query is empty, because then nothing is tested.
+        val keys = if (isQueryEmpty) null else searchKeysFor(channels)
+
         val result = ArrayList<Channel>(if (isQueryEmpty) channels.size else 16)
-        for (channel in channels) {
+        for (i in channels.indices) {
+            val channel = channels[i]
             if (needsFlags) {
                 val byFlag = when (category) {
                     CategoryFilter.FAVORITES -> channel.isFavorite
@@ -66,8 +72,8 @@ object ChannelFilterEngine {
             } else if (rules.isNotEmpty()) {
                 val categoryText = channel.category
                 var matched = false
-                for (i in rules.indices) {
-                    if (categoryText.contains(rules[i].needle, ignoreCase = true)) {
+                for (r in rules.indices) {
+                    if (categoryText.contains(rules[r].needle, ignoreCase = true)) {
                         matched = true
                         break
                     }
@@ -75,7 +81,7 @@ object ChannelFilterEngine {
                 if (!matched) continue
             }
 
-            if (isQueryEmpty || matchesQuery(channel, cleanQuery)) {
+            if (keys == null || keys[i].contains(cleanQuery)) {
                 result.add(channel)
             }
         }
@@ -132,17 +138,49 @@ object ChannelFilterEngine {
         if (category == CategoryFilter.ALL) emptyList() else RulesByCategory[category].orEmpty()
 
     /**
-     * Case-insensitive name-or-category match, without allocating.
+     * The pre-normalised search keys for a channel list, built once and reused.
      *
-     * This used to be `channel.name.lowercase(Locale.ROOT).contains(cleanQuery)`, which
-     * copies both the name and the category into freshly allocated lowercase strings
-     * for every channel on every keystroke — over a thousand short-lived strings per
-     * search, on the main thread, for the length of the search. Kotlin's
-     * `contains(other, ignoreCase = true)` is the same test without the copies.
+     * A search is one substring test per channel against the *channel's own*
+     * normalised name and category. Producing that string per channel per keystroke
+     * cost two allocations for every channel on every keypress — a name and a
+     * category, each lowercased and then filtered — so a search across a merged
+     * list of a thousand channels churned four thousand short-lived strings to
+     * answer one question, and then threw all of them away.
+     *
+     * The key is built once per distinct list instead, so the only work a keystroke
+     * does is the substring test itself. It changes when the list changes, which is
+     * the only time it can: a new merge produces a new list, and identity is
+     * therefore the whole test.
+     *
+     * Held through a [WeakReference] so the memo does not become the thing that
+     * keeps a discarded channel list — and its few hundred channels — alive for the
+     * life of the process.
      */
-    private fun matchesQuery(channel: Channel, cleanQuery: String): Boolean =
-        normalizeQuery(channel.name).contains(cleanQuery) ||
-            normalizeQuery(channel.category).contains(cleanQuery)
+    private class SearchKeyCache(
+        val source: List<Channel>,
+        val keys: Array<String>
+    )
+
+    @Volatile
+    private var keyCache: WeakReference<SearchKeyCache>? = null
+
+    private fun searchKeysFor(channels: List<Channel>): Array<String> {
+        keyCache?.get()?.let { cached ->
+            if (cached.source === channels) return cached.keys
+        }
+        val built = Array(channels.size) { i ->
+            val name = normalizeQuery(channels[i].name)
+            val category = normalizeQuery(channels[i].category)
+            // A separator that `normalizeQuery` can never produce, so a query can
+            // never match across the join — without it, a query like "1g" would
+            // match "NRT 1" followed by "General".
+            if (category.isEmpty()) name else "$name$SEARCH_KEY_SEPARATOR$category"
+        }
+        keyCache = WeakReference(SearchKeyCache(channels, built))
+        return built
+    }
+
+    private const val SEARCH_KEY_SEPARATOR = '/'
 
     /**
      * Puts a name or a query into one canonical shape so the two can be compared.
@@ -166,6 +204,24 @@ object ChannelFilterEngine {
      * folding and script folding are deliberately *not* attempted: they are a larger
      * claim than this test can honestly make, and a much larger cost per keystroke.
      */
-    private fun normalizeQuery(text: String): String =
-        text.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }
+    private fun normalizeQuery(text: String): String {
+        val lower = text.lowercase(Locale.ROOT)
+        // The overwhelming majority of names and categories are already free of
+        // separators, so scan first and only build a string when something has to
+        // come out. `filter` allocated unconditionally.
+        var needsRebuild = false
+        for (i in lower.indices) {
+            if (!lower[i].isLetterOrDigit()) {
+                needsRebuild = true
+                break
+            }
+        }
+        if (!needsRebuild) return lower
+
+        val out = StringBuilder(lower.length)
+        for (c in lower) {
+            if (c.isLetterOrDigit()) out.append(c)
+        }
+        return out.toString()
+    }
 }
