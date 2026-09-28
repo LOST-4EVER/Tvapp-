@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tv Input Framework descriptor for this app's tuner.
+
+  The system Live TV app reads this when the viewer picks an input source, and it is
+  what decides whether the app appears in that list at all. A TvInputService with no
+  descriptor is ignored, which looks exactly like a bug in the service itself.
+
+  `supportsTuning` is false, and that is the honest answer rather than a shortcut.
+  A hardware tuner demodulates a frequency and reports a signal strength; this one
+  is handed a URL. Claiming to tune would have the system send TuneRequests for
+  programs and scan operations that mean nothing here. Playback happens through the
+  session instead, which is the supported path for a tuner that is really a source.
+
+  `settingsActivity` is the app's own launcher, so choosing "Settings" beside the
+  tuner in the system UI lands on something real rather than an empty screen.
+-->
+<tv-input xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.example.MainActivity"
+    android:supportsTuning="false"
+    android:supportsRecording="false"
+    android:supportsPauseAndProgramGuide="false">
+    <display name="@string/tv_input_tuner_label" />
+    <device name="@string/tv_input_tuner_device" />
+</tv-input>

@@ -8,6 +8,22 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **The app is now a system TV input.** A `TvInputService` publishes the channel
+  list to the Android TV Live TV app, so "Kurdish TV Live" appears in the system's
+  list of input sources and its channels appear in the system channel picker. Choosing
+  one starts a session that plays it. Until now the app was a standalone player: a
+  grid only it could show, so anyone with a satellite box next to their television
+  had to switch inputs to watch Kurdish channels at all.
+  - Channel numbers are assigned once and persisted, never renumbered on a refresh.
+    The system records the viewer's current channel, favourites and guide offsets
+    against those numbers, so a channel moving from 340 to 12 looks deleted.
+  - Only presentation is published — name, number, category, artwork. The stream URL
+    stays in the app, resolved at playback time, so a URL that rots (as community
+    playlist URLs do) needs nothing rewritten in the system database.
+  - The channel list comes from the same repository, parser and cache the app's own
+    grid is fed by, so the two can never disagree about a name or a stream.
+  - `COLUMN_HIDDEN` and `COLUMN_NUMBER` are never written, so channels a viewer
+    hid or renumbered in the system UI stay that way across a sync.
 - **The remote's number pad works.** Every key on a television remote was ignored
   before, so reaching a channel on a screen of six hundred meant arcing across the
   grid and counting. The digits now build a channel number, shown large in the middle

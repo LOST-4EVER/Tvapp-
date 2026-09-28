@@ -27,6 +27,12 @@
 # --- Activities and Services referenced from the manifest ---
 -keep class com.example.MainActivity { *; }
 
+# The TvInputService is instantiated by the system, not by any code in this app, so
+# nothing R8 can see ever references it. Without this it is renamed or stripped, the
+# manifest entry points at a class that is no longer there, and the system reports a
+# tuner that does not exist rather than a build error.
+-keep class com.example.tuner.KurdishTvInputService { *; }
+
 # --- Media3 / ExoPlayer ---
 #
 # This used to be `-keep class androidx.media3.** { *; }`, which is the single

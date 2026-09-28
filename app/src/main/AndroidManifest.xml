@@ -71,6 +71,46 @@
         </activity>
 
         <!--
+          The Tv Input Framework tuner.
+
+          This is what makes the app's channels reachable from the *system* Live TV
+          app (Google TV, or an OEM tuner): it appears in the system's list of input
+          sources, its channels appear in the system channel picker, and choosing one
+          starts a session here that plays it.
+
+          Three things about it are load-bearing:
+
+          - `android:permission="android.permission.BIND_TV_INPUT"`. This is a
+            signature-level permission held only by the system, and it is what stops
+            any other app on the device from binding the service and using the app's
+            tuner as a proxy.
+          - `android:exported="true"`. Required, and it looks contradictory next to
+            the permission above. The system is a different UID, so it must be able
+            to bind; the permission is what makes that safe.
+          - The `<meta-data>` block. Without it the service is never discovered as a
+            TV input, and the only symptom is an app that does not appear in the
+            tuner's list.
+
+          The class name is fully qualified on purpose. A relative `android:name`
+          resolves against the namespace, and a service that fails to resolve is not
+          a compile error — it is a class that does not exist at runtime, a tuner
+          that silently never appears, and nothing in the build saying so.
+        -->
+        <service
+            android:name="com.example.tuner.KurdishTvInputService"
+            android:exported="true"
+            android:label="@string/tv_input_tuner_label"
+            android:permission="android.permission.BIND_TV_INPUT">
+            <intent-filter>
+                <action android:name="android.media.tv.TvInputService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.media.tv.input.TvInputService"
+                android:resource="@xml/tv_input_tuner_info" />
+        </service>
+
+        <!--
           Exposes a downloaded update APK to the system package installer as a
           content:// URI. A file:// URI is rejected on Android 7+.
         -->
