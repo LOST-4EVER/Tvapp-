@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.value
 import com.example.kurdishtv.ui.theme.ExpressiveMorph
 import com.example.kurdishtv.ui.theme.ExpressivePolygon
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
@@ -59,7 +60,7 @@ object ShapeMorph {
     /**
      * Resting and active corner radii for a filter chip.
      *
-     * Chips use a percent radius rather than these — see [rememberMorphingPillShape].
+     * Chips use a percent radius rather than these — see [ShapeMorph.pill].
      * These are here for the fixed-height surfaces that want to round further when
      * they are selected.
      */
@@ -81,6 +82,39 @@ object ShapeMorph {
     /** The live dot: 4dp on an 8dp dot is a circle, flattening to 2dp as it pulses. */
     val liveRest: CornerScale = CornerScale.uniform(4.dp)
     val liveActive: CornerScale = CornerScale.uniform(2.dp)
+
+    /**
+     * A corner radius for a control of [size], as a fraction of its shorter side.
+     *
+     * The one rule a fixed `dp` radius has to obey and cannot check for itself:
+     * **a corner radius must be less than half the shortest side.** Past that the four
+     * arcs overlap each other and the shape renders as a lopsided blob — which is
+     * exactly the failure the polygon library used to produce everywhere, now
+     * reintroduced through the back door by hard-coding radii that were sized for a
+     * different control.
+     *
+     * This came up for real when the vocabulary moved off polygons: a polygon is
+     * refitted to whatever box it is drawn in and so can never exceed it, whereas a
+     * `dp` radius carries whatever number it was given. A 20dp radius is a circle on a
+     * 40dp button and a broken shape on the 36dp one, and on the 34dp-tall selection
+     * indicator in the navigation rail.
+     *
+     * Sizing the radius as a fraction of the control, and clamping it here, makes the
+     * whole class of bug unrepresentable: no call site can ask for a radius its
+     * element is too small to carry.
+     */
+    fun cornerRadius(size: Dp, fraction: Float): Dp =
+        (size.value * fraction).coerceAtMost(size.value / 2f).dp
+
+    /**
+     * A true pill, at any size.
+     *
+     * A percent radius is Material's own `Pill` and is exact everywhere: 50% of the
+     * shorter side is a circle on a square element and a stadium on a wide one, with
+     * no arithmetic to get wrong. Preferred over [cornerRadius] wherever the control
+     * has no reason to be anything but a pill.
+     */
+    val pill: Shape = RoundedCornerShape(percent = 50)
 
     /**
      * The outline drawn around whatever currently holds D-pad focus.
@@ -130,27 +164,7 @@ fun rememberMorphingPolygon(
     )
 
     return MorphingPolygonShape(morph, progress, rotation)
-}
-
-/**
- * A true pill — a corner radius of 50% of the shorter side.
- *
- * A percent radius is the whole point. It is resolution-independent, so the same token
- * is a pill on a 40dp chip and a stadium on a 200dp one, and it cannot drift out of
- * proportion the way a fixed dp radius does once the label length changes. It is also
- * exactly what Material's own `Pill` is, so nothing here is a reinvention.
- *
- * Selection is deliberately *not* carried by the outline. A chip that changes fill,
- * label weight and elevation already reads as selected from across a room, and a chip
- * whose silhouette also moves only adds motion to read past a label.
- */
-@Composable
-fun rememberMorphingPillShape(
-    selected: Boolean,
-    reduceMotion: Boolean = LocalReduceMotion.current
-): Shape = RoundedCornerShape(percent = 50)
-
-/**
+}/**
  * A rounded-rectangle shape whose four corner radii animate between two states.
  *
  * This is the shape animation for every surface that carries a label, and it is why
@@ -199,12 +213,11 @@ data class CornerScale(
     /**
      * A radius expressed as a fraction of the shorter side.
      *
-     * 50 is a pill, 25 is a rounded square. [CornerScale] itself stores `Dp`, because
-     * a fixed radius is what the animatable surfaces want; percent is the escape hatch
-     * for a control whose height is not known at the call site, or where one token has
-     * to be a pill at one size and a squircle at another.
+     * 50 is a pill, 25 is a rounded square. [CornerScale] stores `Dp`, because a
+     * fixed radius is what the animatable surfaces want; [ShapeMorph.pill] is the
+     * percent-radius escape hatch for a control whose size is not known at the call
+     * site.
      */
-    fun percent(fraction: Int): Shape = RoundedCornerShape(percent = fraction)
 
     companion object {
         /** Every corner the same. */

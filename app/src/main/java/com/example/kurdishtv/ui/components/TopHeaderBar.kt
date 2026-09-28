@@ -24,10 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.rememberMorphingCorners
-import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -54,8 +55,12 @@ fun TopHeaderBar(
     // header and the content together; while a refresh is in flight the corners open
     // a little, so the header says "working" without a spinner over the grid.
     val brandShape = rememberMorphingCorners(
-        rest = M3ExpressiveShapes.Corners.logoTile,
-        active = M3ExpressiveShapes.Corners.cardFocused,
+        // Sized off the tile, not off a shared token: the tile is 40-46dp, so half
+        // its short side is 20-23dp and the 22dp "logo tile" radius exceeded it on the
+        // narrow layout. Opening 30% -> 44% of the tile keeps it a rounded square at
+        // both sizes and still reads as a change when a refresh is in flight.
+        rest = CornerScale.uniform(ShapeMorph.cornerRadius(46.dp, 0.30f)),
+        active = CornerScale.uniform(ShapeMorph.cornerRadius(46.dp, 0.44f)),
         isActive = isLoading,
         spec = ExpressiveMotion.spatialDefault
     )

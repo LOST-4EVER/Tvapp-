@@ -34,13 +34,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
+import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.rememberMorphingCorners
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
-import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -127,9 +127,12 @@ private fun RecentChannelChip(
     val colors = LocalAppColors.current
     var isFocused by remember(channel.id) { mutableStateOf(false) }
 
+    // The chip is ~54dp tall, so half its short side is 27dp. The shared
+    // "cardFocused" radius is 30dp, which made this chip's own corners overlap into
+    // each other the moment it took focus. 20 -> 24dp opens visibly and stays legal.
     val chipShape = rememberMorphingCorners(
-        rest = M3ExpressiveShapes.Corners.mediumCard,
-        active = M3ExpressiveShapes.Corners.cardFocused,
+        rest = CornerScale.uniform(20.dp),
+        active = CornerScale.uniform(24.dp),
         isActive = isFocused,
         spec = ExpressiveMotion.spatialFast
     )

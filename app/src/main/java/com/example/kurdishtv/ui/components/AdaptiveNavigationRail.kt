@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.CategoryFilter
+import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
@@ -174,9 +175,12 @@ private fun RailCategoryItem(
     val colors = LocalAppColors.current
     var isFocused by remember(category) { mutableStateOf(false) }
 
+    // The indicator is a fixed 60x34dp box, so its longest safe radius is 17dp --
+    // half the short side. A 20dp "active" radius made the four corners overlap and
+    // the selection pill render as a lopsided blob. Sized off the box instead.
     val indicatorShape: Shape = rememberMorphingCorners(
-        rest = ShapeMorph.indicatorRest,
-        active = ShapeMorph.indicatorActive,
+        rest = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.40f)),
+        active = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.50f)),
         isActive = isSelected,
         spec = ExpressiveMotion.spatialDefault
     )

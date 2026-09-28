@@ -29,8 +29,8 @@ import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.model.ChannelFilterEngine
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.LocalReduceMotion
+import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
-import com.example.kurdishtv.ui.motion.rememberMorphingPillShape
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -115,14 +115,11 @@ fun CategoryBar(
                 label = "CategoryPillElevation"
             )
 
-            // The chip is a true pill — a 50% corner radius — so it is a pill whatever
-            // the label length is. Selection is carried by fill, label weight and
-            // elevation together, which survives being read at an angle across a room
-            // in a way a tint shift on its own does not.
-            val pillShape = rememberMorphingPillShape(
-                selected = isSelected,
-                reduceMotion = reduceMotion
-            )
+            // A true pill — a 50% corner radius — so it is a pill whatever the label
+            // length is. Selection is carried by fill, label weight and elevation
+            // together, which survives being read at an angle across a room in a way
+            // a tint shift on its own does not.
+            val pillShape = ShapeMorph.pill
 
             Surface(
                 shape = pillShape,

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
@@ -108,9 +109,14 @@ fun AppIconButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
+    // Sized as a fraction of this button's own [size], not a fixed dp radius: the
+    // same token is a circle at 40dp, at 44dp and at the rail's 36dp, and the clamp
+    // in `cornerRadius` means no caller can request a radius its button is too small
+    // to carry. A hard-coded 20dp was a circle on one of those and a broken shape on
+    // another.
     val shape: Shape = rememberMorphingCorners(
-        rest = ShapeMorph.buttonRest,
-        active = ShapeMorph.buttonPressed,
+        rest = CornerScale.uniform(ShapeMorph.cornerRadius(size, 0.5f)),
+        active = CornerScale.uniform(ShapeMorph.cornerRadius(size, 0.28f)),
         isActive = isPressed,
         spec = ExpressiveMotion.spatialFast
     )
@@ -169,12 +175,10 @@ fun SquishyPillButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val shape = rememberMorphingCorners(
-        rest = ShapeMorph.chipRest,
-        active = ShapeMorph.chipActive,
-        isActive = isPressed || active,
-        spec = ExpressiveMotion.spatialFast
-    )
+    // A percent radius rather than a dp one: this pill is ~30dp tall, and half of
+    // that is 15dp, so the 20dp "active" radius it used to take made its own corners
+    // overlap. A pill is a pill at every size, and this is a pill.
+    val shape: Shape = ShapeMorph.pill
 
     Surface(
         shape = shape,

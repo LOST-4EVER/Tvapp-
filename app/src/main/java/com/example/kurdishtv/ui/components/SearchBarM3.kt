@@ -34,9 +34,12 @@ fun SearchBarM3(
     // on the corner scale rather than reaching for a lobed silhouette.
     val focused = remember { mutableStateOf(false) }
     val fieldShape = rememberMorphingCorners(
-        // 28dp is the pill for a 56dp-tall single-line field; 20dp squares it off
-        // without the corners eating into the placeholder text.
-        rest = CornerScale.uniform(28.dp),
+        // Sized off the field's own height rather than picked. A Material single-line
+        // text field is 56dp, so the longest legal radius is 28dp -- exactly the value
+        // this used, which left the four corner arcs meeting precisely on the centre
+        // line and rendered the resting pill slightly pinched at all four corners.
+        // 26dp is the largest radius that stays strictly inside it.
+        rest = CornerScale.uniform(26.dp),
         active = CornerScale.uniform(18.dp),
         isActive = focused.value,
         spec = ExpressiveMotion.spatialDefault
