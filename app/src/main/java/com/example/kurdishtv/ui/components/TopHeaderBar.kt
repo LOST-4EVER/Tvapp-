@@ -116,10 +116,20 @@ fun TopHeaderBar(
                     modifier = Modifier
                         .size(logoSize)
                         .border(1.dp, colors.primary.copy(alpha = 0.5f), brandShape)
-                        .graphicsLayer {
-                            scaleX = logoScale
-                            scaleY = logoScale
-                        }
+                        // Attached only while the logo is actually breathing. A
+                        // `graphicsLayer` is a render node with its own display list,
+                        // and this one otherwise sat at scale 1 for the entire life of
+                        // the screen, multiplying by one.
+                        .then(
+                            if (logoScale == 1f) {
+                                Modifier
+                            } else {
+                                Modifier.graphicsLayer {
+                                    scaleX = logoScale
+                                    scaleY = logoScale
+                                }
+                            }
+                        )
                         .bouncyClickable { onRefresh() }
                 ) {
                     Box(contentAlignment = Alignment.Center) {

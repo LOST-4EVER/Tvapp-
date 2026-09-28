@@ -81,7 +81,12 @@ fun ChannelCard(
      * outcome — "the first card, or wherever the viewer was" — that needs exactly
      * one owner.
      */
-    focusRequester: FocusRequester? = null
+    focusRequester: FocusRequester? = null,
+    /**
+     * Reports D-pad focus back to the grid, so the grid can remember which card the
+     * viewer was on and put focus back there the next time this screen is shown.
+     */
+    onFocusChanged: (isFocused: Boolean) -> Unit = {}
 ) {
     val colors = LocalAppColors.current
     // The accent is derived from the channel's name, so it is the same for the whole
@@ -106,13 +111,6 @@ fun ChannelCard(
         modifier = modifier
             .testTag("channel_card_${channel.id}")
             .fillMaxWidth()
-            .then(
-                if (focusRequester != null) {
-                    Modifier.focusRequester(focusRequester)
-                } else {
-                    Modifier
-                }
-            )
             // `liftOnFocus = false`: `expressiveFocusRing` below already lifts this
             // node by 1.05 while it is focused. Two lifts on one node multiply, so
             // the card was jumping 10% instead of the 5% that was asked for — and
@@ -127,12 +125,30 @@ fun ChannelCard(
                 liftOnFocus = false,
                 onLongClick = onFavoriteToggle
             ) { onClick() }
+            // The requester sits *after* the click for a reason.
+            //
+            // `Modifier.clickable` brings a focus target of its own, and a
+            // `focusRequester` binds to the first focus target below it in the chain.
+            // Placed before the click — where it used to be — it therefore bound to the
+            // click's target, which is not the target that owns the visible focus
+            // state: `expressiveFocusRing` supplies its own. Asking it for focus lit
+            // nothing up. After the click, the only target below it is the ring's.
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier
+                }
+            )
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
                 focusScale = 1.05f,
-                onFocusChanged = { isFocused = it }
+                onFocusChanged = { focused ->
+                    isFocused = focused
+                    onFocusChanged(focused)
+                }
             )
             .border(1.dp, colors.border, cardShape),
         shape = cardShape,
@@ -336,17 +352,18 @@ internal fun CardFavoriteButton(
             // clipped away by the surface outline and the oversized hit area spilled
             // over the card's own edges, stealing taps from the channel behind it.
             //
-            // `focusable = false` is the D-pad fix, and it is the important one.
-            // This heart sat *inside* the card's own bounds, so directional focus
-            // treated it as the nearest target to the right of every card: one press
-            // of the right arrow landed on the heart, and the next press was needed
-            // to reach the following channel. Across a grid that halved the speed of
-            // the most-used direction in the app, and made browsing a list of several
-            // hundred channels feel like it was skipping every other one.
+            // This heart sits inside the card's own bounds, so a focusable heart is the
+            // nearest target to the right of every card: one press of the right arrow
+            // lands on it and the next press is needed to reach the next channel, which
+            // across a grid of several hundred halves the speed of the most-used
+            // direction in the app.
             //
-            // The action has not been lost. It is a long press on the card, which is
-            // the idiom every TV player uses for the secondary action on a list row,
-            // and the heart is still a tap target for touch.
+            // `focusable = false` is what takes it out of the tab order — see the note
+            // on that parameter, which is the part that is easy to get wrong. The
+            // action is not lost: it is a long press on the card, the idiom every TV
+            // player uses for a list row's secondary action, and the heart remains a
+            // tap target that announces itself and exposes a click action for touch and
+            // for a screen reader.
             .bouncyClickable(focusable = false, onClick = onClick)
     ) {
         Box(contentAlignment = Alignment.Center) {

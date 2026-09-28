@@ -45,9 +45,12 @@ fun KurdishTvNavGraph(
         .fillMaxSize()
         .windowInsetsPadding(WindowInsets.safeDrawing)
 
-    // Changes every time the browse screen is pushed to or popped back to.
+    // Identity of the destination currently on top of the back stack, handed to the
+    // browse screen as the token it keys its focus placement on. `NavBackStackEntry.id`
+    // is a UUID string — it was being fallback-initialised with `?: 0` and passed to an
+    // `Int` parameter, which does not typecheck.
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val backStackEntryId = backStackEntry?.id ?: 0
+    val backStackEntryId = backStackEntry?.id.orEmpty()
 
     NavHost(
         navController = navController,
@@ -70,14 +73,16 @@ fun KurdishTvNavGraph(
                 onRemoveCustomPlaylist = { url -> viewModel.removeCustomPlaylist(url) },
                 onRetryClick = { viewModel.loadChannels() },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
-                // A navigation back stack keeps this destination composed while the
-                // player or the settings screen is on top of it, so the browse screen
-                // never "re-enters" as far as Compose is concerned and cannot know on
-                // its own that it has been shown again. The back stack entry's id
-                // changes on every visit, which makes it exactly the signal the grid
-                // needs to take D-pad focus back after the viewer comes back from a
-                // video — a grid with nothing focused is a grid the remote cannot
-                // drive.
+                // What the grid needs to take D-pad focus back after the viewer comes
+                // back from a video: a grid with nothing focused is a grid the remote
+                // cannot drive.
+                //
+                // This is the id of whichever entry is on top, so it is the browse
+                // screen's own id while the browse screen is the visible one — it does
+                // not change when the viewer returns, because it is the same entry. It
+                // does not have to: navigation-compose takes a destination out of the
+                // composition as soon as it is covered, so returning re-runs the
+                // grid's effects against the focus it saved on the way out.
                 focusToken = backStackEntryId,
                 modifier = insetModifier
             )

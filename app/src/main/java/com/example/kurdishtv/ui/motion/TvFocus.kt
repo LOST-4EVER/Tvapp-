@@ -111,7 +111,7 @@ fun Modifier.tvFocusable(
 /**
  * A focus ring that is itself an animated Material 3 Expressive shape.
  *
- * Three things happen, all on one shared transition so only the focused element ever
+ * Three things happen, all on one shared clock so only the focused element ever
  * animates:
  *
  *  1. the ring's outline springs from the element's own resting shape into a rounded
@@ -152,21 +152,38 @@ fun Modifier.expressiveFocusRing(
     )
 
     // Lining the two outlines up is the expensive half, so it happens once per pair
-    // rather than once per frame.
+    // rather than once per frame. The stroke and the scratch path are reused for the
+    // same reason: a fresh `Stroke` per frame was an allocation per frame per ring.
     val morph = remember(restShape, ringShape) { ExpressiveMorph.between(restShape, ringShape) }
     val ringPath = remember { Path() }
     val strokeWidth = with(LocalDensity.current) { ringWidth.toPx() }
+    val ringStroke = remember(strokeWidth) { Stroke(width = strokeWidth) }
 
-    // One app-wide turn, not one per ring.
+    // Neither of the two *continuously* animated inputs is read here, and that is the
+    // point.
     //
-    // This used to be `key(isFocused) { rememberInfiniteTransition() ... }`, which was
-    // already better than an unconditional loop but still wrong for a D-pad: every
-    // arrow press tore down a `withFrameNanos` loop on the card losing focus and
-    // started a fresh one on the card gaining it, so holding a direction key down
-    // churned a frame callback per card per step. There is only ever one ring drawn,
-    // so there is only ever one loop needed. See [LocalFocusRotation].
-    val sharedRotation = LocalFocusRotation.current
-    val reveal by animateFloatAsState(
+    // Both change on every frame while a ring is on screen. Read during composition,
+    // they invalidate *this* modifier on every frame — which rebuilds the entire
+    // modifier chain of every element that carries a ring, and in the channel grid
+    // that is several hundred of them, sixty times a second. They are State objects
+    // read inside the draw lambda below, where a change invalidates the drawing of the
+    // one node that actually read it and nothing else. That is the whole reason they
+    // are States rather than numbers.
+    //
+    // `scale` above is the exception, and it is not an oversight: it moves only on a
+    // focus change, and the read is what lets the layer be dropped entirely at rest.
+    // One node recomposing for the length of one focus transition is a great deal
+    // cheaper than several hundred render nodes held to multiply by one.
+    //
+    // The turn itself is app-wide — see [LocalFocusRotation]. It used to be
+    // `key(isFocused) { rememberInfiniteTransition() ... }`, which was already better
+    // than one loop per card but still wrong for a D-pad: every arrow press tore down
+    // a `withFrameNanos` loop on the card losing focus and started a fresh one on the
+    // card gaining it, so holding a direction key down churned a frame callback per
+    // card per step. There is only ever one ring drawn, so there is only ever one loop
+    // needed.
+    val rotation = LocalFocusRotation.current
+    val reveal = animateFloatAsState(
         targetValue = if (isFocused) 1f else 0f,
         animationSpec = ExpressiveMotion.spatialDefault,
         label = "FocusRingReveal"
@@ -199,15 +216,15 @@ fun Modifier.expressiveFocusRing(
                 )
                 if (ringSize.minDimension > 0f) {
                     morph.fittedPath(
-                        progress = reveal,
+                        progress = reveal.value,
                         size = ringSize,
-                        rotationDegrees = if (reduceMotion) 0f else sharedRotation,
+                        rotationDegrees = if (reduceMotion) 0f else rotation.floatValue,
                         out = ringPath
                     )
                     drawPath(
                         path = ringPath,
                         color = ringColor,
-                        style = Stroke(width = strokeWidth)
+                        style = ringStroke
                     )
                 }
             }

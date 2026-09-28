@@ -95,9 +95,17 @@ fun CategoryBar(
     val listState = rememberLazyListState()
     LaunchedEffect(selectedCategory, visible) {
         val index = visible.indexOf(selectedCategory)
-        if (index >= 0) {
-            listState.animateScrollToItem(index)
-        }
+        if (index < 0) return@LaunchedEffect
+        // Only when the chip is genuinely out of view.
+        //
+        // `animateScrollToItem` scrolls its target to the leading edge, so running it
+        // on every selection change dragged the whole row along as the viewer arrowed
+        // from chip to chip: the chips under the D-pad appeared to slide out from
+        // under the highlight. A chip that is already on screen needs nothing, and on
+        // a wide window that is every chip there is.
+        val onScreen = listState.layoutInfo.visibleItemsInfo.any { item -> item.index == index }
+        if (onScreen) return@LaunchedEffect
+        listState.animateScrollToItem(index)
     }
 
     LazyRow(

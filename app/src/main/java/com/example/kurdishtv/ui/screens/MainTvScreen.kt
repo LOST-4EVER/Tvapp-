@@ -17,12 +17,13 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.awaitFrame
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +52,7 @@ import com.example.kurdishtv.ui.motion.rememberTvFocusRequester
 import com.example.kurdishtv.ui.motion.staggeredEntrance
 import com.example.kurdishtv.viewmodel.TvUiState
 import com.example.ui.theme.LocalAppColors
+import kotlinx.coroutines.delay
 
 @Composable
 fun MainTvScreen(
@@ -67,14 +69,13 @@ fun MainTvScreen(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     /**
-     * Bumped by the navigator every time this screen becomes the visible one again.
+     * Identity of the navigation entry this screen is showing.
      *
-     * A back stack keeps the browse screen composed while the player is on top of it,
-     * so returning from a video does not re-run this screen's own effects. Without
-     * something to key on, a viewer who watched a channel came back to a grid with
-     * nothing focused and had to hunt for where they were. See [ChannelGrid].
+     * The grid keys its focus placement on this, so a viewer who watched a channel and
+     * came back lands on the card they left rather than on a grid with nothing focused.
+     * See [ChannelGrid].
      */
-    focusToken: Int = 0
+    focusToken: String = ""
 ) {
     val colors = LocalAppColors.current
     var showImportDialog by remember { mutableStateOf(false) }
@@ -204,7 +205,7 @@ fun MainTvScreen(
                                     isHome = isBrowsingHome,
                                     minCellSize = gridMinCellSize,
                                     onChannelClick = onChannelClick,
-                                    onFavoriteToggle = onFavoriteToggle
+                                    onFavoriteToggle = onFavoriteToggle,
                                     focusToken = focusToken
                                 )
                             }
@@ -275,7 +276,7 @@ fun MainTvScreen(
                                     isHome = isBrowsingHome,
                                     minCellSize = 160.dp,
                                     onChannelClick = onChannelClick,
-                                    onFavoriteToggle = onFavoriteToggle
+                                    onFavoriteToggle = onFavoriteToggle,
                                     focusToken = focusToken
                                 )
                             }
@@ -321,7 +322,7 @@ fun MainTvScreen(
                                 isHome = isBrowsingHome,
                                 minCellSize = gridMinCellSize,
                                 onChannelClick = onChannelClick,
-                                onFavoriteToggle = onFavoriteToggle
+                                onFavoriteToggle = onFavoriteToggle,
                                 focusToken = focusToken
                             )
                         }
@@ -402,7 +403,7 @@ private fun LandscapeCompactLayout(
     onRetryClick: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenImport: () -> Unit,
-    focusToken: Int
+    focusToken: String
 ) {
     val colors = LocalAppColors.current
 
@@ -446,7 +447,7 @@ private fun LandscapeCompactLayout(
                     isHome = isBrowsingHome,
                     minCellSize = gridMinCellSize,
                     onChannelClick = onChannelClick,
-                    onFavoriteToggle = onFavoriteToggle
+                    onFavoriteToggle = onFavoriteToggle,
                     focusToken = focusToken
                 )
             }
@@ -464,29 +465,109 @@ private fun ChannelGrid(
     minCellSize: Dp,
     onChannelClick: (Channel) -> Unit,
     onFavoriteToggle: (String) -> Unit,
-    focusToken: Int
+    focusToken: String
 ) {
     // A television is driven by a D-pad, so focus is a primary state rather than a
     // detail: a screen where nothing holds focus is a screen where the remote does
     // nothing, and where the first press of any direction key lands somewhere
     // arbitrary because focus is being picked for the first time.
+    val gridState = rememberLazyGridState()
+    val gridFocus = rememberTvFocusRequester()
+
+    // Where the viewer's focus was the last time this screen was on show.
     //
-    // `rememberTvFocusRequester` has been in the motion package for two revisions and
-    // had never been called. This is that call.
-    val firstCardFocus = rememberTvFocusRequester()
+    // Saved rather than merely remembered, because the navigator composes one
+    // destination at a time: the browse screen is disposed while the player is on top
+    // of it, so coming back from a video is a *fresh* composition of this screen and
+    // nothing in it survives. Without a record of where the viewer was, they came back
+    // to a grid scrolled to their place but with nothing focused, and had to hunt.
+    var lastFocusedId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // The card the [FocusRequester] is currently attached to. Deliberately kept
+    // separate from `lastFocusedId`, which is rewritten on every arrow press: binding
+    // the requester to that value would rebind it — and so recompose every card on
+    // screen — each time the viewer moved. This one changes only when focus has to be
+    // placed somewhere new.
+    var focusAnchorId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // The card in this grid that holds focus right now, or null when focus is somewhere
+    // else on the screen.
+    //
+    // Kept because "the results changed" and "the viewer wants focus moved" are not the
+    // same event. Typing into the search field changes the results on every keystroke,
+    // and a grid that took focus back on the first of them would pull the keyboard out
+    // from under the viewer and end the search one letter in.
+    var activeCardId by remember { mutableStateOf<String?>(null) }
+
+    // Whether this visit has already handed focus to the grid. Plain state on purpose:
+    // it resets when the screen leaves composition, which is exactly the case that has
+    // to place focus — the viewer coming back from a video.
+    var focusPlaced by remember { mutableStateOf(false) }
+
     val firstChannelId = filtered.firstOrNull()?.id
+
+    LaunchedEffect(focusToken, firstChannelId) {
+        if (firstChannelId == null) return@LaunchedEffect
+        val restored = lastFocusedId?.takeIf { id -> filtered.any { it.id == id } }
+        // Nothing here has ever been driven by a remote and the grid is scrolled, which
+        // means the viewer has been scrolling with a finger. Leave their place alone
+        // rather than yanking the list back to the top under them.
+        if (restored == null && lastFocusedId == null && gridState.firstVisibleItemIndex > 0) {
+            return@LaunchedEffect
+        }
+        // The fallback is also the recovery path: it fires when the anchored card has
+        // left the list entirely — a favourite removed while the Favourites tab is on
+        // screen — which is the one case where focus genuinely has nowhere to go.
+        //
+        // The anchor only moves when the grid is where focus already is, or when this
+        // visit has not placed it yet. A card removed out from under a focused grid
+        // leaves `activeCardId` naming a card that no longer exists, which still reads
+        // as "the grid is in charge" and is exactly the case that has to recover.
+        val anchor = restored ?: firstChannelId
+        if (!focusPlaced || activeCardId != null) {
+            focusAnchorId = anchor
+        }
+        focusPlaced = true
+    }
 
     // Requested after a frame rather than during composition: the card is not in the
     // tree until the grid has laid it out, and asking for focus before it is attached
-    // throws.
-    LaunchedEffect(firstChannelId, focusToken) {
-        if (firstChannelId == null) return@LaunchedEffect
-        awaitFrame()
-        runCatching { firstCardFocus.requestFocus() }
+    // does nothing at all.
+    LaunchedEffect(focusAnchorId) {
+        val anchor = focusAnchorId ?: return@LaunchedEffect
+        // Getting the anchor into the tree is this effect's problem, not the focus
+        // system's: a lazy grid does not compose a card that is scrolled a long way off
+        // screen, and `requestFocus` can only target a node that exists. That is the
+        // case this guards — the anchor has fallen back to the first card while the
+        // list is still scrolled — and it is checked against the scroll position rather
+        // than against the outcome of the request, because a request that finds nothing
+        // fails silently rather than reporting it.
+        val recovering = anchor == firstChannelId && gridState.firstVisibleItemIndex > 0
+        if (recovering) {
+            runCatching { gridState.scrollToItem(0) }
+        }
+        withFrameNanos { }
+        runCatching { gridFocus.requestFocus() }
+    }
+
+    // The entrance stagger belongs to a new *set* of channels, not to a scroll.
+    //
+    // A lazy layout recycles item compositions, so an unconditional entrance replayed
+    // on every card that scrolled into view: each newly attached card waited out its
+    // own delay — up to fourteen steps of it — and then faded in, which is what made
+    // the grid look like it was lagging a few hundred milliseconds behind the D-pad.
+    // The stagger is armed when the set changes and disarmed once it has had time to
+    // play, after which cards that arrive from off screen simply appear.
+    var entranceActive by remember { mutableStateOf(true) }
+    LaunchedEffect(uiState.selectedCategory, uiState.searchQuery, filtered.size) {
+        entranceActive = true
+        delay(ExpressiveMotion.STAGGER_MAX_ITEMS * ExpressiveMotion.STAGGER_STEP_MS + 300L)
+        entranceActive = false
     }
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = minCellSize),
+        state = gridState,
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -519,7 +600,6 @@ private fun ChannelGrid(
                     showLogos = showLogos,
                     onWatchClick = onChannelClick,
                     onFavoriteToggle = onFavoriteToggle
-                    focusToken = focusToken
                 )
             }
         }
@@ -533,10 +613,28 @@ private fun ChannelGrid(
                 showLogos = showLogos,
                 onClick = { onChannelClick(channel) },
                 onFavoriteToggle = { onFavoriteToggle(channel.id) },
-                // Exactly one card is the focus entry point. Handing the requester to
-                // every card would put a focus handle on each of several hundred
-                // rows for one job.
-                focusRequester = if (index == 0) firstCardFocus else null,
+                // Exactly one card carries the focus handle: the anchored one. Handing
+                // it to every card would put a requester registration on each of
+                // several hundred rows for one job, for an outcome that needs exactly
+                // one owner.
+                focusRequester = if (channel.id == focusAnchorId) gridFocus else null,
+                // Recorded so the next visit can put focus back where the viewer left
+                // it, and so the grid can tell whether focus is still inside it. Writing
+                // to plain state that nothing reads during composition, so moving
+                // between cards costs one write and nothing else.
+                //
+                // The loss is checked against the card that gained it, because a card
+                // also reports `false` the first time it is composed — which happens
+                // every time one scrolls into view — and that would otherwise clear a
+                // flag another card is still holding.
+                onFocusChanged = { focused ->
+                    if (focused) {
+                        lastFocusedId = channel.id
+                        activeCardId = channel.id
+                    } else if (activeCardId == channel.id) {
+                        activeCardId = null
+                    }
+                },
                 modifier = Modifier
                     // Placement + fade. Without it, changing category or clearing a
                     // search snapped every surviving card to a new slot at once;
@@ -546,7 +644,7 @@ private fun ChannelGrid(
                         fadeInSpec = tween(ExpressiveMotion.DURATION_MEDIUM, easing = ExpressiveMotion.emphasized),
                         placementSpec = ExpressiveMotion.spatialDefaultOffset
                     )
-                    .staggeredEntrance(index = index)
+                    .staggeredEntrance(index = index, animate = entranceActive)
             )
         }
     }

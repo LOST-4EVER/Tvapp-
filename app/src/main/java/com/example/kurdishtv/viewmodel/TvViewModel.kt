@@ -89,19 +89,27 @@ class TvViewModel(
             val recentIds = withContext(Dispatchers.IO) { repository.getRecentChannelIds() }
             val recents = recentIds.mapNotNull { id -> byId[id] }
 
-            _uiState.update { state ->
-                val filtered = ChannelFilterEngine.filter(
-                    channels = instant,
-                    category = state.selectedCategory,
-                    query = state.searchQuery
-                )
-                state.copy(
-                    channels = instant,
-                    filteredChannels = filtered,
-                    recentChannels = recents,
-                    customPlaylistUrls = customUrls,
-                    selectedChannel = state.selectedChannel ?: instant.firstOrNull()
-                )
+            // Filtered on a background dispatcher, like every other whole-catalogue
+            // pass. `update` is a compare-and-set loop and is safe to run from any
+            // thread, so the filter and the swap that publishes it stay one atomic
+            // step — the query and the category cannot move between the two — without
+            // that step's several hundred string comparisons landing on the main
+            // thread during a cold start.
+            withContext(Dispatchers.Default) {
+                _uiState.update { state ->
+                    val filtered = ChannelFilterEngine.filter(
+                        channels = instant,
+                        category = state.selectedCategory,
+                        query = state.searchQuery
+                    )
+                    state.copy(
+                        channels = instant,
+                        filteredChannels = filtered,
+                        recentChannels = recents,
+                        customPlaylistUrls = customUrls,
+                        selectedChannel = state.selectedChannel ?: instant.firstOrNull()
+                    )
+                }
             }
         } catch (_: Exception) {}
     }
@@ -149,29 +157,35 @@ class TvViewModel(
                 val byId = list.associateBy { it.id }
                 val recents = recentIds.mapNotNull { id -> byId[id] }
 
-                _uiState.update { state ->
-                    val filtered = ChannelFilterEngine.filter(
-                        channels = list,
-                        category = state.selectedCategory,
-                        query = state.searchQuery
-                    )
-                    // The previously selected channel can vanish between refreshes —
-                    // a source going down, or a playlist being edited. Keeping the old
-                    // reference would leave the side player and the transport
-                    // controls pointing at something that is no longer in the list,
-                    // and `selectNextChannel` would jump to the first entry instead of
-                    // continuing from where the user was.
-                    val selected = state.selectedChannel
-                        ?.takeIf { current -> list.any { it.id == current.id } }
-                        ?: list.firstOrNull()
-                    state.copy(
-                        isLoading = false,
-                        channels = list,
-                        filteredChannels = filtered,
-                        recentChannels = recents,
-                        customPlaylistUrls = customUrls,
-                        selectedChannel = selected
-                    )
+                // Same reasoning as in [loadInstantState]: the merge can hold well over
+                // a thousand channels once the remote playlists land, and this pass and
+                // the state swap that publishes it are one atomic step.
+                withContext(Dispatchers.Default) {
+                    _uiState.update { state ->
+                        val filtered = ChannelFilterEngine.filter(
+                            channels = list,
+                            category = state.selectedCategory,
+                            query = state.searchQuery
+                        )
+                        // The previously selected channel can vanish between
+                        // refreshes — a source going down, or a playlist being edited.
+                        // Keeping the old reference would leave the side player and
+                        // the transport controls pointing at something that is no
+                        // longer in the list, and `selectNextChannel` would jump to
+                        // the first entry instead of continuing from where the user
+                        // was.
+                        val selected = state.selectedChannel
+                            ?.takeIf { current -> list.any { it.id == current.id } }
+                            ?: list.firstOrNull()
+                        state.copy(
+                            isLoading = false,
+                            channels = list,
+                            filteredChannels = filtered,
+                            recentChannels = recents,
+                            customPlaylistUrls = customUrls,
+                            selectedChannel = selected
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, errorMessage = e.message) }
