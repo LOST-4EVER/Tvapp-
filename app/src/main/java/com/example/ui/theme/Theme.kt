@@ -7,6 +7,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.ui.motion.LocalReduceMotion
@@ -18,6 +19,16 @@ fun KurdishTvTheme(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
+
+    // Ten-foot UI. Read from the configuration rather than inferred from the window
+    // size, because a TV box and a tablet are the same shape on paper.
+    //
+    // `uiMode` is in `MainActivity`'s `configChanges`, so a device that is docked
+    // or undocked does not recreate the activity; reading the configuration here
+    // (rather than caching the answer in a field) is what lets the value change.
+    val isTv = remember(LocalConfiguration.current) {
+        LocalConfiguration.current.isTvMode()
+    }
 
     // Material You (Android 12+): pull the accent from the user's wallpaper palette.
     // Falls back to the bundled accent on older releases or if extraction fails.
@@ -63,6 +74,7 @@ fun KurdishTvTheme(
 
     CompositionLocalProvider(
         LocalAppColors provides colors,
+        LocalIsTv provides isTv,
         LocalReduceMotion provides settings.reduceMotion
     ) {
         MaterialTheme(

@@ -7,6 +7,23 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **The app is on the Android TV home screen.** The manifest declared the leanback
+  feature and shipped a D-pad interface, but the launcher intent-filter carried only
+  `android.intent.category.LAUNCHER`, so the app never appeared in the TV home
+  launcher. On stock Android TV — the common case — that meant the app was effectively
+  unlaunchable on the device it is designed for: there is no app drawer listing
+  non-TV activities to fall back on. The leanback category is now declared alongside
+  the normal one, so a single install serves phones, tablets and televisions, and a
+  320x180 banner (`ic_tv_banner`) gives the TV home row a real tile instead of a
+  placeholder.
+- **TV mode is detected at all.** Nothing in the app read `uiMode`. A TV box and a
+  tablet report comparable sizes and both declare the leanback feature, so every
+  layout decision the app made — the grid's cell size, the settings column — was
+  tuned for a screen held at arm's length and silently applied to a television.
+  `LocalIsTv` now carries the answer, and the grid gets a 220dp ten-foot cell instead
+  of falling through to the two-column *phone* grid it was being handed.
+
 ### Changed
 - **R8 was keeping the whole of media3, which is the largest dependency in the app.**
   `proguard-rules.pro` had `-keep class androidx.media3.** { *; }`, and R8 cannot
@@ -27,6 +44,51 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   anything else while the app is alive. Sized for what is visible plus a screenful
   of scroll-back. The 48 MB *disk* cache is where the long tail belongs and is
   unchanged.
+- **Settings stretched across the whole width of a television.** A `fillMaxWidth`
+  card behind a 20dp phone gutter put a row's label hard against the left edge and
+  its switch hard against the right, with a metre of empty card between them. Cards
+  are now capped to a readable column and centred, and the gutter grows on TV.
+  Phones and tablets are untouched.
+- **Two settings that were already saved were not on the settings screen.** Video fit
+  (fit/fill/zoom) and picture correction (the six colour presets) were persisted and
+  applied, and the player overlay wrote them, but nothing in Settings surfaced
+  either — so a viewer who had not found the player's controls had no idea the
+  choice existed, let alone how to undo it. Both are now under Playback.
+- **Tapping an accent colour did nothing.** With Material You on, the wallpaper's
+  colour wins, so picking “Ember” changed a stored value and not one pixel — which
+  reads as a dead control rather than as a conflict. Tapping a swatch is a request
+  for that colour, so it now also switches Material You off, and the note above the
+  row says so.
+- **Three of the fifteen type slots were never defined.** `displaySmall`,
+  `headlineSmall` and `bodySmall` fell back to the Material defaults, so the
+  featured hero's largest text was the only large text on screen set in the default
+  regular weight while everything around it was bold. All fifteen slots now come from
+  the app's own scale.
+- **The type scale was hostile to Kurdish text.** Line heights were set at Latin
+  display ratios — 1.11 for `displayLarge` — which puts the stacked vowel marks of
+  Sorani (تەلەفزیۆنی کوردی) on the line boundary, so multi-line Kurdish copy collided
+  with the line above it. And positive letter spacing is inserted as an extra
+  advance between glyph *clusters*, which on several Android releases lands between
+  the joined forms of Arabic script and visibly opens the joins. Display and headline
+  slots keep their negative tracking, which is Latin-only; every other slot is now
+  untracked.
+- **Every logo cell built a second composition.** `SubcomposeAsyncImage` composes a
+  subcomposition for its loading and error states, per cell — dozens per screen, on
+  every scroll of the grid — to show two lines of monogram that are the same every
+  time. The monogram is now drawn underneath and the image painted over it, which is
+  the same result with no subcomposition. This is also what the crossfade note above
+  always claimed was happening; it was not, because the `loading` slot replaced the
+  composable output rather than layering over it.
+- **A deep Material You wallpaper accent produced unreadable container text.** The
+  on-container colour was lerped towards white, which is right for the five bundled
+  accents because they are all hand-picked light tones — but a wallpaper-derived
+  primary is not hand-picked, and on the palettes that land on a deep tone the lerp
+  produced a mid value the dark container could not separate from. The on-colour is
+  now chosen by measured contrast when the accent came from the wallpaper, which is
+  the rule the rest of the theme already uses. The bundled accents are untouched.
+- **Dead code.** `CategoryFilter` carried a translated name for all twelve entries
+  that nothing ever read; the two settings rows and the settings cards also shared a
+  hand-rolled chip control that is now the generic one both use.
 
 ### Fixed
 - **Logos re-decoded every time the grid scrolled between card sizes.** The Coil
@@ -38,6 +100,13 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   most. Decode sizes are now bucketed to powers of two, so a grid laying out at
   137dp and one at 141dp share bitmaps, and a logo is never decoded below the size it
   is drawn at.
+- **A deep Material You wallpaper accent produced unreadable container text.** The
+  on-container colour was lerped towards white, which is right for the five bundled
+  accents because they are all hand-picked light tones — but a wallpaper-derived
+  primary is not hand-picked, and on the palettes that land on a deep tone the lerp
+  produced a mid value the dark container could not separate from. The on-colour is
+  now chosen by measured contrast when the accent came from the wallpaper, which is
+  the rule the rest of the theme already uses. The bundled accents are untouched.
 - **Every logo in the grid animated its own fade-in.** The crossfade was a loader
   default, so scrolling produced a rolling wave of per-frame alpha animations, each
   holding a render node open — the most expensive animation in the app and the one

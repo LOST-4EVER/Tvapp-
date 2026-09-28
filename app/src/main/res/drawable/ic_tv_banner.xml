@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android TV home-screen banner.
+
+  Required alongside LEANBACK_LAUNCHER: the TV launcher reserves a 320x180 slot for
+  each app row, and an activity with no banner is rendered with a generic placeholder
+  or dropped from the row entirely. Reuses the launcher background and the Sun Gold
+  accent so the banner and the icon read as one thing.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#151821"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:fillColor="#1E2230"
+        android:pathData="M96,58h128v76h-128z" />
+    <path
+        android:strokeColor="#FFB703"
+        android:strokeWidth="6"
+        android:fillColor="#00000000"
+        android:pathData="M96,58 L224,58 L224,134 L96,134 Z" />
+    <path
+        android:strokeColor="#FFB703"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M140,58 L112,28" />
+    <path
+        android:strokeColor="#FFB703"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M180,58 L208,28" />
+    <path
+        android:strokeColor="#FFB703"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M160,134 L160,152" />
+    <path
+        android:strokeColor="#FFB703"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M140,152 L180,152" />
+</vector>

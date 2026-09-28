@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -59,8 +60,11 @@ import com.example.kurdishtv.ui.components.edgeFade
 import com.example.kurdishtv.update.AppUpdate
 import com.example.kurdishtv.update.UpdateState
 import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.player.ResizeMode
+import com.example.kurdishtv.ui.player.VideoColorFilter
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
+import com.example.ui.theme.LocalIsTv
 import com.example.ui.theme.appColorsFor
 import com.example.ui.theme.onColorFor
 
@@ -85,6 +89,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
+    val isTv = LocalIsTv.current
     val snackbarHostState = remember { SnackbarHostState() }
     val supportsDynamicColor = remember { Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
     var pendingAction by remember { mutableStateOf<PendingAction?>(null) }
@@ -105,7 +110,21 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 40.dp),
+            // Ten-foot treatment.
+            //
+            // On a television the window is roughly 1920dp wide, and a `fillMaxWidth`
+            // card behind a 20dp phone gutter stretched a settings row across the
+            // whole screen: label hard against the left edge, switch hard against
+            // the right, a metre of empty card between them. Each card is capped to
+            // a column that is comfortable to read from a sofa and
+            // `horizontalAlignment` centres it. Phones and tablets are untouched.
+            horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = PaddingValues(
+                start = if (isTv) 40.dp else 20.dp,
+                end = if (isTv) 40.dp else 20.dp,
+                top = 12.dp,
+                bottom = 40.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item(key = "header") {
@@ -139,6 +158,30 @@ fun SettingsScreen(
                         checked = settings.autoHideControls,
                         onCheckedChange = { value -> onUpdate { it.copy(autoHideControls = value) } }
                     )
+                    // Resize mode and picture correction were already persisted and
+                    // already applied — the player overlay writes them — but neither
+                    // appeared anywhere on this screen, so a viewer who had not found
+                    // the player's controls had no idea the choice existed, let alone
+                    // how to undo it.
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SectionLabel("Video fit")
+                    SegmentedOptions(
+                        options = ResizeMode.entries,
+                        selected = settings.resizeMode,
+                        labelOf = { it.label },
+                        onSelect = { mode -> onUpdate { it.copy(resizeMode = mode) } }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SectionLabel("Picture correction")
+                    ChipRow(
+                        options = VideoColorFilter.entries,
+                        selected = settings.videoColorFilter,
+                        labelOf = { it.label },
+                        onSelect = { filter -> onUpdate { it.copy(videoColorFilter = filter) } }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
                     SettingsSwitchRow(
                         iconRes = KurdishTvIcons.LiveTv,
                         title = "Animated LIVE badge",
@@ -158,8 +201,10 @@ fun SettingsScreen(
                     iconRes = KurdishTvIcons.LiveTv
                 ) {
                     SectionLabel("Default category")
-                    CategoryChipRow(
+                    ChipRow(
+                        options = CategoryFilter.entries,
                         selected = settings.startCategory,
+                        labelOf = { it.displayName },
                         onSelect = { category -> onUpdate { it.copy(startCategory = category) } }
                     )
 
@@ -190,7 +235,13 @@ fun SettingsScreen(
                         // accent as selected made the screen claim a colour the app
                         // was not drawing.
                         overridden = settings.dynamicColor && supportsDynamicColor,
-                        onSelect = { accent -> onUpdate { it.copy(accent = accent) } }
+                        // Tapping a colour is a request for *that* colour, so it also
+                        // switches Material You off. Leaving it on meant the wallpaper
+                        // kept winning and the tap changed nothing on screen, which
+                        // reads as a dead control rather than as a conflict.
+                        onSelect = { accent ->
+                            onUpdate { it.copy(accent = accent, dynamicColor = false) }
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -223,12 +274,14 @@ fun SettingsScreen(
                         selected = settings.motion,
                         labelOf = { it.displayName },
                         onSelect = { level -> onUpdate { it.copy(motion = level) } }
-                    )                }
+                    )
+                }
             }
 
             // ── Update ────────────────────────────────────────────────────────
             item(key = "update") {
                 UpdateCard(
+                    modifier = Modifier.readableColumn(isTv),
                     state = updateState,
                     onCheck = onCheckForUpdate,
                     onDownload = onDownloadUpdate,
@@ -349,12 +402,23 @@ private enum class PendingAction(val title: String, val body: String) {
     RESET_SETTINGS("Reset all settings?", "Appearance, playback and browsing preferences return to defaults.")
 }
 
+/**
+ * Caps a card to a column that is comfortable to read from a sofa.
+ *
+ * Applied per card rather than by wrapping the whole list, so the cap composes with
+ * `LazyColumn`'s own `horizontalAlignment` instead of needing a second layout
+ * container around the screen.
+ */
+private fun Modifier.readableColumn(isTv: Boolean): Modifier =
+    if (isTv) this.widthIn(max = 760.dp) else this
+
 @Composable
 private fun SettingsHeader(onBack: () -> Unit) {
     val colors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .readableColumn(LocalIsTv.current)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -408,6 +472,7 @@ private fun SettingsSection(
         color = colors.surface,
         modifier = Modifier
             .fillMaxWidth()
+            .readableColumn(LocalIsTv.current)
             .border(1.dp, colors.border, M3ExpressiveShapes.LargeCard)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
@@ -473,12 +538,13 @@ private fun AccentSwatchRow(
     val colors = LocalAppColors.current
     Column {
         if (overridden) {
-            // Say plainly that these are not in effect. The stored accent still
-            // applies the moment Material You is switched off, so the row stays
-            // enabled and keeps the checkmark — it is just labelled as pending.
+            // Say plainly that these are not in effect, and that tapping one is
+            // how you take effect. The stored accent still applies the moment
+            // Material You is switched off, so the row stays enabled and keeps the
+            // checkmark — it is just labelled as pending.
             Text(
                 text = "Material You is on, so the app is using your wallpaper's color. " +
-                    "Turn it off below to use one of these.",
+                    "Tap one of these to switch it off and use that color instead.",
                 color = colors.textTertiary,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(bottom = 10.dp)
@@ -570,10 +636,19 @@ private fun <T> SegmentedOptions(
     }
 }
 
+/**
+ * A horizontally scrolling row of single-choice chips.
+ *
+ * Generic because two different settings need the same control and the picture
+ * presets outnumber what a segmented bar can hold on a phone. `labelOf` rather than
+ * `toString` so an enum's own constant name never leaks into the UI.
+ */
 @Composable
-private fun CategoryChipRow(
-    selected: CategoryFilter,
-    onSelect: (CategoryFilter) -> Unit
+private fun <T> ChipRow(
+    options: List<T>,
+    selected: T,
+    labelOf: (T) -> String,
+    onSelect: (T) -> Unit
 ) {
     val colors = LocalAppColors.current
     val listState = rememberLazyListState()
@@ -583,8 +658,8 @@ private fun CategoryChipRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(vertical = 2.dp)
     ) {
-        items(CategoryFilter.entries, key = { it.name }) { category ->
-            val isSelected = category == selected
+        items(options, key = { labelOf(it) }) { option ->
+            val isSelected = option == selected
             Surface(
                 shape = M3ExpressiveShapes.Pill,
                 color = if (isSelected) colors.primary else colors.surfaceVariant,
@@ -594,10 +669,10 @@ private fun CategoryChipRow(
                         if (isSelected) colors.primary else colors.border,
                         M3ExpressiveShapes.Pill
                     )
-                    .bouncyClickable(scaleDown = 0.92f) { onSelect(category) }
+                    .bouncyClickable(scaleDown = 0.92f) { onSelect(option) }
             ) {
                 Text(
-                    text = category.displayName,
+                    text = labelOf(option),
                     color = if (isSelected) colors.onPrimary else colors.textPrimary,
                     fontSize = 12.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
