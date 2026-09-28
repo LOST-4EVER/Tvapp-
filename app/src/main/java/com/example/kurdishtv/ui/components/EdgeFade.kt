@@ -2,9 +2,6 @@ package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -27,55 +24,49 @@ import com.example.ui.theme.LocalAppColors
  * Only the edge that actually has content beyond it is painted. Fading both ends
  * unconditionally is wrong in a way that is easy to miss: the fade overlaps the
  * row's own content padding, so it dimmed the first and last chip even when the
- * row fitted on screen and had nothing to scroll to. [listState] is what makes
- * the two ends independent — `canScrollBackward` and `canScrollForward` are
- * already derived values, so neither costs a recomposition per scroll frame.
+ * row fitted on screen and had nothing to scroll to.
+ *
+ * The scroll state is read *inside* the draw lambda rather than captured into
+ * remembered derived state. `LazyListState.canScrollForward` and
+ * `canScrollBackward` are themselves derived state, so reading them from the draw
+ * phase registers this node as an observer and re-runs the draw when they flip —
+ * the same mechanism every other draw-time read uses, and it keeps this a plain
+ * Modifier extension rather than a composable one.
  */
 fun Modifier.horizontalEdgeFade(
     listState: LazyListState,
     background: Color,
     width: Dp = 28.dp
-): Modifier {
-    val fadeAtStart by remember(listState) {
-        derivedStateOf { listState.canScrollBackward }
-    }
-    val fadeAtEnd by remember(listState) {
-        derivedStateOf { listState.canScrollForward }
-    }
-    return this.drawWithContent {
-        drawContent()
+): Modifier = this.drawWithContent {
+    drawContent()
 
-        // Converted here rather than in the modifier factory: a DrawScope is
-        // itself a Density, and reading LocalDensity outside a composable is not
-        // allowed.
-        val fadePx = width.toPx()
-        val bounds = size
-        // A row narrower than the fade has nothing to fade into it; painting it would
-        // just dim the ends of the only item.
-        if (bounds.width <= fadePx * 2f) return@drawWithContent
+    val fadePx = width.toPx()
+    val bounds = size
+    // A row narrower than the fade has nothing to fade into it; painting it would
+    // just dim the ends of the only item.
+    if (bounds.width <= fadePx * 2f) return@drawWithContent
 
-        if (fadeAtStart) {
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(background, Color.Transparent),
-                    startX = 0f,
-                    endX = fadePx
-                ),
-                topLeft = Offset.Zero,
-                size = Size(fadePx, bounds.height)
-            )
-        }
-        if (fadeAtEnd) {
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(Color.Transparent, background),
-                    startX = bounds.width - fadePx,
-                    endX = bounds.width
-                ),
-                topLeft = Offset(bounds.width - fadePx, 0f),
-                size = Size(fadePx, bounds.height)
-            )
-        }
+    if (listState.canScrollBackward) {
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(background, Color.Transparent),
+                startX = 0f,
+                endX = fadePx
+            ),
+            topLeft = Offset.Zero,
+            size = Size(fadePx, bounds.height)
+        )
+    }
+    if (listState.canScrollForward) {
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, background),
+                startX = bounds.width - fadePx,
+                endX = bounds.width
+            ),
+            topLeft = Offset(bounds.width - fadePx, 0f),
+            size = Size(fadePx, bounds.height)
+        )
     }
 }
 

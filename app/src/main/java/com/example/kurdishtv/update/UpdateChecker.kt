@@ -83,7 +83,7 @@ class UpdateChecker(
             // present but unparseable, the gate passed and the tag's patch number
             // was compared against VERSION_CODE anyway.
             val runNumber = fromApi.notes
-                ?.let { runNumberFrom(it) }
+                ?.let { UpdateManifestParser.runNumberFrom(it) }
                 ?: return@withContext Result.success(null)
 
             Result.success(

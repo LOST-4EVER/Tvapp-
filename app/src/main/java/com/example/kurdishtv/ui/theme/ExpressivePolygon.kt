@@ -563,13 +563,17 @@ fun ExpressiveMorph.fittedPath(
 /**
  * Stretches [path] so that [bounds] becomes exactly [size].
  *
- * Compose matrices post-multiply, so scaling and then translating means "move the
- * shape's top-left corner to the origin, then stretch it across the box".
+ * Compose matrices post-multiply, so translating first and then scaling applies
+ * the scale to the *translated* path — "move the shape's top-left corner to the
+ * origin, then stretch it across the box".
+ *
+ * [Matrix.scale] takes one scale factor per axis with no pivot, so the order is
+ * the whole mechanism rather than a stylistic choice.
  */
 private fun fitToBox(path: Path, bounds: Rect, size: Size, matrix: Matrix = Matrix()) {
     matrix.reset()
-    matrix.scale(size.width / bounds.width, size.height / bounds.height, 0f, 0f)
     matrix.translate(-bounds.left, -bounds.top)
+    matrix.scale(size.width / bounds.width, size.height / bounds.height)
     path.transform(matrix)
 }
 
