@@ -72,7 +72,13 @@ fun Modifier.tvFocusable(
             scaleX = scale
             scaleY = scale
         }
-        .border(BorderStroke(ringWidth, ringColor), shape)
+        // Only while focused. The ring used to be applied unconditionally, which
+        // put a 3dp accent outline on *every* card in the grid — the grid read as
+        // though everything were selected at once, and the accent colour competed
+        // with the LIVE badge and the artwork.
+        .then(
+            if (isFocused) Modifier.border(BorderStroke(ringWidth, ringColor), shape) else Modifier
+        )
 }
 
 /** A [FocusRequester] for programmatically focusing an element, e.g. the first card. */

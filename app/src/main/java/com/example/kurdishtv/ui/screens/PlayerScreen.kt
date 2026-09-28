@@ -143,6 +143,7 @@ fun PlayerScreen(
             resizeMode = resizeMode,
             onPlaybackError = { err -> errorMessage = err },
             colorFilter = colorFilter,
+            areControlsVisible = isControlsVisible,
             modifier = Modifier.fillMaxSize()
         )
 

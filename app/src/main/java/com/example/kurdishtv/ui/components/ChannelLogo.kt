@@ -166,7 +166,7 @@ private val MonogramAccents = listOf(
 )
 
 /** Stable per-channel accent, chosen from a hash of the name. */
-private fun monogramAccent(seed: String): Color {
+internal fun monogramAccent(seed: String): Color {
     // String.hashCode is specified by the JDK, so this is stable across processes
     // and app restarts — the same channel always gets the same colour.
     val hash = seed.hashCode().let { if (it == Int.MIN_VALUE) 0 else it }

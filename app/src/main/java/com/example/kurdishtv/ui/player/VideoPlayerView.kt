@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +48,15 @@ fun VideoPlayerView(
     resizeMode: ResizeMode,
     onPlaybackError: (String) -> Unit,
     colorFilter: VideoColorFilter = VideoColorFilter.None,
+    /**
+     * Whether the transport controls are on screen.
+     *
+     * The buffering notice and the transport row are both centred, so when the
+     * controls were visible the "Connecting stream…" pill was drawn straight
+     * through the play button. The controls already communicate playback state, so
+     * the notice is only needed once they auto-hide.
+     */
+    areControlsVisible: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -196,10 +206,12 @@ fun VideoPlayerView(
         )
 
         AnimatedVisibility(
-            visible = isBuffering,
+            visible = isBuffering && !areControlsVisible,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.Center)
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(24.dp)
         ) {
             PlayerBufferingIndicator()
         }

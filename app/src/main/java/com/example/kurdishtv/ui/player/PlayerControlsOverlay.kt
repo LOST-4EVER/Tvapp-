@@ -84,71 +84,86 @@ fun PlayerControlsOverlay(
                     .background(Color.Black.copy(alpha = 0.45f))
             ) {
                 // ── Top action bar ────────────────────────────────────────────
-                Row(
+                // The scrim is a wrapper with extra bottom padding rather than a
+                // background on the row itself. A gradient drawn across the row's
+                // own bounds has to reach transparent exactly at the row's edge,
+                // which leaves a hard line across the video; giving the wrapper room
+                // below the row lets the falloff finish in empty space.
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopCenter)
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent)
+                                listOf(
+                                    Color.Black.copy(alpha = 0.92f),
+                                    Color.Black.copy(alpha = 0.55f),
+                                    Color.Transparent
+                                )
                             )
                         )
-                        .padding(horizontal = 16.dp, vertical = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 40.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppIconButton(
-                            iconRes = KurdishTvIcons.ChevronLeft,
-                            contentDescription = "Back",
-                            onClick = onBackClick,
-                            style = AppIconButtonStyle.Glass,
-                            size = 44.dp,
-                            iconSize = 24.dp
-                        )
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column {
-                            Text(
-                                text = channel.name,
-                                color = colors.textPrimary,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AppIconButton(
+                                iconRes = KurdishTvIcons.ChevronLeft,
+                                contentDescription = "Back",
+                                onClick = onBackClick,
+                                style = AppIconButtonStyle.Glass,
+                                size = 44.dp,
+                                iconSize = 24.dp
                             )
-                            Text(
-                                text = "${channel.category} • ${channel.quality}",
-                                color = colors.textSecondary,
-                                fontSize = 12.sp
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = channel.name,
+                                    color = colors.textPrimary,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = "${channel.category} • ${channel.quality}",
+                                    color = colors.textSecondary,
+                                    fontSize = 12.sp,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            AppIconButton(
+                                iconRes = if (isMuted) KurdishTvIcons.VolumeOff else KurdishTvIcons.VolumeUp,
+                                contentDescription = if (isMuted) "Unmute" else "Mute",
+                                onClick = onToggleMute,
+                                style = AppIconButtonStyle.Glass,
+                                active = isMuted
+                            )
+                            AppIconButton(
+                                iconRes = KurdishTvIcons.Bedtime,
+                                contentDescription = "Sleep timer",
+                                onClick = onOpenSleepTimer,
+                                style = AppIconButtonStyle.Glass,
+                                active = !sleepTimerRemainingText.isNullOrEmpty()
+                            )
+                            AppIconButton(
+                                iconRes = if (channel.isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
+                                contentDescription = "Favorite",
+                                onClick = onFavoriteToggle,
+                                style = AppIconButtonStyle.Glass,
+                                active = channel.isFavorite
                             )
                         }
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        AppIconButton(
-                            iconRes = if (isMuted) KurdishTvIcons.VolumeOff else KurdishTvIcons.VolumeUp,
-                            contentDescription = if (isMuted) "Unmute" else "Mute",
-                            onClick = onToggleMute,
-                            style = AppIconButtonStyle.Glass,
-                            active = isMuted
-                        )
-                        AppIconButton(
-                            iconRes = KurdishTvIcons.Bedtime,
-                            contentDescription = "Sleep timer",
-                            onClick = onOpenSleepTimer,
-                            style = AppIconButtonStyle.Glass,
-                            active = !sleepTimerRemainingText.isNullOrEmpty()
-                        )
-                        AppIconButton(
-                            iconRes = if (channel.isFavorite) KurdishTvIcons.FavoriteFilledRes else KurdishTvIcons.FavoriteOutline,
-                            contentDescription = "Favorite",
-                            onClick = onFavoriteToggle,
-                            style = AppIconButtonStyle.Glass,
-                            active = channel.isFavorite
-                        )
                     }
                 }
 
@@ -190,109 +205,120 @@ fun PlayerControlsOverlay(
                 }
 
                 // ── Bottom action bar ─────────────────────────────────────────
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                                listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.55f),
+                                    Color.Black.copy(alpha = 0.92f)
+                                )
                             )
                         )
-                        .padding(horizontal = 20.dp, vertical = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 22.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        LiveBadge()
-                        if (!sleepTimerRemainingText.isNullOrEmpty()) {
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Surface(
-                                shape = M3ExpressiveShapes.BadgePill,
-                                color = colors.primaryContainer
-                            ) {
-                                Text(
-                                    text = "Timer $sleepTimerRemainingText",
-                                    color = colors.onPrimaryContainer,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
-
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            shape = M3ExpressiveShapes.Pill,
-                            color = colors.glass,
-                            modifier = Modifier.bouncyClickable(onClick = onResizeModeToggle)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                SvgIcon(
-                                    resId = KurdishTvIcons.AspectRatio,
-                                    contentDescription = null,
-                                    tint = colors.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text(
-                                    text = resizeMode.label,
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        // Colour correction. Cycles through the presets and is
-                        // highlighted while one is active, so the current
-                        // treatment is visible without opening a menu.
-                        Surface(
-                            shape = M3ExpressiveShapes.Pill,
-                            color = if (colorFilter.isActive) {
-                                colors.primary
-                            } else {
-                                colors.glass
-                            },
-                            modifier = Modifier.bouncyClickable(onClick = onCycleColorFilter)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                SvgIcon(
-                                    resId = KurdishTvIcons.Palette,
-                                    contentDescription = "Video colour filter",
-                                    tint = if (colorFilter.isActive) colors.onPrimary else Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                if (colorFilter.isActive) {
-                                    Spacer(modifier = Modifier.width(5.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            LiveBadge()
+                            if (!sleepTimerRemainingText.isNullOrEmpty()) {
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Surface(
+                                    shape = M3ExpressiveShapes.BadgePill,
+                                    color = colors.primaryContainer
+                                ) {
                                     Text(
-                                        text = colorFilter.label,
-                                        color = colors.onPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
+                                        text = "Timer $sleepTimerRemainingText",
+                                        color = colors.onPrimaryContainer,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
                             }
                         }
 
-                        AppIconButton(
-                            iconRes = if (isFullscreen) KurdishTvIcons.FullscreenExit else KurdishTvIcons.Fullscreen,
-                            contentDescription = "Fullscreen",
-                            onClick = onFullscreenToggle,
-                            style = AppIconButtonStyle.Glass,
-                            size = 40.dp,
-                            iconSize = 20.dp
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // A glass pill reads correctly over video; the label is
+                            // white rather than the accent, which would vanish
+                            // against a bright frame.
+                            Surface(
+                                shape = M3ExpressiveShapes.Pill,
+                                color = colors.glass,
+                                modifier = Modifier.bouncyClickable(onClick = onResizeModeToggle)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    SvgIcon(
+                                        resId = KurdishTvIcons.AspectRatio,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = resizeMode.label,
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+
+                            // Colour correction. Cycles through the presets and is
+                            // highlighted while one is active, so the current
+                            // treatment is visible without opening a menu.
+                            Surface(
+                                shape = M3ExpressiveShapes.Pill,
+                                color = if (colorFilter.isActive) {
+                                    colors.primary
+                                } else {
+                                    colors.glass
+                                },
+                                modifier = Modifier.bouncyClickable(onClick = onCycleColorFilter)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    SvgIcon(
+                                        resId = KurdishTvIcons.Palette,
+                                        contentDescription = "Video colour filter",
+                                        tint = if (colorFilter.isActive) colors.onPrimary else Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    if (colorFilter.isActive) {
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text(
+                                            text = colorFilter.label,
+                                            color = colors.onPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+
+                            AppIconButton(
+                                iconRes = if (isFullscreen) KurdishTvIcons.FullscreenExit else KurdishTvIcons.Fullscreen,
+                                contentDescription = "Fullscreen",
+                                onClick = onFullscreenToggle,
+                                style = AppIconButtonStyle.Glass,
+                                size = 40.dp,
+                                iconSize = 20.dp
+                            )
+                        }
                     }
                 }
             }
