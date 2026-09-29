@@ -138,7 +138,9 @@ fun Modifier.expressiveFocusRing(
     val ringStroke = remember(strokePx) { Stroke(width = strokePx) }
     // The width that makes the scrim span from the element's own edge outward to
     // `outset + stroke`. See the note where it is drawn.
-    val scrimStroke = remember(outsetPx, strokePx) { Stroke(width = outsetPx * 2f + strokePx) }
+    val scrimStroke = remember(outsetPx, strokePx) {
+        Stroke(width = focusScrimStrokeWidth(outsetPx, strokePx))
+    }
 
     this
         // A focus target only when this element has no click of its own. When a shared
@@ -157,11 +159,8 @@ fun Modifier.expressiveFocusRing(
 
             // Grown by the ring's own stroke so the outline sits entirely outside the
             // element: half the stroke inside, half out, plus the outset.
-            val grown = (outsetPx + strokePx / 2f).coerceAtLeast(0f)
-            val ringSize = Size(
-                width = size.width + grown * 2f,
-                height = size.height + grown * 2f
-            )
+            val grown = focusRingGrowth(outsetPx, strokePx)
+            val ringSize = focusRingSize(size, grown)
             if (ringSize.minDimension <= 0f) return@drawWithContent
 
             // progress and rotation are both constants. A shape that does not change
@@ -200,7 +199,16 @@ fun Modifier.expressiveFocusRing(
                 // ring, so the ring lands on the outer part of it and the inner part
                 // is the visible gap.
                 if (scrim != Color.Transparent) {
-                    drawPath(path = ringPath, color = scrim, style = scrimStroke)
+                    // Shifted back by half the outset so the band runs from the
+                    // element's own edge out to the ring's outer edge, and stops
+                    // there. Left centred on the path it would overshoot by half a
+                    // stroke on the outside, and an opaque band that overshoots
+                    // into a 14dp grid gutter reaches into the *neighbouring* card,
+                    // which reads as a bite taken out of it.
+                    val scrimShift = -outsetPx / 2f
+                    translate(left = scrimShift, top = scrimShift) {
+                        drawPath(path = ringPath, color = scrim, style = scrimStroke)
+                    }
                 }
                 drawPath(path = ringPath, color = ringColor, style = ringStroke)
             }
@@ -210,3 +218,53 @@ fun Modifier.expressiveFocusRing(
 /** A [FocusRequester] for programmatically focusing an element, e.g. the first card. */
 @Composable
 fun rememberTvFocusRequester(): FocusRequester = remember { FocusRequester() }
+
+// ── Geometry ──────────────────────────────────────────────────────────────────
+//
+// These three are the whole of the ring's layout and they are pure, so they live
+// out here where a test can reach them.
+//
+// They are here because all three were wrong at once and none of it was visible
+// without a device. `fittedPath` anchors a shape's top-left at the origin, so the
+// path has to be *shifted* by [focusRingGrowth] when it is drawn; the scrim has to
+// be *wider* than the ring or the ring paints straight over it; and the ring has to
+// be drawn outside the element, which means nothing upstream may clip. See
+// FocusRingGeometryTest.
+
+/**
+ * How far the ring's path box is grown beyond the element on each side.
+ *
+ * Half the stroke sits outside the path and half inside, so the growth is the outset
+ * plus half a stroke. [Size] for the path is then this element's size plus twice
+ * this, and the draw is translated back by exactly this much — see the note in the
+ * draw block for why the shift is not optional.
+ */
+internal fun focusRingGrowth(outsetPx: Float, strokePx: Float): Float =
+    (outsetPx + strokePx / 2f).coerceAtLeast(0f)
+
+/** The size of the ring's path box for an element of [element] and a growth of [grown]. */
+internal fun focusRingSize(element: Size, grown: Float): Size =
+    Size(
+        width = element.width + grown * 2f,
+        height = element.height + grown * 2f
+    )
+
+/**
+ * The stroke width that makes the scrim a visible band rather than an invisible one.
+ *
+ * `outset + stroke` is the total distance the scrim has to reach: from the element's
+ * own edge, across the gap the outset left, and out to the ring's far edge. A stroke
+ * is centred on the path, so the draw shifts it back by half a stroke — see the note
+ * in the draw block.
+ *
+ * At the ring's own width the scrim is painted over completely by the ring drawn
+ * immediately after it, which is the bug this constant exists to make impossible to
+ * reintroduce: six call sites were passing a colour and getting no band at all.
+ *
+ * And it must not be *wider* than this either. A centred stroke of `2 * outset +
+ * stroke` would span 0..11dp on the app's shipped numbers, and the channel grid's
+ * gutter is 14dp — so an opaque band that size reaches 4dp into the neighbouring
+ * card. `FocusRingGeometryTest` pins the reach against the real spacing.
+ */
+internal fun focusScrimStrokeWidth(outsetPx: Float, strokePx: Float): Float =
+    outsetPx + strokePx

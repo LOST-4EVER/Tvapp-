@@ -8,6 +8,40 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- **A logo tile now shows a neutral placeholder while it loads, instead of the
+  channel's monogram.** The monogram is the channel's real fallback identity - it is
+  what a channel with no `tvg-logo` is *supposed* to look like - but it was also being
+  used as the loading state, so every tile in the grid drew letters and an accent
+  gradient that it then tore down the instant the artwork arrived. On a cold start
+  that is the whole first screen changing its mind at once, and it reads *slower*
+  than a neutral block, because the eye has already read the monogram and then has to
+  read the logo again. The load state is now three-valued rather than one boolean:
+  a static `LogoSkeleton` in flight, the artwork once it lands, and the monogram only
+  when there is genuinely nothing to show - the load failed, or the channel has no
+  logo at all.
+  - The skeleton does not shimmer. A shimmer is a per-frame shader pass and a render
+    node held open for the whole wait, and a placeholder moving while the real content
+    sits still beside it would be the one thing on screen contradicting the app's no
+    animation rule.
+  - **The grid deliberately does not get one.** The bundled catalogue is on screen
+    before any load starts and stays there while a refresh runs behind it, so there is
+    never blank space for a skeleton to stand in for. Replacing a hundred real cards
+    with a hundred grey rectangles would throw away something the viewer can already
+    use and make the screen slower, not faster. A card-shaped skeleton was written and
+    cut, because nothing could reach it.
+
+- **The focus ring's geometry is now three pure functions, and they have tests.**
+  #39's own note records that nothing in this repository covers the UI layer - "the
+  focus ring, the player, the D-pad flow" - and the ring is where that gap had already
+  cost something, because all three of its layout bugs were invisible without a device.
+  `FocusRingGeometryTest` pins the growth, the path box, the promised gap and the
+  scrim's reach, using the numbers the app actually ships (3dp stroke, 4dp outset).
+  - The scrim's width was wrong in the fix as much as in the original. Centred on the
+    ring's path it spans 0-11dp from a card's edge, and the grid's gutter is 14dp, so
+    an opaque band that size reaches 4dp into the *neighbouring* card - a visible
+    notch rather than a focus ring. It now runs from the element's own edge to the
+    ring's outer edge and stops, which is exactly half the gutter.
+
 - **The interface no longer animates. At all.** Every spring, easing curve, frame
   loop and shape morph in the app has been deleted rather than switched off. A
   `snap()` spec still creates an animation, still registers a frame callback and
