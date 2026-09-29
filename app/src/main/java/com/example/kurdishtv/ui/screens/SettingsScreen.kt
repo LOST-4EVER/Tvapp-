@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -51,6 +52,7 @@ import com.example.BuildConfig
 import com.example.kurdishtv.model.AccentColor
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.model.CategoryFilter
+import com.example.kurdishtv.model.DeviceMode
 import com.example.kurdishtv.model.MotionLevel
 import com.example.kurdishtv.model.ThemeMode
 import com.example.kurdishtv.ui.components.KurdishTvIcons
@@ -66,7 +68,27 @@ import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 import com.example.ui.theme.LocalIsTv
 import com.example.ui.theme.appColorsFor
+import com.example.ui.theme.isTvMode
 import com.example.ui.theme.onColorFor
+
+/**
+ * One line explaining what the device-mode control is currently doing.
+ *
+ * Pure so it can be unit-tested without a `Configuration`, and kept next to the
+ * control it describes rather than inline in the composable.
+ */
+internal fun deviceModeHint(mode: DeviceMode, detectedIsTv: Boolean): String = when (mode) {
+    DeviceMode.AUTO ->
+        if (detectedIsTv) {
+            "Auto — this device reports itself as a TV, so the ten-foot layout is in use."
+        } else {
+            "Auto — this device reports itself as a phone or tablet, so the handheld layout is in use."
+        }
+    DeviceMode.TV ->
+        "TV — the room-sized layout is forced, whatever the device reports."
+    DeviceMode.MOBILE ->
+        "Phone — the compact touch layout is forced, whatever the device reports."
+}
 
 @Composable
 fun SettingsScreen(
@@ -92,6 +114,10 @@ fun SettingsScreen(
     val isTv = LocalIsTv.current
     val snackbarHostState = remember { SnackbarHostState() }
     val supportsDynamicColor = remember { Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
+    // What the *device* says, as opposed to what the preference resolved to. Shown
+    // beside the control so "Auto" is not a mystery, and read from the configuration
+    // here rather than passed down: it is the one place the raw answer is wanted.
+    val detectedIsTv = LocalConfiguration.current.isTvMode()
     var pendingAction by remember { mutableStateOf<PendingAction?>(null) }
 
     LaunchedEffect(message) {
@@ -216,6 +242,43 @@ fun SettingsScreen(
                         checked = settings.showLogos,
                         onCheckedChange = { value -> onUpdate { it.copy(showLogos = value) } },
                         showDivider = false
+                    )
+                }
+            }
+
+            // ── Interface ──────────────────────────────────────────────────────
+            //
+            // Its own section rather than a row at the bottom of Appearance, because
+            // it is the one setting on this screen that changes the *shape* of the
+            // rest of the app rather than its colours. It also has to sit above
+            // Motion, because a viewer who arrives here because the cards are
+            // unreadable on their box should meet that reason before they are asked
+            // to decide whether the animation is worth the frame rate.
+            item(key = "interface") {
+                SettingsSection(
+                    title = "Interface",
+                    subtitle = "Which layout to use",
+                    iconRes = KurdishTvIcons.Tv
+                ) {
+                    SectionLabel("Device mode")
+                    SegmentedOptions(
+                        options = DeviceMode.entries,
+                        selected = settings.deviceMode,
+                        labelOf = { it.displayName },
+                        onSelect = { mode -> onUpdate { it.copy(deviceMode = mode) } }
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    // Says what "Auto" actually resolved to. Without this the row is
+                    // a three-way switch with no way to find out which one the
+                    // device is currently on — and on a box that misreports its
+                    // `uiMode`, "Auto" producing the wrong layout is exactly the
+                    // thing the viewer needs to see explained before they can tell
+                    // whether the override has fixed it.
+                    Text(
+                        text = deviceModeHint(settings.deviceMode, detectedIsTv),
+                        color = colors.textSecondary,
+                        fontSize = 12.sp
                     )
                 }
             }

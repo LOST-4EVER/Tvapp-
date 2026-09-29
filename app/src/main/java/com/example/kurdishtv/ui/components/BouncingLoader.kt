@@ -9,7 +9,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -61,37 +62,57 @@ fun BouncingLoader(
         }
     }
 
-    val transition = rememberInfiniteTransition(label = "M3LoadingIndicator")
     // The two animated values are held as State and read *inside* the draw lambda
     // rather than being delegated at the top level. Reading them during composition
     // would recompose this composable on every frame of a seven-second loop; reading
     // them during draw only re-runs the draw pass, which is what an indicator needs.
-    val walk = transition.animateFloat(
-        initialValue = 0f,
-        targetValue = sequence.size.toFloat(),
-        animationSpec = infiniteRepeatable(
-            // Linear, because a morph that also eases looks like it is hesitating
-            // between shapes rather than moving continuously through them.
-            animation = tween(
-                durationMillis = sequence.size * MORPH_MILLIS,
-                easing = LinearEasing
+    //
+    // Under reduced motion the transition is not created at all.
+    //
+    // It used to be created unconditionally and the *drawing* branched on the setting
+    // instead, which meant a viewer who had asked for reduced motion still ran two
+    // infinite animations at display rate — a frame callback sixty times a second,
+    // for the whole time the indicator was up — to produce a still shape. Three
+    // things in the app show this loader (a channel refresh, an update check, a
+    // buffering stream), so it was a permanent frame loop rather than a rare one.
+    // `rememberInfiniteTransition` cannot be switched off the way `LaunchedEffect` can,
+    // so the honest fix is to not ask for one: the `if` is on the composable call,
+    // not on its result.
+    val walk: State<Float>
+    val rotation: State<Float>
+    if (reduceMotion) {
+        val still = remember { mutableFloatStateOf(0f) }
+        walk = still
+        rotation = still
+    } else {
+        val transition = rememberInfiniteTransition(label = "M3LoadingIndicator")
+        walk = transition.animateFloat(
+            initialValue = 0f,
+            targetValue = sequence.size.toFloat(),
+            animationSpec = infiniteRepeatable(
+                // Linear, because a morph that also eases looks like it is hesitating
+                // between shapes rather than moving continuously through them.
+                animation = tween(
+                    durationMillis = sequence.size * MORPH_MILLIS,
+                    easing = LinearEasing
+                ),
+                repeatMode = RepeatMode.Restart
             ),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LoadingWalk"
-    )
-    val rotation = transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = sequence.size * MORPH_MILLIS,
-                easing = LinearEasing
+            label = "LoadingWalk"
+        )
+        rotation = transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(
+                    durationMillis = sequence.size * MORPH_MILLIS,
+                    easing = LinearEasing
+                ),
+                repeatMode = RepeatMode.Restart
             ),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "LoadingRotation"
-    )
+            label = "LoadingRotation"
+        )
+    }
 
     val path = remember { Path() }
 

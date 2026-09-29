@@ -31,6 +31,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -152,6 +155,26 @@ fun PlayerScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+            // The remote was dead while the controls were hidden.
+            //
+            // Auto-hide takes the transport bar out of the composition, and the bar is
+            // the only focusable thing on this screen — the scrim it sits on is a
+            // `tapOnly` precisely so that it is *not* a focus target. Once it is gone
+            // there is no focus target left here at all, so a direction key had nothing
+            // to move to and no effect key had anything to press: a viewer who let the
+            // controls fade out had to press Back to leave or change channel blind.
+            // On a television, which is the device with no finger to tap the screen
+            // and wake them, that is a dead end.
+            //
+            // Any key press brings them back. It never consumes the event, so the
+            // controls still receive it once they are there — this only re-opens the
+            // bar, and the auto-hide effect above re-arms and hides it again if the
+            // viewer is not actually watching.
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                if (!isControlsVisible) isControlsVisible = true
+                false
+            }
     ) {
         VideoPlayerView(
             streamUrl = channel.streamUrl,
