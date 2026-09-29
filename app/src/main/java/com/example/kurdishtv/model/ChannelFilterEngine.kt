@@ -15,7 +15,7 @@ import java.util.Locale
 private data class CategoryRule(val filter: CategoryFilter, val needle: String)
 
 /** Favourites and HD are not substring tests, so they carry no needle. */
-private val StringRules: List<CategoryRule> = listOf(
+private val stringRules: List<CategoryRule> = listOf(
     CategoryRule(CategoryFilter.NEWS, "News"),
     CategoryRule(CategoryFilter.KURDISH, "Kurdish"),
     CategoryRule(CategoryFilter.GENERAL, "General"),
@@ -34,8 +34,8 @@ private val StringRules: List<CategoryRule> = listOf(
  * but it is a lookup rather than a scan precisely so that adding a second rule to a
  * category later does not silently change the meaning of the existing one.
  */
-private val RulesByCategory: Map<CategoryFilter, List<CategoryRule>> =
-    StringRules.groupBy { it.filter }
+private val rulesByCategory: Map<CategoryFilter, List<CategoryRule>> =
+    stringRules.groupBy { it.filter }
 
 object ChannelFilterEngine {
 
@@ -108,8 +108,8 @@ object ChannelFilterEngine {
             if (channel.isHd) counts[CategoryFilter.HD.ordinal]++
 
             val categoryText = channel.category
-            for (i in StringRules.indices) {
-                val rule = StringRules[i]
+            for (i in stringRules.indices) {
+                val rule = stringRules[i]
                 if (categoryText.contains(rule.needle, ignoreCase = true)) {
                     counts[rule.filter.ordinal]++
                 }
@@ -135,7 +135,7 @@ object ChannelFilterEngine {
      * once, from a list that never changes after this file is loaded.
      */
     private fun rulesFor(category: CategoryFilter): List<CategoryRule> =
-        if (category == CategoryFilter.ALL) emptyList() else RulesByCategory[category].orEmpty()
+        if (category == CategoryFilter.ALL) emptyList() else rulesByCategory[category].orEmpty()
 
     /**
      * The pre-normalised search keys for a channel list, built once and reused.

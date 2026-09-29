@@ -308,8 +308,18 @@ class UpdateChecker(
          * The release body records the CI run number, e.g.
          * `*on run* \`36\`.`. Recovering it is what makes an API-sourced update
          * comparable with the installed `VERSION_CODE`.
+         *
+         * The gap between "on run" and the digits is matched as "up to four
+         * spaces, asterisks or backticks" rather than as one exact sequence. The
+         * generated body spells it `` *on run* `36` ``, but the body is free text
+         * anyone can edit, and the obvious rewordings — `on run 36` and
+         * `on run *36*` — all used to fail to match. A miss here is silent: the
+         * parser then falls back to the tag's patch number, which is on the wrong
+         * scale, and the update simply never appears. Digits are what terminate
+         * the gap, so the run number is still read from the same place and
+         * nothing else can be mistaken for one.
          */
-        internal val RUN_NUMBER_IN_BODY = Regex("""on run\*?\s*`?(\d+)`?""")
+        internal val RUN_NUMBER_IN_BODY = Regex("""on run[\s*`]{0,4}(\d+)""")
     }
 }
 

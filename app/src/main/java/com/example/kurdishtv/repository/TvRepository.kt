@@ -56,13 +56,32 @@ class TvRepository(
     fun getInstantInitialChannels(): InitialChannels {
         val cached = freshCachedChannels()
         val channels = cached ?: KurdishChannelCatalog.getDefaultChannels()
-        val favIds = favoriteStorage.getFavoriteIds()
         return InitialChannels(
-            channels = channels.map {
-                it.copy(isFavorite = favIds.contains(it.id) || favIds.contains(it.originalId))
-            },
+            channels = applyFavorites(channels),
             fromFreshCache = cached != null
         )
+    }
+
+    /**
+     * Stamps the stored favourites onto [channels].
+     *
+     * One definition of what "is this channel a favourite" means, used by both the
+     * cold-start path and the post-merge path. The test is deliberately against the
+     * channel's *original* id as well as its current one: [Channel.originalId] is
+     * the id before duplicate resolution, so a channel whose id picked up a
+     * collision suffix is still the same channel to someone who hearted it before
+     * the merge, and a lookup on the suffixed id alone silently dropped the heart.
+     *
+     * Favourites are re-applied on every read rather than cached alongside the
+     * channels, which is why the on-disk cache never persists the flag.
+     */
+    private fun applyFavorites(channels: List<Channel>): List<Channel> {
+        val favIds = favoriteStorage.getFavoriteIds()
+        if (favIds.isEmpty()) return channels
+        return channels.map { channel ->
+            val isFav = favIds.contains(channel.id) || favIds.contains(channel.originalId)
+            if (channel.isFavorite == isFav) channel else channel.copy(isFavorite = isFav)
+        }
     }
 
     /**
@@ -97,15 +116,7 @@ class TvRepository(
                 // falls through to the network exactly as if it had been stale.
                 val cached = freshCachedChannels()
                 if (cached != null) {
-                    val favIds = favoriteStorage.getFavoriteIds()
-                    return@withContext Result.success(
-                        cached.map {
-                            it.copy(
-                                isFavorite = favIds.contains(it.id) ||
-                                    favIds.contains(it.originalId)
-                            )
-                        }
-                    )
+                    return@withContext Result.success(applyFavorites(cached))
                 }
             }
 
@@ -186,16 +197,10 @@ class TvRepository(
                 uniqueChannels.add(ch.copy(id = candidate))
             }
 
-            // Apply favorite states.
-            //
-            // Matched against the channel's *original* id, not the de-duplicated one.
-            // A channel whose id picked up a collision suffix is still the same
-            // channel, so a stored favourite must still find it.
-            val favIds = favoriteStorage.getFavoriteIds()
-            val channelsWithFavs = uniqueChannels.map { channel ->
-                val isFav = favIds.contains(channel.id) || favIds.contains(channel.originalId)
-                channel.copy(isFavorite = isFav)
-            }
+            // Apply favorite states. See [applyFavorites] — the merge path and the
+            // cold-start path must agree on what a favourite *is*, or the same
+            // channel reads as a favourite on one launch and not on the next.
+            val channelsWithFavs = applyFavorites(uniqueChannels)
 
             // Persisted to the on-disk cache, still on `Dispatchers.IO` so the
             // serialise-and-write is off the main thread.

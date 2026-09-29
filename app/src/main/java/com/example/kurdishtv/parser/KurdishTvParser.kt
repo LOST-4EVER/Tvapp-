@@ -24,7 +24,7 @@ object KurdishTvParser {
      * chain of string equals) and impossible to get out of step with the list of
      * words that are meant to be canonicalised.
      */
-    private val CanonicalWords: Map<String, String> = mapOf(
+    private val canonicalWords: Map<String, String> = mapOf(
         "tv" to "TV",
         "hd" to "HD",
         "4k" to "4K",
@@ -165,7 +165,7 @@ object KurdishTvParser {
 
         val clean = wordRegex.replace(flattened) { match ->
             val word = match.value
-            CanonicalWords[word.lowercase(Locale.ROOT)]
+            canonicalWords[word.lowercase(Locale.ROOT)]
                 ?: word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
         }
         return clean.ifBlank { "Kurdish Channel" }
