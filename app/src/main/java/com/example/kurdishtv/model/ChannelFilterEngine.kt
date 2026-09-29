@@ -12,7 +12,31 @@ import java.util.Locale
  * one channel against every category without re-reading its category string once per
  * category.
  */
-private data class CategoryRule(val filter: CategoryFilter, val needle: String)
+private data class CategoryRule(
+    val filter: CategoryFilter,
+    val needle: String,
+    /**
+     * The same text, folded once at construction.
+     *
+     * Every category test in this file compares against this rather than passing
+     * `ignoreCase = true` at the call site. That flag is not a cheap "compare
+     * case-insensitively": it is a per-character comparison that folds both sides
+     * at every position of the haystack, so a category of thirty characters
+     * against one needle is thirty folded comparisons — and
+     * [countsByCategory] runs nine of them for every channel in the catalogue.
+     * Six hundred channels is five thousand of those, on the thread that draws
+     * the chips, every time the channel list changes — which is to say, every
+     * time a heart is tapped.
+     *
+     * Folding the category string once per channel and comparing plainly against
+     * a needle that was folded when this file was loaded turns all of that back
+     * into one linear scan per needle. The two are not identical in the abstract:
+     * per-character folding also equates things like the Kelvin sign with a plain
+     * k. For Latin-script category names they agree, and the ambiguity is one
+     * this file already resolved the same way in [normalizeQuery].
+     */
+    val foldedNeedle: String = needle.lowercase(Locale.ROOT)
+)
 
 /** Favourites and HD are not substring tests, so they carry no needle. */
 private val stringRules: List<CategoryRule> = listOf(
@@ -70,10 +94,10 @@ object ChannelFilterEngine {
                 }
                 if (!byFlag) continue
             } else if (rules.isNotEmpty()) {
-                val categoryText = channel.category
+                val categoryText = channel.category.lowercase(Locale.ROOT)
                 var matched = false
                 for (r in rules.indices) {
-                    if (categoryText.contains(rules[r].needle, ignoreCase = true)) {
+                    if (categoryText.contains(rules[r].foldedNeedle)) {
                         matched = true
                         break
                     }
@@ -107,10 +131,10 @@ object ChannelFilterEngine {
             if (channel.isFavorite) counts[CategoryFilter.FAVORITES.ordinal]++
             if (channel.isHd) counts[CategoryFilter.HD.ordinal]++
 
-            val categoryText = channel.category
+            val categoryText = channel.category.lowercase(Locale.ROOT)
             for (i in stringRules.indices) {
                 val rule = stringRules[i]
-                if (categoryText.contains(rule.needle, ignoreCase = true)) {
+                if (categoryText.contains(rule.foldedNeedle)) {
                     counts[rule.filter.ordinal]++
                 }
             }

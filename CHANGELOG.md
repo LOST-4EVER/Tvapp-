@@ -28,7 +28,7 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   by hand in a comment, and streams rot silently.
 
 - **One failing source could cost the viewer every remote channel.** The merge
-  fetched four sources concurrently and then collected each with an `await()`
+  launched each source with `async` and then collected it with an `await()`
   *inside* the `supervisorScope`. A supervisor stops a failing child from
   cancelling its siblings, but it still rethrows that child's exception once they
   finish - so a single `async` that threw propagated out of the scope, every
@@ -46,6 +46,18 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it had collected, which is how a cancellation became a plausible-looking
   short channel list instead of a cancellation. It is now rethrown, which is what
   structured concurrency requires and what makes the real cause visible.
+- **The remote sources were never fetched at the same time.** Every source was
+  started with `async` and then immediately `await`ed, inside the same loop - so
+  the next source was not even launched until the previous one had finished,
+  three attempts and a backoff later. Four built-in playlists were fetched one
+  after another, and a viewer who had imported twenty was looking at a spinner
+  for minutes. All sources are now launched first and awaited afterwards, so the
+  slowest one sets the time instead of their sum.
+- **A merge could leave the viewer watching a spinner.** With each source allowed
+  three attempts at an eight second timeout plus backoff, a merge had no ceiling
+  at all. There is now a thirty second deadline across every source at once; past
+  it the sources still in flight are cancelled and the ones that already answered
+  are kept, so a slow merge degrades to a smaller grid rather than to no grid.
 
 ### Added
 - **A source that hiccups is now retried instead of written off.** Every remote
@@ -234,6 +246,64 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Two throwaway lists per playlist line.** `parseTvgLogo` and `parseGroupTitle` used
   `groupValues[1]`, which materialises every group in the match plus the whole matched
   text as element zero, to read one attribute. Both now read the group directly.
+- **The channel cache was parsed in full, twice per refresh, to read one integer.**
+  The merge asks how many channels are already on disk so it can refuse to
+  overwrite a richer list with a smaller one, and it got that number from
+  `getCachedChannels()?.size` - which reads the whole file and builds a `Channel`
+  for every entry, six hundred of them, to read a count off the end and throw all
+  of it away. It now counts the array's elements in a single pass that allocates
+  nothing, tracking string and escape state so a `}` inside a channel name cannot
+  be mistaken for the end of an entry.
+- **A cache stamped in the future was treated as brand new, forever.** The age was
+  computed by subtracting the file's timestamp from the clock, and a negative
+  result - a device whose clock had been set forward and then corrected - was
+  reported as `0`, which is the *youngest* age there is. The app then served that
+  list as freshly written on every launch and never asked the network again, and
+  nothing in the UI could tell. It is now reported as older than any freshness
+  window, so it is refetched. `0` now means one thing only: nothing is cached.
+- **Writing the cache could destroy the one it was replacing.** The atomic write
+  fell back to delete-then-rename when `renameTo` would not overwrite. Deleting
+  first means a second failure - and a full disk is exactly that - left no cache
+  at all, which is the outcome the atomic write existed to prevent. It now copies
+  over the old file, so the previous list stays readable until the new bytes
+  land, and a temp file left behind by a failed write is cleaned up rather than
+  sitting there as a second full copy of the catalogue.
+- **The whole catalogue was written through one enormous string.** The cache was
+  serialised by building a `JSONArray` of several hundred `JSONObject`s, calling
+  `toString()` on it and writing the result - so the heap held every object and
+  then a second full copy of all of them at once, on a device that may have 32 MB.
+  It is now streamed field by field through a buffered writer, with the same
+  bytes out.
+- **Two quick presses of the heart could lose one of them.** Favourites, watch
+  history and playlist links are each a read-modify-write of a whole stored set,
+  and nothing held those steps together. Two overlapping toggles read the same
+  set and wrote the same answer, so the second was silently dropped while the UI
+  reported it had been applied - and a channel watched in the gap between two
+  history writes fell out of the history entirely. All three now hold a lock
+  across the whole operation.
+- **The animation loops ran with the app in the background.** The shared LIVE
+  pulse and the focus rotation are `withFrameNanos` loops, which re-arm through
+  the Choreographer on every vsync; the Choreographer keeps posting for as long
+  as the display is on, whether or not the app is in front of it. They already
+  stopped when nothing was reading them and when the viewer had switched motion
+  off, but not when the viewer pressed Home - so a box left on another input was
+  still waking the CPU sixty times a second for a dot and a ring nobody could
+  see. They now stop when the app leaves the foreground, and resume without a
+  visible jump because both loops measure their phase from an origin that
+  outlives them.
+- **Category tests were doing five thousand case-folded comparisons per refresh.**
+  `contains(needle, ignoreCase = true)` is not a cheap case-insensitive compare;
+  it folds both characters at every position of the haystack. `countsByCategory`
+  runs nine of them per channel, so a six-hundred-channel list paid about five
+  thousand of those on the thread that draws the category chips, on every change
+  to the channel list - which is to say, on every heart tapped. The category
+  string is now folded once per channel and compared against needles that were
+  folded when the file loaded.
+- **A heart tap rebuilt the catalogue on the thread that draws it.** Toggling a
+  favourite re-derived three lists over the whole channel list inside the state
+  update, which runs on the main thread. The rebuild now happens on a worker and
+  only the swap is published, with a guard that recomputes if the list was
+  replaced in the meantime so the two answers cannot disagree.
 
 ### Fixed
 - **The app reported itself online on a network that could not reach anything.**

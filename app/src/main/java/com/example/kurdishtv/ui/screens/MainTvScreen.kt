@@ -804,7 +804,11 @@ private fun ChannelGrid(
         // as the catalogue's anchor, and is skipped entirely once someone has recents
         // and is browsing, rather than competing with them for the first glance.
         if (isHome && uiState.recentChannels.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }, key = "recent_channels_section") {
+            item(
+                span = { GridItemSpan(maxLineSpan) },
+                key = "recent_channels_section",
+                contentType = "section"
+            ) {
                 RecentChannelsRow(
                     recentChannels = uiState.recentChannels,
                     onChannelClick = onChannelClick
@@ -813,7 +817,11 @@ private fun ChannelGrid(
         }
 
         if (isHome && heroChannel != null) {
-            item(span = { GridItemSpan(maxLineSpan) }, key = "featured_hero_section") {
+            item(
+                span = { GridItemSpan(maxLineSpan) },
+                key = "featured_hero_section",
+                contentType = "section"
+            ) {
                 FeaturedHeroCard(
                     channel = heroChannel,
                     showLogos = showLogos,
@@ -825,7 +833,21 @@ private fun ChannelGrid(
 
         itemsIndexed(
             items = filtered,
-            key = { _, ch -> ch.id }
+            key = { _, ch -> ch.id },
+            // What this buys, on a list this long.
+            //
+            // A lazy layout recycles the *composition* of an item as well as its
+            // slot, but it will only reuse one for an item of the same
+            // content type. Without one, every cell that scrolls into view is
+            // composed from scratch and the previous one's state is thrown away —
+            // and with six hundred channels on a television that is six hundred
+            // composes over a session of arrowing down the list, on a device
+            // that is already the slowest thing in the room.
+            //
+            // The two full-width sections are given their own type so they cannot
+            // be handed a channel cell's recycled composition, which is what would
+            // otherwise happen the moment one of them scrolled off the top.
+            contentType = { _ -> "channel" }
         ) { index, channel ->
             ChannelCard(
                 channel = channel,

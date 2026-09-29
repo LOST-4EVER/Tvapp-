@@ -13,8 +13,8 @@ import com.example.kurdishtv.network.retryDelayMs
 import com.example.kurdishtv.parser.KurdishTvParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -140,11 +140,13 @@ class TvRepository(
     suspend fun fetchChannels(forceRefresh: Boolean = true): Result<List<Channel>> =
         withContext(Dispatchers.IO) {
             if (!forceRefresh) {
-                // 0 is ambiguous: it means "no cache" *or* "the clock moved
-                // backwards". It cannot be distinguished here, and it does not
-                // need to be — the read below is what actually decides. A fresh
-                // age only lets us *try* the cache; an empty or unreadable one
-                // falls through to the network exactly as if it had been stale.
+                // A zero age now means exactly one thing: nothing is cached. A
+                // file stamped in the future by a clock that has since been
+                // corrected reports the largest age there is, so it is refetched
+                // rather than trusted indefinitely. Either way the read below is
+                // what actually decides — a fresh age only lets us *try* the
+                // cache, and an empty or unreadable one falls through to the
+                // network exactly as if it had been stale.
                 val cached = freshCachedChannels()
                 if (cached != null) {
                     return@withContext Result.success(applyFavorites(cached))
@@ -171,30 +173,62 @@ class TvRepository(
                 // answered.
                 //
                 // [fetchSource] is now a total function — it cannot throw, so
-                // there is nothing left for the scope to rethrow, and every await
-                // is reached.
-                supervisorScope {
-                    // Every source, as (url, id-tag, is-json). Built up front so
-                    // the four built-ins and the viewer's own playlists are
-                    // fetched by exactly the same code path — the difference
-                    // between them used to be four copies of the same block.
-                    val sources = buildList {
-                        add(Triple(gistChannelsUrl, "gist", true))
-                        add(Triple(primaryEndpointUrl, "krd", false))
-                        add(Triple(secondaryEndpointUrl, "iptv", false))
-                        add(Triple(fallbackGistUrl, "fbk", false))
-                        customPlaylistStorage.getCustomPlaylistUrls()
-                            .forEachIndexed { idx, url ->
-                                add(Triple(url, "usr$idx", false))
-                            }
-                    }
+                // there is nothing left for the scope to rethrow.
+                //
+                // Every source, as (url, id-tag, is-json). Built up front so the
+                // four built-ins and the viewer's own playlists are fetched by
+                // exactly the same code path — the difference between them used
+                // to be four copies of the same block.
+                val sources = buildList {
+                    add(Triple(gistChannelsUrl, "gist", true))
+                    add(Triple(primaryEndpointUrl, "krd", false))
+                    add(Triple(secondaryEndpointUrl, "iptv", false))
+                    add(Triple(fallbackGistUrl, "fbk", false))
+                    customPlaylistStorage.getCustomPlaylistUrls()
+                        .forEachIndexed { idx, url ->
+                            add(Triple(url, "usr$idx", false))
+                        }
+                }
 
-                    for ((url, tag, asJson) in sources) {
-                        // Safe to await inline: fetchSource cannot throw, so this
-                        // loop is reached on every iteration regardless of what
-                        // the other sources did.
-                        allChannels.addAll(async { fetchSource(url, tag, asJson) }.await())
+                // One slot per source, each written by exactly one child.
+                //
+                // Not a shared list. The children run concurrently on
+                // Dispatchers.IO, so they would be appending to one collection
+                // from several threads at a time. A slot per source needs no
+                // lock, and reading the array after the scope has joined is
+                // ordered by that join.
+                val fetched = arrayOfNulls<List<Channel>>(sources.size)
+
+                // Bounded, and the bound is the point.
+                //
+                // A source is asked up to three times with an eight second
+                // timeout and a growing backoff, so one unreachable playlist can
+                // spend about twenty five seconds finding that out. Four of those
+                // in a row — or a viewer who has imported twenty playlists — is a
+                // spinner measured in minutes, on a merge that was supposed to
+                // make the app *faster*. The deadline cancels whatever is still in
+                // flight and keeps every slot that already landed, so a slow
+                // merge degrades to a smaller list rather than to a grid that
+                // never appears at all.
+                val finishedInTime = withTimeoutOrNull(MERGE_DEADLINE_MS) {
+                    supervisorScope {
+                        sources.forEachIndexed { index, (url, tag, asJson) ->
+                            // Safe to launch bare: fetchSource is total, so a
+                            // source that fails returns an empty list rather than
+                            // taking the scope — and every other source — down
+                            // with it.
+                            launch { fetched[index] = fetchSource(url, tag, asJson) }
+                        }
                     }
+                }
+                if (finishedInTime == null) {
+                    NetworkClient.logDebug(
+                        "Channel merge hit the ${MERGE_DEADLINE_MS}ms deadline; " +
+                            "keeping the sources that answered."
+                    )
+                }
+                for (list in fetched) {
+                    if (list != null) allChannels.addAll(list)
                 }
             } catch (e: CancellationException) {
                 // Rethrown, deliberately.
@@ -253,7 +287,12 @@ class TvRepository(
             // it impossible, and the cost of getting this wrong is thirty minutes
             // of missing channels that no subsequent launch will even try to
             // replace — see [shouldReplaceCache].
-            val cachedCount = channelCacheStorage.getCachedChannels()?.size ?: 0
+            //
+            // Counted, not parsed. This used to be
+            // `getCachedChannels()?.size`, which read the whole file and built a
+            // Channel for every entry in it — six hundred objects — in order to
+            // read one integer off the end, on every refresh.
+            val cachedCount = channelCacheStorage.getCachedChannelCount()
             if (shouldReplaceCache(channelsWithFavs.size, cachedCount)) {
                 channelCacheStorage.saveChannels(channelsWithFavs)
             } else {
@@ -354,7 +393,13 @@ class TvRepository(
 
     fun toggleFavorite(channelId: String): Boolean = favoriteStorage.toggleFavorite(channelId)
 
-    fun addRecentChannel(channelId: String) = recentStorage.addRecentChannel(channelId)
+    /**
+     * Records a channel as most recently watched and returns the stored history.
+     *
+     * The list comes back from the write rather than from a second read of it —
+     * see [RecentStorage.addRecentChannel].
+     */
+    fun addRecentChannel(channelId: String): List<String> = recentStorage.addRecentChannel(channelId)
 
     fun getRecentChannelIds(): List<String> = recentStorage.getRecentChannelIds()
 
@@ -391,5 +436,16 @@ class TvRepository(
          * reuses it instead of re-fetching every playlist.
          */
         const val CACHE_FRESH_MS = 30 * 60 * 1000L
+
+        /**
+         * The ceiling on one merge, counted across every source at once.
+         *
+         * Comfortably above what a healthy merge needs — a few seconds — and
+         * comfortably below the point at which a viewer would decide the app had
+         * hung. It cannot be tightened to the per-source worst case, because the
+         * sources now run concurrently and the whole point is that the slowest
+         * one sets the time rather than their sum.
+         */
+        const val MERGE_DEADLINE_MS = 30_000L
     }
 }

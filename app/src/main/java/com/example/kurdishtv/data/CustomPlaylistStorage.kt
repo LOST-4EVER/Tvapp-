@@ -6,7 +6,19 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 class CustomPlaylistStorage(context: Context) {
     private val prefs: SharedPreferences =
-        context.getSharedPreferences("kurdish_tv_custom_playlists_v2", Context.MODE_PRIVATE)
+        context.applicationContext
+            .getSharedPreferences("kurdish_tv_custom_playlists_v2", Context.MODE_PRIVATE)
+
+    /**
+     * Serialises the read-modify-write behind adding or removing a link.
+     *
+     * Same reason as the favourites store, and the same consequence without it:
+     * adding a playlist reads the set to check the cap, adds one entry and writes
+     * the whole set back, and two of those interleaving means one of the links the
+     * viewer entered is never stored — even though the confirmation told them it
+     * was. See [FavoriteStorage].
+     */
+    private val writeLock = Any()
 
     fun getCustomPlaylistUrls(): Set<String> {
         return try {
@@ -23,12 +35,12 @@ class CustomPlaylistStorage(context: Context) {
      * failed to save must not be reported as added, or the UI shows a playlist the
      * next launch will never fetch.
      */
-    fun addCustomPlaylistUrl(url: String): Boolean {
-        val cleanUrl = normalize(url) ?: return false
+    fun addCustomPlaylistUrl(url: String): Boolean = synchronized(writeLock) {
+        val cleanUrl = normalize(url) ?: return@synchronized false
         val current = getCustomPlaylistUrls().toMutableSet()
-        if (current.size >= MAX_PLAYLISTS) return false
-        if (!current.add(cleanUrl)) return false
-        return try {
+        if (current.size >= MAX_PLAYLISTS) return@synchronized false
+        if (!current.add(cleanUrl)) return@synchronized false
+        try {
             prefs.edit().putStringSet(KEY_CUSTOM_URLS, current).commit()
         } catch (_: Exception) {
             false
@@ -53,11 +65,11 @@ class CustomPlaylistStorage(context: Context) {
     }
 
     /** Removes a playlist link, reporting whether it is no longer stored. */
-    fun removeCustomPlaylistUrl(url: String): Boolean {
+    fun removeCustomPlaylistUrl(url: String): Boolean = synchronized(writeLock) {
         val cleanUrl = normalize(url) ?: url.trim()
         val current = getCustomPlaylistUrls().toMutableSet()
-        if (!current.remove(cleanUrl)) return false
-        return try {
+        if (!current.remove(cleanUrl)) return@synchronized false
+        try {
             prefs.edit().putStringSet(KEY_CUSTOM_URLS, current).commit()
         } catch (_: Exception) {
             false
@@ -65,10 +77,12 @@ class CustomPlaylistStorage(context: Context) {
     }
 
     /** Removes every custom playlist. Returns whether the write actually landed. */
-    fun clear(): Boolean = try {
-        prefs.edit().remove(KEY_CUSTOM_URLS).commit()
-    } catch (_: Exception) {
-        false
+    fun clear(): Boolean = synchronized(writeLock) {
+        try {
+            prefs.edit().remove(KEY_CUSTOM_URLS).commit()
+        } catch (_: Exception) {
+            false
+        }
     }
 
     companion object {
