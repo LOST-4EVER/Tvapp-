@@ -81,9 +81,11 @@ class RemoteKeyPolicyTest {
 
     @Test
     fun `a clock that goes backwards does not lock the key out`() {
-        // `SystemClock.uptimeMillis` is monotonic, but a recomposition mid-keypress
-        // must not be able to wedge CH+ permanently: a negative gap compares as "not
-        // yet", and the viewer would have to release and press again.
+        // `SystemClock.uptimeMillis` is monotonic within a boot, so this should not
+        // arise — but the failure modes are not symmetric. Refusing here would wedge
+        // CH+ until the key was released and pressed again, and the viewer would have
+        // no way to know why the key they are holding had stopped working.
         assertTrue(RemoteKeyPolicy.acceptsChannelStep(nowMs = 100L, lastStepAtMs = 500L))
+        assertTrue(RemoteKeyPolicy.acceptsChannelStep(nowMs = 500L, lastStepAtMs = 500L))
     }
 }

@@ -58,6 +58,15 @@ object RemoteKeyPolicy {
      */
     fun acceptsChannelStep(nowMs: Long, lastStepAtMs: Long?): Boolean {
         if (lastStepAtMs == null) return true
-        return nowMs - lastStepAtMs >= CHANNEL_STEP_MIN_INTERVAL_MS
+        val sinceLast = nowMs - lastStepAtMs
+        // A gap that is not positive means the clock went backwards, which
+        // `SystemClock.uptimeMillis` should not do within a boot. Treating it as
+        // "long enough" rather than letting a negative number fall through the
+        // comparison is deliberate: the failure modes are not symmetric. Accepting
+        // costs at worst one step the viewer did not quite ask for. Refusing locks
+        // CH+ out until the key is released and pressed again, and the viewer has no
+        // way to know why the key they are holding stopped working.
+        if (sinceLast <= 0L) return true
+        return sinceLast >= CHANNEL_STEP_MIN_INTERVAL_MS
     }
 }
