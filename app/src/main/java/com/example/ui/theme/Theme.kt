@@ -76,7 +76,11 @@ fun KurdishTvTheme(
             surfaceVariant = colors.surfaceVariant,
             onSurfaceVariant = colors.textSecondary,
             surfaceContainer = colors.surfaceElevated,
+            surfaceContainerHigh = colors.surfaceHigh,
             outline = colors.border,
+            // A rule between rows is not a card outline. Material asks for both,
+            // and wiring only `outline` left every divider it draws at card weight.
+            outlineVariant = colors.divider,
             error = KurdishRed,
             onError = onColorFor(KurdishRed)
         )

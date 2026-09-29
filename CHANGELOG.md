@@ -7,6 +7,82 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **The interface no longer animates. At all.** Every spring, easing curve, frame
+  loop and shape morph in the app has been deleted rather than switched off. A
+  `snap()` spec still creates an animation, still registers a frame callback and
+  still schedules a recomposition for the frame it lands on, so a reduced-motion
+  switch would have bought none of the cost back - only the appearance of the
+  setting.
+  - Gone: `ExpressiveMotion`'s spring table, easing curves, durations and stagger;
+    two app-wide `withFrameNanos` loops (the LIVE pulse and the focus rotation);
+    `WatchedFloat`, `LocalLivePulse`, `LocalFocusRotation`; `LocalReduceMotion` and
+    the two Settings rows that fed it; `staggeredEntrance` and the grid's
+    `animateItem` fade; the whole morphing shape layer, under which chips, cards,
+    wells, rails and fields all changed outline under the viewer; every press and
+    focus scale; `AnimatedVisibility` on the offline banner, the update card, the
+    player's transport controls and the buffering panel;
+    `animateColorAsState` / `animateDpAsState` on the category chips;
+    `animateScrollToItem` in the chip row and the sidebar; the number overlay's
+    pop; and the header logo's swell.
+  - Kept, because they are feedback rather than decoration: press fills, which
+    still switch instantly, because a D-pad press is a *hold* and nothing at all
+    happening for a third of a second reads as a dead app; the focus ring, now
+    heavier and outset rather than inset over a flat band of the page colour,
+    which is what replaces its rotation as the thing that makes focus findable
+    from a sofa; and selection states, which switch rather than transition.
+  - `BouncingLoader` was a hand-drawn copy of Material's seven-shape morphing
+    sequence rather than a spinner, and it is now three static dots. A frozen
+    spinner reads as a hung app; an ellipsis reads as working because it always
+    did.
+  - Renamed to match what they now do: `bouncyClickable` -> `tvClickable`,
+    `BouncingLoader` -> `LoadingIndicator`, `SquishyPillButton` ->
+    `LabelPillButton`, `rememberMorphingCorners` -> `staticCornerShape`.
+  - The **Motion** setting and the **Animated LIVE badge** switch are gone from
+    Settings, along with the `motion`, `live_pulse` and `reduceMotion` keys in
+    settings storage. Existing installs carrying those keys are unaffected; the
+    values are simply no longer read.
+
+- **A new colour system, and a flat, quieter way to draw a card.** With the motion
+  gone the surfaces had to carry the interface on their own, and the old ramp was
+  doing two jobs badly: a four-step neutral ramp for a five-level stack of
+  surfaces, and a vertical gradient on every card so a near-black card would not
+  read as a hole.
+  - The palette is rebuilt on cool neutrals, so the warm accents and the LIVE red
+    are the only warm things on screen and an accent reads as an accent.
+  - `surfaceHigh` is a new fifth step for the surfaces that sit *on* a card -
+    icon buttons, text fields, chips. They were drawn at the card's own level and
+    read as part of the card rather than as controls on it.
+  - `divider` separates two parts of one surface from a card's outline
+    separating it from the page, so the sidebar's edge and the rule under each
+    Settings heading are no longer the same weight as a card border.
+  - `edgeHighlight` is a 1dp line of light along the inside top of a card, and it
+    replaces the per-card `Brush.verticalGradient` outright. The gradient was a
+    per-card draw in a grid of several hundred, and it made the top of every card
+    look like the front face of something solid. The featured hero keeps an accent
+    wash: it is one surface on the page, and the tint is what tells the viewer it
+    is a channel rather than a section header.
+  - The focus ring's scrim is now the app's own `focusScrim` role rather than
+    `background` spelled out at each of the six call sites.
+
+- **Numerals are monospaced, and the type scale is retuned.** This is a television:
+  the sidebar numbers every row, the remote's number pad is the fastest way to
+  reach a channel, and the number-pad overlay exists to be read from a sofa. In a
+  proportional face a `1` is about half the width of an `8`, so a column of channel
+  numbers wobbles and the overlay visibly changes width on every keystroke - which
+  reads as a digit being replaced rather than as one being added. `ChannelNumber`
+  and `NumeralLarge` are fixed-width for that reason and are the only two slots in
+  the scale that are. The rest of the scale is retuned a step down and a notch
+  tighter, and all-caps Latin markers such as FEATURED and RECENTLY WATCHED now
+  share the one `labelSmall` style built for them.
+  - Line heights still leave room for stacked vowel marks: Sorani is written with
+    diacritics above *and* below the baseline, and a display line height tight
+    enough for Latin puts the top and bottom of those marks on the line boundary.
+  - Kurdish text still carries no positive letter spacing. Tracking is inserted as
+    an extra advance between glyph clusters, and Arabic script is written as
+    *connected* clusters, so on several Android releases that advance visibly opens
+    the joins.
+
 ### Fixed
 - **Three channels could never play, and looked fine.** `BNAR Action` and `Soz Quran`
   return 404 on their master playlist. `Iraqia Kurdish` is worse: its playlist and

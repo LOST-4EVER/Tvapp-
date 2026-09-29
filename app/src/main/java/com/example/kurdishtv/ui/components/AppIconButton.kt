@@ -87,7 +87,7 @@ fun AppIconButton(
     val container = when {
         active && style != AppIconButtonStyle.Filled -> colors.primary.copy(alpha = 0.28f)
         style == AppIconButtonStyle.Filled -> colors.primary
-        style == AppIconButtonStyle.Tonal -> colors.surfaceElevated
+        style == AppIconButtonStyle.Tonal -> colors.surfaceHigh
         style == AppIconButtonStyle.Glass -> colors.glass
         else -> Color.Transparent
     }

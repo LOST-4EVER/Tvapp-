@@ -53,20 +53,31 @@ import com.example.ui.theme.LocalAppColors
  *
  * The card is the app's densest surface — a name, a category, a quality badge, a logo
  * and two controls — and it is the surface a person on a sofa scans from two metres
- * away. So it carries two shape animations, chosen for different jobs:
+ * away.
  *
- *  - **The card's own corners** open up when it takes D-pad focus. A rounded
- *    rectangle that springs from 22dp to 30dp is a much quieter signal than a colour
- *    change, and unlike a colour change it survives being looked at obliquely.
- *  - **The logo well** morphs from a rounded square into a puffy blob, because the
- *    well holds an image and nothing else. This is the one part of the card free to be
- *    properly expressive, and it is why the grid reads as having depth rather than as
- *    a flat list of rectangles.
+ * Nothing on it moves. Focus is a 3dp accent ring drawn outside a flat band of the
+ * page colour, and pressing is a flat tint, both instant. That leaves the card's
+ * outline free to be one fixed shape all the time, which is what lets the grid read
+ * as a grid: a column of cards that all had the same rounded rectangle is a column,
+ * and one whose corners opened on hover was a column too, but it took a moment to
+ * find out.
  *
- * The focus ring itself is an Expressive shape that turns slowly — see
- * [expressiveFocusRing]. Everything the card does is a spatial spring, so the surface
- * arrives with a small overshoot rather than easing in.
+ * The card is painted as a flat fill plus a single 1dp hairline of light along its
+ * top edge, rather than the vertical ramp it used to carry. The ramp is a per-card
+ * draw in a grid of several hundred, and it also made the top of the card look like
+ * the front face of something solid. The hairline separates the card from the page
+ * for the cost of one line.
  */
+/**
+ * The card's corner radius, as a number rather than a shape.
+ *
+ * [TopEdgeHighlight] insets its line by this so the line stops where the curve
+ * begins, which needs the radius itself rather than the shape the card is drawn
+ * with. It is [M3ExpressiveShapes.MediumCard]'s 20dp; the two are declared
+ * separately because a shape cannot be asked for its radius.
+ */
+private val CardCorner = 20.dp
+
 @Composable
 fun ChannelCard(
     channel: Channel,
@@ -111,7 +122,8 @@ fun ChannelCard(
     val accent = remember(channel.name) { monogramAccent(channel.name) }
 
     // Focus is tracked here as well as inside the modifier, because the card's
-    // background is tinted in response to it and the modifier owns the state.
+    // resting border is dropped in response to it - the ring is the mark, and a
+    // 1dp hairline drawn under a 3dp ring is just a seam.
     var isFocused by remember(channel.id) { mutableStateOf(false) }
 
     val cardShape: Shape = M3ExpressiveShapes.Corners.mediumCard.toShape()
@@ -148,12 +160,13 @@ fun ChannelCard(
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = focusSource,
-                // The scrim is what replaced the ring's rotation as the thing that
-                // makes focus findable from across a room. A 3dp outline in the
+                // The scrim is the thing that makes focus findable from across a
+                // room, now that the ring no longer turns. A 3dp outline in the
                 // accent is a bigger and higher-contrast mark than the 1dp hairline
                 // this card carries at rest, but on a bright panel a hairline can
-                // still be lost against the logo behind it.
-                scrim = colors.background,
+                // still be lost against the logo behind it, so the ring is drawn
+                // over a flat band of the page colour.
+                scrim = colors.focusScrim,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
                 onFocusChanged = { focused ->
@@ -168,19 +181,15 @@ fun ChannelCard(
             ),
         shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = colors.surface),
-        // Depth comes from the gradient and the logo well below. A Material shadow on a
-        // near-black surface is invisible, and it still costs a render pass per item in
-        // a grid of several hundred cards.
+        // No shadow. A Material shadow on a near-black surface is invisible, and it
+        // still costs a render pass per item in a grid of several hundred cards. The
+        // card's separation comes from the hairline below and the ring above it.
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        // A top-lit ramp rather than a flat fill. On a near-black surface a flat card
-        // reads as a hole with a border; the ramp gives it something to sit on.
-        Box(
-            modifier = Modifier.background(
-                Brush.verticalGradient(listOf(colors.surfaceVariant, colors.surface)),
-                cardShape
-            )
-        ) {
+        // A flat fill with a hairline of light along the top edge, which is what
+        // keeps a near-black card from reading as a hole cut in the page.
+        Box(modifier = Modifier.background(colors.surface, cardShape)) {
+            TopEdgeHighlight(inset = CardCorner)
             Column {
                 // The status row is its own band rather than an overlay on the
                 // artwork. Floating the badge and the heart on top of the logo meant
@@ -211,7 +220,6 @@ fun ChannelCard(
                     channel = channel,
                     accent = accent,
                     showLogos = showLogos,
-                    isActive = isFocused,
                     compact = compact
                 )
 
@@ -286,26 +294,23 @@ fun ChannelCard(
  * colour before the name is read — and a channel with no logo at all still gets a
  * designed tile rather than a gap in the grid.
  *
- * When the card takes focus the well's corners open up. It used to open into a puffy
- * lobed blob; a lobed outline on the card's largest element made the tile's silhouette
- * fight the card's own rounded rectangle right above it, and the logo inside was no
- * longer reliably inside *anything*. A corner that opens 20dp → 28dp says the same
- * thing and leaves the logo exactly where it was.
+ * The well is a fixed rounded square and does not react to focus. It used to open
+ * from 20dp to 28dp on a spring, and before that into a puffy lobed blob; a lobed
+ * outline on the card's largest element made the tile's silhouette fight the card's
+ * own rounded rectangle right above it, and the logo inside was no longer reliably
+ * inside *anything*. The ring around the card is the focus mark now, and a tile
+ * whose own outline also changed was two signals competing for one event.
  */
 @Composable
 private fun ChannelLogoWell(
     channel: Channel,
     accent: Color,
     showLogos: Boolean,
-    isActive: Boolean,
     compact: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
 
-    // A fixed rounded square. It used to open from 20dp to 28dp on a spring when the
-    // card took focus; the focus ring around the card is now what marks that, and a
-    // tile whose own outline also changes is two signals competing for one event.
     val wellShape: Shape = M3ExpressiveShapes.LogoTile
 
     Box(

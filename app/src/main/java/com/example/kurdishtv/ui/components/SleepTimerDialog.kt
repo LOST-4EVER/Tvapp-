@@ -145,7 +145,7 @@ private fun TimerChip(
     val colors = LocalAppColors.current
     Surface(
         shape = M3ExpressiveShapes.Pill,
-        color = if (isSelected) colors.primary else colors.surfaceVariant,
+        color = if (isSelected) colors.primary else colors.surfaceHigh,
         modifier = modifier
             .border(
                 1.dp,

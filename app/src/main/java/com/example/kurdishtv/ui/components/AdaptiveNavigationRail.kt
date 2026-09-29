@@ -232,7 +232,7 @@ private fun RailCategoryItem(
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = focusSource,
-                scrim = colors.background,
+                scrim = colors.focusScrim,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = M3ExpressivePolygons.Cookie6Sided,
                 onFocusChanged = { isFocused = it }

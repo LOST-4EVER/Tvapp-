@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -56,6 +57,7 @@ import com.example.kurdishtv.model.DeviceMode
 import com.example.kurdishtv.model.ThemeMode
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.SvgIcon
+import com.example.kurdishtv.ui.components.TopEdgeHighlight
 import com.example.kurdishtv.ui.components.UpdateCard
 import com.example.kurdishtv.ui.components.edgeFade
 import com.example.kurdishtv.update.AppUpdate
@@ -468,7 +470,7 @@ private fun SettingsHeader(onBack: () -> Unit) {
     ) {
         Surface(
             shape = CircleShape,
-            color = colors.surfaceElevated,
+            color = colors.surfaceHigh,
             modifier = Modifier
                 .size(44.dp)
                 .border(1.dp, colors.border, CircleShape)
@@ -503,6 +505,9 @@ private fun SettingsHeader(onBack: () -> Unit) {
     }
 }
 
+/** [M3ExpressiveShapes.LargeCard]'s radius, as a number, for [TopEdgeHighlight]. */
+private val SectionCorner = 26.dp
+
 @Composable
 private fun SettingsSection(
     title: String,
@@ -519,44 +524,61 @@ private fun SettingsSection(
             .readableColumn(LocalIsTv.current)
             .border(1.dp, colors.border, M3ExpressiveShapes.LargeCard)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    // A soft cookie rather than the spiked Burst, which made every
-                    // section header look like a cog instead of an icon tile.
-                    shape = M3ExpressiveShapes.MediumCard,
-                    color = colors.primaryContainer
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(38.dp)
+        Box {
+            // The same hairline every other card in the app carries. See
+            // `TopEdgeHighlight` for why it is a line rather than a gradient.
+            TopEdgeHighlight(inset = SectionCorner)
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        // A soft cookie rather than the spiked Burst, which made every
+                        // section header look like a cog instead of an icon tile.
+                        shape = M3ExpressiveShapes.MediumCard,
+                        color = colors.primaryContainer
                     ) {
-                        SvgIcon(
-                            resId = iconRes,
-                            contentDescription = null,
-                            tint = colors.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            SvgIcon(
+                                resId = iconRes,
+                                contentDescription = null,
+                                tint = colors.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = title,
+                            color = colors.textPrimary,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            text = subtitle,
+                            color = colors.textSecondary,
+                            fontSize = 12.sp
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = title,
-                        color = colors.textPrimary,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = subtitle,
-                        color = colors.textSecondary,
-                        fontSize = 12.sp
-                    )
-                }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            content()
+                Spacer(modifier = Modifier.height(14.dp))
+                // A rule between the header and what it heads, which is a different
+                // job from the hairline at the top of the card. That one separates
+                // the card from the page; this one separates two parts of the same
+                // surface, so it is a step lighter than a card outline — otherwise
+                // a settings list reads as a stack of boxes each holding a title
+                // and some text.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(colors.divider)
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                content()
+            }
         }
     }
 }

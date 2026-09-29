@@ -98,8 +98,8 @@ fun ImportPlaylistDialog(
                     singleLine = true,
                     shape = M3ExpressiveShapes.MediumCard,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = colors.surfaceElevated,
-                        unfocusedContainerColor = colors.surfaceElevated,
+                        focusedContainerColor = colors.surfaceHigh,
+                        unfocusedContainerColor = colors.surfaceHigh,
                         focusedBorderColor = colors.primary,
                         unfocusedBorderColor = colors.border,
                         focusedTextColor = colors.textPrimary,

@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Shape
 import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
+import com.example.ui.theme.ChannelNumber
 import com.example.ui.theme.LocalAppColors
 
 /**
@@ -107,7 +108,11 @@ fun ChannelSidebar(
             .fillMaxHeight()
             .width(260.dp)
             .background(colors.surface)
-            .border(width = 1.dp, color = colors.border)
+            // A divider, not a card outline. This edge separates the rail from the
+            // grid beside it rather than boxing the rail in as an object of its own,
+            // so it is a step lighter than the one around a card and does not glow
+            // the same way.
+            .border(width = 1.dp, color = colors.divider)
     ) {
         SidebarHeader(channels.size)
 
@@ -166,7 +171,8 @@ private fun ChannelSidebarRow(
     onClick: () -> Unit,
     onFocused: () -> Unit,
     onFavoriteToggle: () -> Unit
-) {    val colors = LocalAppColors.current
+) {
+    val colors = LocalAppColors.current
     var isFocused by remember(channel.id) { mutableStateOf(false) }
 
     // One focus target for the row: the click's own. The ring observes it rather than
@@ -177,11 +183,14 @@ private fun ChannelSidebarRow(
     // the stacked-two-on-one-box problem the comment below is about.
     val heartFocusSource = remember { MutableInteractionSource() }
 
-    // Selected and focused are drawn differently on purpose. Focus is the yellow
-    // turning ring the viewer is looking for *right now*; selection is a quieter
-    // filled plate, because it is a record of where they are rather than a prompt.
-    // Drawing them identically made the sidebar's highlight and the grid's disagree
-    // whenever selection was somewhere else.
+    // Selected and focused are drawn differently on purpose. Focus is the accent
+    // ring the viewer is looking for *right now*; selection is a quieter filled
+    // plate, because it is a record of where they are rather than a prompt. Drawing
+    // them identically made the sidebar's highlight and the grid's disagree whenever
+    // selection was somewhere else.
+    //
+    // The plate is [AppColors.surfaceHigh] rather than the card's own surface, so a
+    // selected row lifts off the rail instead of shifting sideways in tone.
     val plateShape: Shape = M3ExpressiveShapes.Corners.smallCard.toShape()
 
     Row(
@@ -189,7 +198,7 @@ private fun ChannelSidebarRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(plateShape)
-            .background(if (isSelected) colors.surfaceVariant else colors.surface)
+            .background(if (isSelected) colors.surfaceHigh else colors.surface)
             // The click keeps its own focus target and the ring watches the same
             // source, so there is one stop on this row rather than two competing ones.
             // `onLongClick` is how a remote reaches the favourite, since the heart is
@@ -203,7 +212,7 @@ private fun ChannelSidebarRow(
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = rowFocusSource,
-                scrim = colors.background,
+                scrim = colors.focusScrim,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
                 onFocusChanged = { focused ->
@@ -220,11 +229,14 @@ private fun ChannelSidebarRow(
         // The number is part of the row rather than a separate column so that it
         // scrolls with the channel. A fixed gutter of numbers beside a scrolling
         // list drifts out of alignment as soon as anything is filtered.
+        //
+        // A fixed-width face in a fixed-width slot, so row 8 and row 108 leave the
+        // logo in exactly the same place and the column of numbers scans straight
+        // down instead of stepping in and out.
         Text(
             text = number.toString(),
             color = if (isSelected) colors.primary else colors.textTertiary,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
+            style = ChannelNumber,
             maxLines = 1,
             modifier = Modifier.width(26.dp)
         )
@@ -294,7 +306,7 @@ private fun ChannelSidebarRow(
                 .expressiveFocusRing(
                     ringColor = colors.primary,
                     interactionSource = heartFocusSource,
-                    scrim = colors.background,
+                    scrim = colors.focusScrim,
                     restShape = M3ExpressivePolygons.Square,
                     ringShape = M3ExpressivePolygons.Cookie6Sided
                 ),

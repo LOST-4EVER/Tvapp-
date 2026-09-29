@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.kurdishtv.viewmodel.ChannelJump
 import com.example.ui.theme.LocalAppColors
+import com.example.ui.theme.NumeralLarge
 
 /**
  * What the remote's number pad is doing, shown while the viewer types.
@@ -62,11 +63,15 @@ fun ChannelNumberOverlay(
                 .border(1.dp, colors.primary, shape)
                 .padding(horizontal = 28.dp, vertical = 20.dp)
         ) {
+            // Monospaced and Black. Every keystroke redraws these three or four
+            // characters, and in a proportional face a `1` is roughly half the width
+            // of an `8` — so typing `18` after `1` makes the panel visibly change
+            // width, which reads as one digit being replaced rather than as a
+            // second one being added.
             Text(
                 text = jump.digits,
                 color = colors.textPrimary,
-                fontSize = 46.sp,
-                fontWeight = FontWeight.Black,
+                style = NumeralLarge,
                 maxLines = 1
             )
             Spacer(modifier = Modifier.height(4.dp))

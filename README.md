@@ -86,11 +86,13 @@ for a D-pad and a ten-foot viewing distance first, and adapts to touch second.
 
 **Platform**
 - Appears on the **Android TV home screen** (`LEANBACK_LAUNCHER`)
-- D-pad focus with an expressive focus ring, and correct focus restoration when
+- D-pad focus with a heavy outset focus ring, and correct focus restoration when
   returning from the player
 - Edge-to-edge, with insets applied per route
 - In-app updater with resumable download, progress, and signature pre-check
-- Material 3 Expressive shapes and motion, with a reduced-motion switch
+- **No animation anywhere.** Every spring, easing, frame loop and shape morph has
+  been deleted, not disabled: focus and press are instant, and the only motion the
+  app has left is a spinner replacing itself
 - Material You dynamic colour on Android 12+, plus five bundled accent palettes
 
 ## Architecture
@@ -174,9 +176,9 @@ app/src/main/java/com/example/
 │   ├── viewmodel/                 TvViewModel, SettingsViewModel, TvUiState
 │   └── ui/
 │       ├── screens/               MainTvScreen, PlayerScreen, SettingsScreen
-│       ├── components/            22 shared composables
+│       ├── components/            23 shared composables
 │       ├── player/                VideoPlayerView, controls, colour filters
-│       ├── motion/                focus ring, bouncy click, expressive motion
+│       ├── motion/                focus ring, TV click, shape tokens
 │       ├── theme/                 M3 Expressive shapes and polygons
 │       └── navigation/            NavGraph
 └── ui/theme/                      colour, type, theme, TV detection
@@ -444,11 +446,12 @@ that:
   together rather than calling `filter` twelve times, and folds each channel's
   category string once instead of asking for nine case-insensitive substring
   matches, which is a per-character fold at every position of the string.
-- **Animations are demand-driven.** The shared LIVE pulse and focus rotation only
-  run their frame loops while something is actually reading them, and only while
-  the app is in the foreground - a `withFrameNanos` loop re-arms through the
-  Choreographer, which keeps posting for as long as the display is on whether or
-  not the app is in front of it.
+- **There is no motion to optimise.** The shared LIVE pulse and the focus rotation
+  used to run `withFrameNanos` loops for the whole life of the app, drawing
+  nothing; a `withFrameNanos` loop re-arms through the Choreographer, which keeps
+  posting for as long as the display is on whether or not the app is in front of
+  it. Both loops are gone, along with the shape-morphing layer, the grid's fade-in
+  and the springs behind every press and focus.
 - **The cache is counted, not parsed.** The merge needs to know how many channels
   are on disk before it will overwrite them. Reading that number used to mean
   building a `Channel` for every entry in the file; it is now a single pass that

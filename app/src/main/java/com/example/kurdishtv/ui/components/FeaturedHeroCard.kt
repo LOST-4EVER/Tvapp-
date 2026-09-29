@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -60,17 +59,11 @@ fun FeaturedHeroCard(
     // The click keeps the focus target; the ring observes it. See `expressiveFocusRing`.
     val focusSource = remember { MutableInteractionSource() }
 
-    // The hero's corners open up when it takes focus, and its logo tile — which holds
-    // an image and no text — becomes properly expressive. The silhouette of the card
-    // itself stays on the corner scale, because it carries the channel's name.
-    //
-    // Fixed dp radii are safe here and nowhere else in the app: the hero is a
-    // full-width card roughly 180dp tall on every layout, so even the widest radius
-    // in play stays well inside half its short side.
-    // A fixed radius. The hero's outline used to squash on the vertical axis as it
-    // took focus — 42dp at the ends, 22dp at the top and bottom — which read as a
-    // lens rather than a card. It is a full-width surface roughly 180dp tall, so
-    // every radius in play stays well inside half its short side.
+    // A fixed radius, at the widest step of the card scale. The hero's outline used
+    // to squash on the vertical axis as it took focus — 42dp at the ends, 22dp at
+    // the top and bottom — which read as a lens rather than a card, and it is a
+    // full-width surface roughly 180dp tall, so every radius in play stays well
+    // inside half its short side.
     val heroShape: Shape = M3ExpressiveShapes.Corners.extraLarge.toShape()
     val logoShape: Shape = ShapeMorph.logoRest.toShape()
 
@@ -87,7 +80,7 @@ fun FeaturedHeroCard(
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = focusSource,
-                scrim = colors.background,
+                scrim = colors.focusScrim,
                 restShape = M3ExpressivePolygons.Square,
                 // The same ring the cards and the rail use. The hero had its own
                 // `SoftBurst`, so the two surfaces you are most likely to move
@@ -109,6 +102,12 @@ fun FeaturedHeroCard(
     ) {
         // A wide accent wash from the leading edge, so the hero reads as the
         // channel's own surface rather than a generic dark panel.
+        //
+        // The grid card dropped its ramp for a flat fill and a 1dp top hairline, and
+        // this keeps a gradient on purpose. The cards pay for theirs several hundred
+        // times over and sit shoulder to shoulder, where a tint per card turns the
+        // grid into stripes; the hero is one surface on the page, and the accent is
+        // what tells the viewer this is a channel rather than a section header.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -116,7 +115,6 @@ fun FeaturedHeroCard(
                     Brush.linearGradient(
                         listOf(
                             accent.copy(alpha = 0.16f),
-                            colors.surfaceVariant.copy(alpha = 0.0f),
                             Color.Transparent
                         )
                     ),
@@ -134,16 +132,16 @@ fun FeaturedHeroCard(
                         LiveBadge()
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
-                            shape = RoundedCornerShape(percent = 50),
+                            shape = M3ExpressiveShapes.Pill,
                             color = colors.primaryContainer
                         ) {
                             Text(
+                                // The one all-caps, Latin-only, widely-tracked style
+                                // in the type scale. See the note on `labelSmall`.
                                 text = "FEATURED",
                                 color = colors.onPrimaryContainer,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                             )
                         }
                     }
@@ -208,7 +206,7 @@ fun FeaturedHeroCard(
                         // introduce.
                         Button(
                             onClick = { onWatchClick(channel) },
-                            shape = RoundedCornerShape(percent = 50),
+                            shape = M3ExpressiveShapes.Pill,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = colors.primary,
                                 contentColor = colors.onPrimary
@@ -227,8 +225,8 @@ fun FeaturedHeroCard(
                             Spacer(modifier = Modifier.width(7.dp))
                             Text(
                                 text = "Watch live now",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }

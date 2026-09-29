@@ -132,7 +132,7 @@ fun CategoryBar(
             // category is the single most repeated gesture in the app, so these were
             // also the transitions that ran most often — three per chip press across
             // twelve chips.
-            val backgroundColor = if (isSelected) colors.primary else colors.surfaceVariant
+            val backgroundColor = if (isSelected) colors.primary else colors.surfaceHigh
             val contentColor = if (isSelected) colors.onPrimary else colors.textSecondary
 
             // A true pill — a 50% corner radius — so it is a pill whatever the label

@@ -94,8 +94,11 @@ fun SearchBarM3(
             onSearch = { focusManager.clearFocus() }
         ),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = colors.surfaceElevated,
-            unfocusedContainerColor = colors.surfaceElevated,
+            // One step above a card. The field is a control that sits *on* the
+            // header, and at the card's own level it read as a card-shaped hole in
+            // the bar rather than as something you type into.
+            focusedContainerColor = colors.surfaceHigh,
+            unfocusedContainerColor = colors.surfaceHigh,
             focusedBorderColor = colors.primary,
             unfocusedBorderColor = colors.border,
             focusedTextColor = colors.textPrimary,
