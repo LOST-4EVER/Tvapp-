@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -137,20 +138,24 @@ private fun RecentChannelChip(
         spec = ExpressiveMotion.spatialFast
     )
     val tileShape: Shape = remember { RoundedCornerShape(percent = 50) }
+    // The click keeps the focus target; the ring observes it. See `expressiveFocusRing`.
+    val focusSource = remember { MutableInteractionSource() }
 
     Surface(
         shape = chipShape,
         color = colors.surfaceVariant,
         modifier = Modifier
-            // The ring below owns the focus lift; see the note in `bouncyClickable`.
+            // One focus target: the click's own, watched by the ring below.
+            // `liftOnFocus = false` because the ring draws the lift too.
             .bouncyClickable(
                 scaleDown = 0.92f,
-                focusable = false,
+                interactionSource = focusSource,
                 liftOnFocus = false,
                 onClick = onClick
             )
             .expressiveFocusRing(
                 ringColor = colors.primary,
+                interactionSource = focusSource,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
                 focusScale = 1.04f,
