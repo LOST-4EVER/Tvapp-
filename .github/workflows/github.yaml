@@ -172,7 +172,10 @@ jobs:
           # this step is the slowest in the workflow. That is still cheaper than
           # the alternative, which is finding out from a viewer's TV.
           echo "::group::Running JVM unit tests"
-          ./gradlew testReleaseUnitTest --stacktrace
+          # `test`, not `testReleaseUnitTest`: the per-variant task is not present
+          # under this AGP, and the lifecycle task runs every unit-test variant
+          # that does exist, which is what is wanted here anyway.
+          ./gradlew test --stacktrace
           echo "::endgroup::"
 
       - name: Build Release APK
