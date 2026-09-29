@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.example.kurdishtv.model.AppSettings
-import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.theme.AppShapes
 
 @Composable
@@ -85,8 +84,7 @@ fun KurdishTvTheme(
 
     CompositionLocalProvider(
         LocalAppColors provides colors,
-        LocalIsTv provides isTv,
-        LocalReduceMotion provides settings.reduceMotion
+        LocalIsTv provides isTv
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

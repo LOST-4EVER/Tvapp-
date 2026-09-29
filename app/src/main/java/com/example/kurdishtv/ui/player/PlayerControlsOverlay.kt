@@ -1,8 +1,5 @@
 package com.example.kurdishtv.ui.player
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,7 +27,7 @@ import com.example.kurdishtv.ui.components.AppIconButton
 import com.example.kurdishtv.ui.components.AppIconButtonStyle
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.LiveBadge
-import com.example.kurdishtv.ui.components.SquishyPillButton
+import com.example.kurdishtv.ui.components.LabelPillButton
 import com.example.kurdishtv.ui.motion.tapOnly
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -76,12 +73,14 @@ fun PlayerControlsOverlay(
             // for a surface that exists to be tapped by a finger.
             .tapOnly(onTap = onTapOverlay)
     ) {
-        AnimatedVisibility(
-            visible = isVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.fillMaxSize()
-        ) {
+        // Shown or not, with nothing in between. The controls used to fade in and out
+        // over a third of a second, and they auto-hide after a few seconds of no
+        // input — so on the player there was almost always a fade running. It is the
+        // one place a transition was most defensible, and the argument against it
+        // still wins: the scrim is opaque enough that a partial fade leaves the video
+        // at an unreadable brightness, and the auto-hide timer is what the viewer is
+        // actually waiting for.
+        if (isVisible) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -193,8 +192,7 @@ fun PlayerControlsOverlay(
                         onClick = onPreviousChannel,
                         style = AppIconButtonStyle.Glass,
                         size = 56.dp,
-                        iconSize = 28.dp,
-                        scaleDown = 0.86f
+                        iconSize = 28.dp
                     )
 
                     AppIconButton(
@@ -203,8 +201,7 @@ fun PlayerControlsOverlay(
                         onClick = onPlayPauseToggle,
                         style = AppIconButtonStyle.Filled,
                         size = 74.dp,
-                        iconSize = 36.dp,
-                        scaleDown = 0.88f
+                        iconSize = 36.dp
                     )
 
                     AppIconButton(
@@ -213,8 +210,7 @@ fun PlayerControlsOverlay(
                         onClick = onNextChannel,
                         style = AppIconButtonStyle.Glass,
                         size = 56.dp,
-                        iconSize = 28.dp,
-                        scaleDown = 0.86f
+                        iconSize = 28.dp
                     )
                 }
 
@@ -274,7 +270,7 @@ fun PlayerControlsOverlay(
                             // The label names the mode that is *on*, not the one the
                             // next tap selects, so the state is readable rather than
                             // being a preview of an action nobody has taken yet.
-                            SquishyPillButton(
+                            LabelPillButton(
                                 iconRes = KurdishTvIcons.AspectRatio,
                                 label = resizeMode.label,
                                 onClick = onResizeModeToggle,
@@ -295,7 +291,7 @@ fun PlayerControlsOverlay(
                             // rendering fault rather than as a button. Naming the
                             // state also stops the control changing width the moment
                             // a filter is applied.
-                            SquishyPillButton(
+                            LabelPillButton(
                                 iconRes = KurdishTvIcons.Palette,
                                 label = if (colorFilter.isActive) colorFilter.label else "Colour",
                                 onClick = onCycleColorFilter,

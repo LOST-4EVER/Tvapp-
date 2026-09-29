@@ -1,11 +1,5 @@
 package com.example.kurdishtv.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,7 +17,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,17 +90,17 @@ fun UpdateCard(
                 }
             }
 
-            AnimatedVisibility(
-                visible = state !is UpdateState.Idle,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
+            // Shown or not shown, with nothing in between. This was an
+            // `AnimatedVisibility` that faded and grew, so the card below it was
+            // measured twice on every state change of a check the viewer did not
+            // start.
+            if (state !is UpdateState.Idle) {
                 Column {
                     when (state) {
                         is UpdateState.Checking -> {
                             Spacer(modifier = Modifier.height(14.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                BouncingLoader(size = 20.dp)
+                                LoadingIndicator(size = 20.dp)
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
                                     text = "Checking for updates…",
@@ -229,7 +222,7 @@ private fun DownloadProgress(progress: DownloadState) {
     when (progress) {
         is DownloadState.Idle -> {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BouncingLoader(size = 20.dp)
+                LoadingIndicator(size = 20.dp)
                 Spacer(modifier = Modifier.width(10.dp))
                 Text("Preparing download…", color = colors.textSecondary, fontSize = 12.sp)
             }
@@ -237,14 +230,11 @@ private fun DownloadProgress(progress: DownloadState) {
 
         is DownloadState.Running -> {
             val fraction = progress.fraction
-            // Read in the draw phase is not available for a Material progress
-            // indicator, so this animates as ordinary state. It is throttled to one
-            // update per 256 KB by the downloader, so on a real connection this
-            // settles in a few frames and then stops.
-            val animated by animateFloatAsState(
-                targetValue = fraction ?: 0f,
-                label = "DownloadProgress"
-            )
+            // The bar is written straight to. It was an `animateFloatAsState` easing
+            // towards each new value, so a download throttled to one update per
+            // 256 KB dragged a five-second spring behind every one of them and the
+            // bar read as several hundred bytes behind the number beside it.
+            val animated = fraction ?: 0f
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

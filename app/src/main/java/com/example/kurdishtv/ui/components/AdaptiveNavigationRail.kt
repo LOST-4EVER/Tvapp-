@@ -37,9 +37,9 @@ import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
-import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.motion.staticCornerShape
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.motion.expressiveFocusRing
-import com.example.kurdishtv.ui.motion.rememberMorphingCorners
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -109,7 +109,7 @@ fun AdaptiveNavigationRail(
                     color = colors.primary,
                     modifier = Modifier
                         .size(48.dp)
-                        .bouncyClickable { onRefresh() }
+                        .tvClickable { onRefresh() }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                     SvgIcon(
@@ -211,18 +211,12 @@ private fun RailCategoryItem(
     // The indicator is a fixed 60x34dp box, so its longest safe radius is 17dp --
     // half the short side. A 20dp "active" radius made the four corners overlap and
     // the selection pill render as a lopsided blob. Sized off the box instead.
-    val indicatorShape: Shape = rememberMorphingCorners(
+    val indicatorShape: Shape = staticCornerShape(
         rest = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.40f)),
-        active = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.50f)),
-        isActive = isSelected,
-        spec = ExpressiveMotion.spatialDefault
+        active = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.40f)),
+        isActive = isSelected
     )
-    val containerShape = rememberMorphingCorners(
-        rest = M3ExpressiveShapes.Corners.largeCard,
-        active = M3ExpressiveShapes.Corners.cardFocused,
-        isActive = isFocused,
-        spec = ExpressiveMotion.spatialDefault
-    )
+    val containerShape: Shape = M3ExpressiveShapes.Corners.largeCard.toShape()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -230,20 +224,17 @@ private fun RailCategoryItem(
             .width(80.dp)
             .clip(containerShape)
             // One focus target on the item: the click's own, watched by the ring below.
-            // `liftOnFocus = false` because the ring draws the lift too.
-            .bouncyClickable(
-                scaleDown = 0.92f,
+            .tvClickable(
                 interactionSource = focusSource,
-                liftOnFocus = false,
+                pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
                 onClick = onClick
             )
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = focusSource,
+                scrim = colors.background,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = M3ExpressivePolygons.Cookie6Sided,
-                focusScale = 1.06f,
-                ringWidth = 2.dp,
                 onFocusChanged = { isFocused = it }
             )
             .semantics {

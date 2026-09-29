@@ -1,6 +1,5 @@
 package com.example.kurdishtv.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,20 +15,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.CornerScale
-import com.example.kurdishtv.ui.motion.ExpressiveMotion
-import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
-import com.example.kurdishtv.ui.motion.bouncyClickable
-import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -48,32 +42,15 @@ fun TopHeaderBar(
 ) {
     val colors = LocalAppColors.current
 
-    // While a refresh is in flight the logo swells slightly and settles back, so the
-    // header reads as alive without needing a blocking spinner over the grid.
-    val reduceMotion = LocalReduceMotion.current
-    val logoScale by animateFloatAsState(
-        targetValue = if (isLoading) 1.06f else 1f,
-        // An effects token rather than the spatial default under reduced motion: the
-        // point of the setting is that nothing *moves*, and a spring here moves.
-        animationSpec = if (reduceMotion) ExpressiveMotion.effectsDefault
-        else ExpressiveMotion.spatialDefault,
-        label = "HeaderLogoScale"
-    )
-
-    // The brand tile holds a glyph, so it stays on the corner scale. Its resting
-    // radius matches the logo tiles in the grid below it, which is what ties the
-    // header and the content together; while a refresh is in flight the corners open
-    // a little, so the header says "working" without a spinner over the grid.
-    val brandShape = rememberMorphingCorners(
-        // Sized off the tile, not off a shared token: the tile is 40-46dp, so half
-        // its short side is 20-23dp and the 22dp "logo tile" radius exceeded it on the
-        // narrow layout. Opening 30% -> 44% of the tile keeps it a rounded square at
-        // both sizes and still reads as a change when a refresh is in flight.
-        rest = CornerScale.uniform(ShapeMorph.cornerRadius(46.dp, 0.30f)),
-        active = CornerScale.uniform(ShapeMorph.cornerRadius(46.dp, 0.44f)),
-        isActive = isLoading,
-        spec = ExpressiveMotion.spatialDefault
-    )
+    // The brand tile is a fixed rounded square, sized off the tile rather than off a
+    // shared token: it is 40-46dp, so half its short side is 20-23dp and the 22dp
+    // "logo tile" radius exceeded it on the narrow layout.
+    //
+    // It used to swell to 1.06 and its corners open from 30% to 44% while a refresh
+    // was in flight. A refresh is now reported by [LoadingIndicator] next to the
+    // button, which says "working" without the brand changing shape underneath the
+    // title.
+    val brandShape = CornerScale.uniform(ShapeMorph.cornerRadius(46.dp, 0.30f)).toShape()
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         // On narrow screens the title, the action row and the channel count cannot all
@@ -121,28 +98,7 @@ fun TopHeaderBar(
                     modifier = Modifier
                         .size(logoSize)
                         .border(1.dp, colors.primary.copy(alpha = 0.5f), brandShape)
-                        // Attached only while the logo is actually moving. A
-                        // `graphicsLayer` is a render node with its own display list,
-                        // and this one otherwise sat at scale 1 for the entire life of
-                        // the screen, multiplying by one.
-                        //
-                        // `== 1f`, not `>= 1f`. The resting target here is exactly
-                        // 1f and `animateFloatAsState` assigns its target exactly, so
-                        // equality is true whenever the header is idle. `>=` would
-                        // instead drop the layer the moment the swell passed 1f on its
-                        // way up and never put it back — deleting the animation this
-                        // branch exists to make cheap.
-                        .then(
-                            if (logoScale == 1f) {
-                                Modifier
-                            } else {
-                                Modifier.graphicsLayer {
-                                    scaleX = logoScale
-                                    scaleY = logoScale
-                                }
-                            }
-                        )
-                        .bouncyClickable { onRefresh() }
+                        .tvClickable { onRefresh() }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         SvgIcon(
@@ -211,7 +167,7 @@ fun TopHeaderBar(
                     style = AppIconButtonStyle.Tonal
                 )
                 if (isLoading) {
-                    BouncingLoader(size = 26.dp)
+                    LoadingIndicator(size = 26.dp)
                 }
             }
         }

@@ -39,9 +39,9 @@ import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
-import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.expressiveFocusRing
-import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import androidx.compose.ui.graphics.Shape
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -94,7 +94,11 @@ fun ChannelSidebar(
     }
     LaunchedEffect(selectedIndex) {
         if (selectedIndex >= 0) {
-            runCatching { listState.animateScrollToItem(selectedIndex) }
+            // `scrollToItem`, not `animateScrollToItem`. The row is highlighted the
+            // instant it is selected, and a glide that takes a third of a second
+            // lands the viewer looking at a list that has not caught up with the
+            // highlight they just watched appear.
+            runCatching { listState.scrollToItem(selectedIndex) }
         }
     }
 
@@ -178,12 +182,7 @@ private fun ChannelSidebarRow(
     // filled plate, because it is a record of where they are rather than a prompt.
     // Drawing them identically made the sidebar's highlight and the grid's disagree
     // whenever selection was somewhere else.
-    val plateShape = rememberMorphingCorners(
-        rest = M3ExpressiveShapes.Corners.largeCard,
-        active = M3ExpressiveShapes.Corners.cardFocused,
-        isActive = isSelected,
-        spec = ExpressiveMotion.spatialDefault
-    )
+    val plateShape: Shape = M3ExpressiveShapes.Corners.smallCard.toShape()
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -193,22 +192,20 @@ private fun ChannelSidebarRow(
             .background(if (isSelected) colors.surfaceVariant else colors.surface)
             // The click keeps its own focus target and the ring watches the same
             // source, so there is one stop on this row rather than two competing ones.
-            // `liftOnFocus = false` because the ring below draws the lift; two lifts on
-            // one node multiply. `onLongClick` is how a remote reaches the favourite,
-            // since the heart is out of the tab order.
-            .bouncyClickable(
-                scaleDown = 0.96f,
+            // `onLongClick` is how a remote reaches the favourite, since the heart is
+            // out of the tab order.
+            .tvClickable(
                 interactionSource = rowFocusSource,
-                liftOnFocus = false,
+                pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                pressedShape = plateShape,
                 onLongClick = onFavoriteToggle
             ) { onClick() }
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = rowFocusSource,
+                scrim = colors.background,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
-                focusScale = 1.03f,
-                ringWidth = 2.dp,
                 onFocusChanged = { focused ->
                     isFocused = focused
                     if (focused) onFocused()
@@ -290,19 +287,16 @@ private fun ChannelSidebarRow(
                 // the standard list-with-a-trailing-action shape, and arrowing down
                 // the list never passes through it. Only the rows on screen are
                 // composed at all, so the cost is bounded by the viewport.
-                .bouncyClickable(
-                    scaleDown = 0.86f,
+                .tvClickable(
                     interactionSource = heartFocusSource,
-                    liftOnFocus = false,
                     onClick = onFavoriteToggle
                 )
                 .expressiveFocusRing(
                     ringColor = colors.primary,
                     interactionSource = heartFocusSource,
+                    scrim = colors.background,
                     restShape = M3ExpressivePolygons.Square,
-                    ringShape = M3ExpressivePolygons.Cookie6Sided,
-                    focusScale = 1.08f,
-                    ringWidth = 2.dp
+                    ringShape = M3ExpressivePolygons.Cookie6Sided
                 ),
             contentAlignment = Alignment.Center
         ) {

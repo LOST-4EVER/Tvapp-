@@ -1,8 +1,5 @@
 package com.example.kurdishtv.ui.components
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -16,19 +13,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -39,53 +29,11 @@ fun EmptyChannelState(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
-    val reduceMotion = LocalReduceMotion.current
-
-    // Springs in rather than appearing flat, which makes an empty result read as a
-    // deliberate state instead of a failed render.
-    //
-    // The target has to be flipped after the first composition. `animateFloatAsState`
-    // seeds itself from its target value, so a constant `targetValue = 1f` starts
-    // and ends at 1 and nothing animates at all — which is what this used to do.
-    var entered by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { entered = true }
-    val entrance by animateFloatAsState(
-        targetValue = if (entered) 1f else 0f,
-        animationSpec = if (reduceMotion) {
-            spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)
-        } else {
-            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
-        },
-        label = "EmptyStateEntrance"
-    )
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(32.dp)
-            // Attached only while the state is actually springing in. Left in place it
-            // would hold a render node at alpha 1 and scale 1 for as long as the empty
-            // state is on screen, which is the whole point of it being an empty state.
-            //
-            // `== 1f` is right here, and worth saying why because `>=` looks like the
-            // obvious improvement and is not. `animateFloatAsState` ends its animation
-            // by assigning the target *exactly*, so the resting value is bit-for-bit
-            // 1f and this branch is taken for as long as the empty state is up. The
-            // overshoot of the bouncy spring is not what it looks like: it happens
-            // mid-flight, when `entrance` is above 1f and this branch is correctly not
-            // taken. (The motion layer's `staggeredEntrance` does use `>=`, which does
-            // clip its own overshoot — see the note there.)
-            .then(
-                if (entrance == 1f) {
-                    Modifier
-                } else {
-                    Modifier.graphicsLayer {
-                        scaleX = entrance
-                        scaleY = entrance
-                        alpha = entrance.coerceIn(0f, 1f)
-                    }
-                }
-            ),
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {

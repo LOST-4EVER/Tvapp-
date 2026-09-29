@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -109,7 +109,7 @@ fun SleepTimerDialog(
                             color = colors.liveRed.copy(alpha = 0.18f),
                             modifier = Modifier
                                 .weight(1f)
-                                .bouncyClickable {
+                                .tvClickable {
                                     onSelectMinutes(0)
                                     onDismiss()
                                 }
@@ -152,7 +152,7 @@ private fun TimerChip(
                 if (isSelected) colors.primary else colors.border,
                 M3ExpressiveShapes.Pill
             )
-            .bouncyClickable(scaleDown = 0.90f, onClick = onClick)
+            .tvClickable(onClick = onClick)
     ) {
         Text(
             text = "${minutes}m",
