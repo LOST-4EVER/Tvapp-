@@ -427,49 +427,94 @@ class TvViewModel(
             val isFav = withContext(Dispatchers.IO) {
                 runCatching { repository.toggleFavorite(channelId) }.getOrNull()
             } ?: return@launch
+
+            // Three list rebuilds over a catalogue that runs to several hundred
+            // channels, for one boolean. Built on a worker and only swapped in
+            // here, so the tap does not spend its first frames on the thread that
+            // has to draw the grid it is drawing into.
+            val snapshot = _uiState.value
+            val rebuilt = withContext(Dispatchers.Default) {
+                rebuildForFavorite(snapshot, channelId, isFav)
+            }
             _uiState.update { state ->
-                val updatedChannels = state.channels.map {
-                    if (it.id == channelId) it.copy(isFavorite = isFav) else it
-                }
-                val updatedSelected = if (state.selectedChannel?.id == channelId) {
-                    state.selectedChannel.copy(isFavorite = isFav)
-                } else state.selectedChannel
-
-                val updatedRecents = state.recentChannels.map {
-                    if (it.id == channelId) it.copy(isFavorite = isFav) else it
-                }
-
-                // Only the Favourites tab actually changes membership when a heart is
-                // tapped. In the other eleven categories the channel is in the list
-                // before and after, and what changed about it is one boolean — so
-                // the same `Channel` instance with the flag flipped is substituted
-                // into the existing filtered list instead of re-deriving the list
-                // from several hundred channels.
-                //
-                // This is the action a viewer performs most often after watching
-                // something, and it is on the main thread, so the difference between
-                // "replace one element" and "refilter everything" is the difference
-                // between instant and a visible stall on a large merged playlist.
-                val filtered = if (state.selectedCategory == CategoryFilter.FAVORITES) {
-                    ChannelFilterEngine.filter(
-                        updatedChannels,
-                        state.selectedCategory,
-                        state.searchQuery
+                // A merge, a search or a second tap can land while the rebuild is
+                // in flight, and then the answer describes a list that is no longer
+                // on screen. Identity, not equality: a re-merged catalogue is a
+                // different object even when it holds the same channels, and
+                // recomputing for it is what keeps the two answers consistent.
+                if (state.channels !== snapshot.channels) {
+                    val fresh = rebuildForFavorite(state, channelId, isFav)
+                    state.copy(
+                        channels = fresh.channels,
+                        filteredChannels = fresh.filteredChannels,
+                        selectedChannel = fresh.selectedChannel,
+                        recentChannels = fresh.recentChannels
                     )
                 } else {
-                    state.filteredChannels.map {
-                        if (it.id == channelId) it.copy(isFavorite = isFav) else it
-                    }
+                    state.copy(
+                        channels = rebuilt.channels,
+                        filteredChannels = rebuilt.filteredChannels,
+                        selectedChannel = rebuilt.selectedChannel,
+                        recentChannels = rebuilt.recentChannels
+                    )
                 }
-
-                state.copy(
-                    channels = updatedChannels,
-                    filteredChannels = filtered,
-                    selectedChannel = updatedSelected,
-                    recentChannels = updatedRecents
-                )
             }
         }
+    }
+
+    /** The four lists a heart tap changes, derived together so they cannot disagree. */
+    private data class FavoriteUpdate(
+        val channels: List<Channel>,
+        val filteredChannels: List<Channel>,
+        val selectedChannel: Channel?,
+        val recentChannels: List<Channel>
+    )
+
+    /**
+     * Applies one favourite flag across every list that holds a copy of a channel.
+     *
+     * Only the Favourites tab actually changes membership when a heart is tapped.
+     * In the other eleven categories the channel is in the list before and after,
+     * and what changed about it is one boolean — so the same `Channel` instance
+     * with the flag flipped is substituted into the existing filtered list instead
+     * of re-deriving the list from several hundred channels.
+     *
+     * This is the action a viewer performs most often after watching something,
+     * so the difference between "replace one element" and "refilter everything" is
+     * the difference between instant and a visible stall on a large merged
+     * playlist.
+     */
+    private fun rebuildForFavorite(
+        state: TvUiState,
+        channelId: String,
+        isFav: Boolean
+    ): FavoriteUpdate {
+        val updatedChannels = state.channels.map {
+            if (it.id == channelId) it.copy(isFavorite = isFav) else it
+        }
+        val updatedSelected = if (state.selectedChannel?.id == channelId) {
+            state.selectedChannel.copy(isFavorite = isFav)
+        } else state.selectedChannel
+        val updatedRecents = state.recentChannels.map {
+            if (it.id == channelId) it.copy(isFavorite = isFav) else it
+        }
+        val filtered = if (state.selectedCategory == CategoryFilter.FAVORITES) {
+            ChannelFilterEngine.filter(
+                updatedChannels,
+                state.selectedCategory,
+                state.searchQuery
+            )
+        } else {
+            state.filteredChannels.map {
+                if (it.id == channelId) it.copy(isFavorite = isFav) else it
+            }
+        }
+        return FavoriteUpdate(
+            channels = updatedChannels,
+            filteredChannels = filtered,
+            selectedChannel = updatedSelected,
+            recentChannels = updatedRecents
+        )
     }
 
     fun onChannelSelected(channel: Channel) {
@@ -480,12 +525,15 @@ class TvViewModel(
         // refresh the "recently watched" row once the write has completed.
         _uiState.update { it.copy(selectedChannel = channel, isPlaybackPaused = false) }
         viewModelScope.launch {
+            // The store hands back the history it just wrote, so this does not
+            // read the file again to be told what it already knows. It used to:
+            // build a JSON array, write it, read it straight back and parse it,
+            // on every press of OK.
             val recents = withContext(Dispatchers.IO) {
-                runCatching {
-                    repository.addRecentChannel(channel.id)
-                    repository.getRecentChannelIds()
-                }.getOrNull()
-            } ?: return@launch
+                runCatching { repository.addRecentChannel(channel.id) }
+                    .getOrDefault(emptyList())
+            }
+            if (recents.isEmpty()) return@launch
             // Deliberately does **not** write `selectedChannel` back.
             //
             // This block finishes some time after the selection was made, and on a

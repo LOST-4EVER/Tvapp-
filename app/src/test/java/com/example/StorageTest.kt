@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.TimeUnit
 
 /**
  * The persistence layer, including the on-disk format migrations.
@@ -96,6 +97,23 @@ class StorageTest {
         // Newest first, so the last one watched is the head of the list.
         assertEquals("channel30", ids.first())
         assertEquals("channel19", ids.last())
+    }
+
+    @Test
+    fun `adding a channel hands back the history that was written`() {
+        // The caller that publishes the "continue watching" row used to read the
+        // file straight back to get this, which meant building a JSON array,
+        // writing it, reading it and parsing it again on every press of OK. If the
+        // returned value ever stops matching what is stored, that optimisation has
+        // quietly become a lie and the row would show something that was not
+        // saved — so the two are pinned together here.
+        val storage = RecentStorage(context)
+        assertEquals(listOf("first"), storage.addRecentChannel("first"))
+        assertEquals(listOf("second", "first"), storage.addRecentChannel("second"))
+        assertEquals(
+            storage.getRecentChannelIds(),
+            RecentStorage(context).addRecentChannel("first")
+        )
     }
 
     @Test
@@ -273,9 +291,30 @@ class StorageTest {
     fun `there is no cache before anything is written`() {
         val storage = ChannelCacheStorage(context)
         assertNull(storage.getCachedChannels())
-        // Zero is ambiguous on purpose: it means "no cache" or "the clock moved
-        // backwards", and the caller decides by reading, not by asking.
+        // Zero now means exactly one thing: nothing is cached.
         assertEquals(0L, storage.getCacheAgeMs())
+    }
+
+    @Test
+    fun `a cache stamped in the future is reported as stale, not as brand new`() {
+        // The failure this prevents is permanent rather than visible. A device
+        // whose clock was set forward and then corrected leaves the file stamped
+        // in the future, and an age of zero for that file — which is what a
+        // backwards subtraction produces — means "written just now". The app then
+        // serves that list on every launch, forever, and never asks again.
+        val storage = ChannelCacheStorage(context)
+        storage.saveChannels(listOf(channel("a")))
+        val file = java.io.File(context.filesDir, "cached_kurdish_channels.json")
+        assertTrue(
+            "could not move the cache into the future",
+            file.setLastModified(System.currentTimeMillis() + 3_600_000L)
+        )
+
+        val age = ChannelCacheStorage(context).getCacheAgeMs()
+        assertTrue(
+            "a future-dated cache reported an age of $age ms, which reads as fresh",
+            age > TimeUnit.HOURS.toMillis(1)
+        )
     }
 
     @Test
@@ -308,5 +347,67 @@ class StorageTest {
         // A truncated or corrupted file must degrade to "no cache" so the app
         // falls through to the network, not crash on every launch.
         assertNull(storage.getCachedChannels())
+        // The count has to fail the same way, quietly. It is only ever used to
+        // decide whether a merge shrank, and a number read out of a file that does
+        // not parse would let a partial merge overwrite the good list.
+        assertEquals(0, storage.getCachedChannelCount())
+    }
+
+    // ── Counting the cache without parsing it ───────────────────────────────
+
+    @Test
+    fun `the count agrees with what a full parse finds`() {
+        val storage = ChannelCacheStorage(context)
+        val original = (1..40).map { channel("id$it", category = if (it % 2 == 0) "News" else "Music") }
+        storage.saveChannels(original)
+
+        val storage2 = ChannelCacheStorage(context)
+        assertEquals(storage2.getCachedChannels()!!.size, storage2.getCachedChannelCount())
+    }
+
+    @Test
+    fun `there is no count before anything is written`() {
+        assertEquals(0, ChannelCacheStorage(context).getCachedChannelCount())
+    }
+
+    @Test
+    fun `the element counter is not fooled by punctuation inside a channel name`() {
+        val storage = ChannelCacheStorage(context)
+        // The exact shapes that break a scanner which only looks for braces and
+        // commas: a closing brace in a name, an embedded quote, an escaped
+        // backslash, and a newline. These are all reachable — channel names come
+        // from community playlists — and each one used to be able to make the
+        // counter disagree with the parser.
+        val awkward = listOf(
+            channel("a", name = "NRT } 1"),
+            channel("b", name = "Say \"hi\" TV"),
+            channel("c", name = "back\\slash"),
+            channel("d", name = "line\nbreak"),
+            channel("e", name = "brace } and { pair"),
+            channel("f", name = "array [bracket]")
+        )
+        storage.saveChannels(awkward)
+
+        val storage2 = ChannelCacheStorage(context)
+        val parsed = storage2.getCachedChannels()!!
+        assertEquals(awkward.size, parsed.size)
+        assertEquals(parsed.size, storage2.getCachedChannelCount())
+        assertEquals(listOf("NRT } 1", "Say \"hi\" TV", "back\\slash"), parsed.take(3).map { it.name })
+    }
+
+    @Test
+    fun `the element counter handles the shapes a hand written file can be in`() {
+        val storage = ChannelCacheStorage(context)
+        assertEquals(0, storage.countTopLevelElements(""))
+        assertEquals(0, storage.countTopLevelElements("[]"))
+        assertEquals(0, storage.countTopLevelElements("  [  ]  "))
+        assertEquals(1, storage.countTopLevelElements("""[{"a":1}]"""))
+        assertEquals(3, storage.countTopLevelElements("""[{"a":1},{"b":2},{"c":3}]"""))
+        // A nested array belongs to its element, and must not be counted.
+        assertEquals(1, storage.countTopLevelElements("""[{"a":[1,2,3]}]"""))
+        // Commas inside strings are not separators.
+        assertEquals(2, storage.countTopLevelElements("""[{"a":"x,y"},{"b":"z"}]"""))
+        // As are braces and escaped quotes.
+        assertEquals(1, storage.countTopLevelElements("""[{"a":"}\""}]"""))
     }
 }

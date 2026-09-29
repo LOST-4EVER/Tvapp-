@@ -441,9 +441,24 @@ that:
   built once per distinct channel list rather than per keystroke, held through a
   `WeakReference` so the cache cannot keep a discarded list alive.
 - **Category counts are one pass.** `countsByCategory` computes all twelve counts
-  together rather than calling `filter` twelve times.
+  together rather than calling `filter` twelve times, and folds each channel's
+  category string once instead of asking for nine case-insensitive substring
+  matches, which is a per-character fold at every position of the string.
 - **Animations are demand-driven.** The shared LIVE pulse and focus rotation only
-  run their frame loops while something is actually reading them.
+  run their frame loops while something is actually reading them, and only while
+  the app is in the foreground - a `withFrameNanos` loop re-arms through the
+  Choreographer, which keeps posting for as long as the display is on whether or
+  not the app is in front of it.
+- **The cache is counted, not parsed.** The merge needs to know how many channels
+  are on disk before it will overwrite them. Reading that number used to mean
+  building a `Channel` for every entry in the file; it is now a single pass that
+  counts array elements and allocates nothing.
+- **Scrolling the grid reuses item compositions.** Channel cells declare a
+  content type, so a lazy layout can hand a recycled composition to the next
+  cell instead of composing every one of several hundred channels from scratch.
+- **Selecting a channel writes the watch history once.** The store hands back the
+  history it just wrote, so the "continue watching" row no longer re-reads and
+  re-parses the file it was just given.
 - **Media traffic is isolated.** Video uses a separate OkHttp client with no HTTP
   cache, so HLS segments cannot evict playlists and logos, and a grid full of logos
   cannot starve a stream of its per-host connection slots.

@@ -23,6 +23,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlinx.coroutines.delay
@@ -366,10 +369,43 @@ internal fun WatchFocusRotation(active: Boolean) {
     }
 }
 
+/**
+ * Whether the app is on screen, as opposed to merely alive.
+ *
+ * The two shared frame loops below used to key on the viewer's setting and on
+ * whether anything was reading them, and nothing on whether anyone was *looking*.
+ * Both are `withFrameNanos` loops, which re-arm themselves through the
+ * Choreographer on every vsync; the Choreographer keeps posting for as long as the
+ * display is on, whether or not the app that posted is in front of it. So an
+ * activity that had been sent to the background — because the viewer pressed Home
+ * mid-channel, or switched to a box office app, or the TV box decided to show
+ * something else entirely — went on waking the CPU sixty times a second to animate
+ * a dot and a ring that nobody could see. On a television that is the app quietly
+ * running the box hot while it is switched to another input; on a handset it is
+ * measurable battery for nothing at all.
+ *
+ * This is the third condition, and it is the one that was missing. A loop now
+ * exists exactly while the app is in the foreground *and* something is reading
+ * it *and* the viewer has not switched motion off.
+ *
+ * STARTED rather than RESUMED, so the loops survive a transient loss of focus —
+ * a notification shade pulled down, a system dialog — without visibly restarting.
+ * Nothing is lost when they do restart anyway: both loops measure their phase
+ * from a shared origin that outlives them, so the values continue rather than
+ * snapping to zero.
+ */
+@Composable
+private fun rememberIsForeground(): Boolean {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val state by lifecycle.currentStateAsState()
+    return state.isAtLeast(Lifecycle.State.STARTED)
+}
+
 /** Drives [LocalFocusRotation]. One frame loop for the whole app; see that property. */
 @Composable
 fun rememberFocusRotation(enabled: Boolean): WatchedFloat {
     val rotation = remember { WatchedFloat(0f) }
+    val isForeground = rememberIsForeground()
 
     // Driven by a plain `withFrameNanos` loop writing one state object, rather
     // than by a `rememberInfiniteTransition`.
@@ -398,8 +434,8 @@ fun rememberFocusRotation(enabled: Boolean): WatchedFloat {
     // per-loop origin, the ring would snap back to 0° on every single arrow press —
     // the exact stutter the slow continuous turn exists to avoid, reintroduced by the
     // optimisation. With a shared origin it picks up at the angle it left off at.
-    LaunchedEffect(enabled, rotation.watchers.intValue) {
-        if (!enabled || !rotation.isWatched) {
+    LaunchedEffect(enabled, rotation.watchers.intValue, isForeground) {
+        if (!enabled || !rotation.isWatched || !isForeground) {
             // Deliberately *not* zeroed. Nothing is drawing the ring while it is
             // unfocused, and zeroing it would make the next focus gain start the
             // turn from the top rather than from where it actually was.
@@ -431,14 +467,15 @@ fun rememberFocusRotation(enabled: Boolean): WatchedFloat {
 @Composable
 fun rememberLivePulse(enabled: Boolean): WatchedFloat {
     val pulse = remember { WatchedFloat(ExpressiveMotion.RESTING_PULSE) }
+    val isForeground = rememberIsForeground()
 
     // Keyed on the watcher count for the same reason as [rememberFocusRotation]: the
     // setting says whether the viewer *wants* a pulse, not whether any badge is on
     // screen to receive one. The player draws exactly one badge and only while its
     // transport controls are up, so most of the time spent watching a channel there
     // is nothing reading this number — and it was waking the CPU anyway.
-    LaunchedEffect(enabled, pulse.watchers.intValue) {
-        if (!enabled || !pulse.isWatched) {
+    LaunchedEffect(enabled, pulse.watchers.intValue, isForeground) {
+        if (!enabled || !pulse.isWatched || !isForeground) {
             // Resting, not merely unwritten: unlike the focus ring, a badge draws this
             // value on every frame it is composed, so leaving the last breathing scale
             // in place would freeze a dot mid-pulse at whatever size it happened to
