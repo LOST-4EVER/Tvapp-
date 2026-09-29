@@ -3,17 +3,11 @@ package com.example.kurdishtv.ui.motion
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -548,41 +542,4 @@ class WatchedFloat internal constructor(initial: Float) {
         // drive the count negative and wedge the loop off permanently.
         if (watchers.intValue > 0) watchers.intValue--
     }
-}
-
-/**
- * A shared 0→1 driver for continuous shape animation.
- *
- * Everything that loops forever in this app — the loading indicator's shape walk, the
- * live badge's rotation, the hero card's slow turn — reads from this one transition, so
- * the number of running animations does not grow with the number of things on screen.
- *
- *    [keyframes] holds at each extreme, which reproduces the loading indicator's
- * stretch-and-settle cadence instead of looping mechanically.
- *
- * Note the contrast with [rememberLivePulse] and [rememberFocusRotation], which are
- * driven by `withFrameNanos` loops that stop when nothing reads them. That is not an
- * oversight here: this one is only ever called while a loading indicator is on screen,
- * so there is always a reader by construction, and an infinite transition is the
- * clearer way to say "loop until I leave the composition".
- */
-@Composable
-fun rememberBounceProgress(enabled: Boolean): Float {
-    val transition = rememberInfiniteTransition(label = "ShapeCycle")
-    val progress by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 1400
-                0f at 0
-                1f at 700
-                1f at 850
-                0f at 1400
-            },
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ShapeCycleValue"
-    )
-    return if (enabled) progress else ExpressiveMotion.RESTING_BOUNCE
 }

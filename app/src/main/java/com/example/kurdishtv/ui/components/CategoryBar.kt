@@ -1,7 +1,9 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,7 +23,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.CategoryFilter
@@ -61,6 +65,21 @@ fun CategoryBar(
 ) {
     val colors = LocalAppColors.current
     val reduceMotion = LocalReduceMotion.current
+
+    // The selection transitions, and the spec they share.
+    //
+    // `reduceMotion` was read here and then never used, which is the quietest kind of
+    // bug there is: nothing failed, nothing looked wrong, and a viewer who had asked
+    // for reduced motion got the same three moving chips as everyone else. Selecting a
+    // category is the single most repeated gesture in the app, so these three
+    // transitions are also the ones that run most often.
+    //
+    // `snap()` rather than a fast spring: the setting means *instant*, and a spring
+    // with high stiffness still moves, which is the thing being asked not to happen.
+    val pillColorSpec: AnimationSpec<Color> =
+        if (reduceMotion) snap() else ExpressiveMotion.effectsColor
+    val pillElevationSpec: AnimationSpec<Dp> =
+        if (reduceMotion) snap() else ExpressiveMotion.spatialDp
 
     // Hide tabs that would show nothing.
     //
@@ -137,17 +156,17 @@ fun CategoryBar(
                 targetValue = if (isSelected) colors.primary else colors.surfaceVariant,
                 // An effects token, not a default spring: colour must not overshoot,
                 // and a colour that bounces past its target is a visible artefact.
-                animationSpec = ExpressiveMotion.effectsColor,
+                animationSpec = pillColorSpec,
                 label = "CategoryPillBackground"
             )
             val contentColor by animateColorAsState(
                 targetValue = if (isSelected) colors.onPrimary else colors.textSecondary,
-                animationSpec = ExpressiveMotion.effectsColor,
+                animationSpec = pillColorSpec,
                 label = "CategoryPillContent"
             )
             val elevation by animateDpAsState(
                 targetValue = if (isSelected) 6.dp else 0.dp,
-                animationSpec = ExpressiveMotion.spatialDp,
+                animationSpec = pillElevationSpec,
                 label = "CategoryPillElevation"
             )
 

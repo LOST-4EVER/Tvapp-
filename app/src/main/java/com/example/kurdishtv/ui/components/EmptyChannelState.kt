@@ -66,6 +66,15 @@ fun EmptyChannelState(
             // Attached only while the state is actually springing in. Left in place it
             // would hold a render node at alpha 1 and scale 1 for as long as the empty
             // state is on screen, which is the whole point of it being an empty state.
+            //
+            // `== 1f` is right here, and worth saying why because `>=` looks like the
+            // obvious improvement and is not. `animateFloatAsState` ends its animation
+            // by assigning the target *exactly*, so the resting value is bit-for-bit
+            // 1f and this branch is taken for as long as the empty state is up. The
+            // overshoot of the bouncy spring is not what it looks like: it happens
+            // mid-flight, when `entrance` is above 1f and this branch is correctly not
+            // taken. (The motion layer's `staggeredEntrance` does use `>=`, which does
+            // clip its own overshoot — see the note there.)
             .then(
                 if (entrance == 1f) {
                     Modifier

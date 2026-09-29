@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
 import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.rememberMorphingCorners
@@ -47,11 +48,15 @@ fun TopHeaderBar(
 ) {
     val colors = LocalAppColors.current
 
-    // While a refresh is in flight the logo gently breathes, so the header reads as
-    // alive without needing a blocking spinner over the grid.
+    // While a refresh is in flight the logo swells slightly and settles back, so the
+    // header reads as alive without needing a blocking spinner over the grid.
+    val reduceMotion = LocalReduceMotion.current
     val logoScale by animateFloatAsState(
         targetValue = if (isLoading) 1.06f else 1f,
-        animationSpec = ExpressiveMotion.spatialDefault,
+        // An effects token rather than the spatial default under reduced motion: the
+        // point of the setting is that nothing *moves*, and a spring here moves.
+        animationSpec = if (reduceMotion) ExpressiveMotion.effectsDefault
+        else ExpressiveMotion.spatialDefault,
         label = "HeaderLogoScale"
     )
 
@@ -116,10 +121,17 @@ fun TopHeaderBar(
                     modifier = Modifier
                         .size(logoSize)
                         .border(1.dp, colors.primary.copy(alpha = 0.5f), brandShape)
-                        // Attached only while the logo is actually breathing. A
+                        // Attached only while the logo is actually moving. A
                         // `graphicsLayer` is a render node with its own display list,
                         // and this one otherwise sat at scale 1 for the entire life of
                         // the screen, multiplying by one.
+                        //
+                        // `== 1f`, not `>= 1f`. The resting target here is exactly
+                        // 1f and `animateFloatAsState` assigns its target exactly, so
+                        // equality is true whenever the header is idle. `>=` would
+                        // instead drop the layer the moment the swell passed 1f on its
+                        // way up and never put it back — deleting the animation this
+                        // branch exists to make cheap.
                         .then(
                             if (logoScale == 1f) {
                                 Modifier

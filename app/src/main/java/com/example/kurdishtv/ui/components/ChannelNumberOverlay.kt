@@ -2,6 +2,7 @@ package com.example.kurdishtv.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.kurdishtv.viewmodel.ChannelJump
 import com.example.ui.theme.LocalAppColors
@@ -47,6 +49,7 @@ fun ChannelNumberOverlay(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
+    val reduceMotion = LocalReduceMotion.current
     val target = jump.target
     val shape = M3ExpressiveShapes.LargeCard
 
@@ -54,14 +57,27 @@ fun ChannelNumberOverlay(
     // instead of one frozen panel. A single `Animatable` on one composable — not a
     // frame loop over anything else on screen, and not the permanent rotation the
     // focus ring uses, which would be the wrong signal for something transient.
+    //
+    // The `snapTo` is what makes "re-armed" true. `animateTo(1f)` on an `Animatable`
+    // that is already at 1f has nothing to do, so without the reset the very first
+    // digit popped and every digit after it silently did nothing — the opposite of
+    // what a viewer typing `12` sees, which is one pop and then a frozen panel while
+    // the readout changes.
     val pop = remember { Animatable(0.88f) }
     LaunchedEffect(jump.digits) {
+        pop.snapTo(0.88f)
         pop.animateTo(
             targetValue = 1f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow
-            )
+            // Reduced motion means nothing *moves*. A bouncy pop is the definition
+            // of movement, and this is a panel large enough to see it cross a screen.
+            animationSpec = if (reduceMotion) {
+                snap()
+            } else {
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            }
         )
     }
 
