@@ -186,11 +186,16 @@ fun appColorsFor(settings: AppSettings, dynamicScheme: ColorScheme? = null): App
         tonalPair(primary, surface)
     }
 
+    // Named up front because [focusScrim] below *is* this colour, and a constructor
+    // call cannot refer to a sibling named argument of itself.
+    val background = if (amoled) AmoledBackground else DarkBackground
+    val elevated = if (amoled) AmoledSurfaceElevated else DarkSurfaceElevated
+
     return AppColors(
-        background = if (amoled) AmoledBackground else DarkBackground,
+        background = background,
         surface = surface,
         surfaceVariant = variant,
-        surfaceElevated = if (amoled) AmoledSurfaceElevated else DarkSurfaceElevated,
+        surfaceElevated = elevated,
         surfaceHigh = if (amoled) AmoledSurfaceHigh else DarkSurfaceHigh,
         border = if (amoled) AmoledCardBorder else DarkCardBorder,
         divider = if (amoled) AmoledDivider else DarkDivider,
@@ -201,8 +206,7 @@ fun appColorsFor(settings: AppSettings, dynamicScheme: ColorScheme? = null): App
         focusScrim = background,
         // A shade lighter than the card it sits on, which is what makes a flat
         // card read as a surface rather than as a hole.
-        edgeHighlight = (if (amoled) AmoledSurfaceElevated else DarkSurfaceElevated)
-            .lighten(0.06f),
+        edgeHighlight = elevated.lighten(0.06f),
         borderGlow = primary.copy(alpha = 0.20f),
         glass = if (amoled) Color(0xE6000000) else GlassOverlay,
         textPrimary = TextPrimary,

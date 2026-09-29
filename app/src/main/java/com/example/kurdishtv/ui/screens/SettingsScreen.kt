@@ -464,7 +464,6 @@ private enum class PendingAction(val title: String, val body: String) {
 private fun Modifier.readableColumn(isTv: Boolean): Modifier =
     if (isTv) this.widthIn(max = 760.dp) else this
 
-@Composable
 /**
  * The outline a focused settings row's plate is drawn in.
  *

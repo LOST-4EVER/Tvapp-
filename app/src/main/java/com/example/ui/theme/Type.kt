@@ -3,7 +3,6 @@ package com.example.ui.theme
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontFamily.Monospace
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
@@ -156,7 +155,10 @@ val Typography = Typography(
  * three-digit number and a one-digit number leave the name in the same place.
  */
 val ChannelNumber = TextStyle(
-    fontFamily = Monospace,
+    // `FontFamily.Monospace`, not an import of `Monospace`. It is a property on
+    // `FontFamily`'s companion object rather than a nested type, so
+    // `import FontFamily.Monospace` does not resolve and the import has to go.
+    fontFamily = FontFamily.Monospace,
     fontWeight = FontWeight.Bold,
     fontSize = 13.sp,
     lineHeight = 18.sp,
@@ -172,7 +174,7 @@ val ChannelNumber = TextStyle(
  * digit rather than as a new one.
  */
 val NumeralLarge = TextStyle(
-    fontFamily = Monospace,
+    fontFamily = FontFamily.Monospace,
     fontWeight = FontWeight.Black,
     fontSize = 56.sp,
     lineHeight = 62.sp,
