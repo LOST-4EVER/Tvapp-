@@ -18,6 +18,7 @@ television, a TV box, a tablet or a phone.
 | **Language** | Kotlin 2.2.10, Jetpack Compose (BOM 2024.09.00) |
 | **Build** | AGP 9.1.1, Gradle 9.3.1, JDK 21 |
 | **Repository** | <https://github.com/LOST-4EVER/Tvapp-> |
+| **Catalogue** | 98 channels, all verified end to end |
 
 ---
 
@@ -196,13 +197,32 @@ app/src/main/java/com/example/
 ./gradlew test                   # unit + Robolectric tests
 ./gradlew lintRelease            # Android Lint
 ./gradlew assembleRelease        # minified release APK
+./gradlew auditStreams           # verify every catalogue stream against the network
 ```
 
 `./gradlew` needs no Gradle installed. It uses a Gradle on `PATH` if there is
 one, otherwise the official wrapper if `gradle/wrapper/gradle-wrapper.jar` has
 been restored into the checkout, and otherwise it downloads the exact
 distribution pinned in `gradle/wrapper/gradle-wrapper.properties` once and
-caches it. The version it uses therefore always matches CI.
+caches it. The version it uses therefore always matches CI — CI pins the same
+`9.3.1` rather than resolving whatever Gradle happened to be current.
+
+### Build time
+
+A few things are deliberately *not* in the build, because nothing consumed them:
+
+- **KSP is not applied.** Every annotation processor that would use it
+  (`room-compiler`, `moshi-codegen`) is commented out in `app/build.gradle.kts`,
+  so it was joining the task graph and producing nothing. The plugin alias is
+  still in the version catalog — re-add it in the same commit that uncomments a
+  `ksp(...)` dependency.
+- **The Maps Platform secrets plugin is not applied.** It generated `SECRET_*`
+  `BuildConfig` fields, and this app reads no secrets: it talks only to public
+  playlists and a public update manifest. It also pulled Google Maps Platform
+  into a build with no Maps and no Firebase.
+
+Configuration cache, build cache, parallel project evaluation and the Kotlin
+compiler daemon are all enabled in `gradle.properties`.
 
 ### Run on a device
 
@@ -282,6 +302,41 @@ same filesystem, so a kill partway through can no longer leave a half-written
 cache. A source that returns nothing usable is treated as a problem with that
 source; it never falls back to injecting unrelated channels.
 
+### Auditing the catalogue
+
+Third-party streams rot, and a broken one is worse than a missing one: it takes
+up a slot in the grid and only fails once the viewer commits to it.
+
+```bash
+./gradlew auditStreams              # or: python3 scripts/audit_streams.py
+python3 scripts/audit_streams.py --url https://example.com/stream.m3u8
+```
+
+The script walks each stream all the way down — master playlist, then the
+highest-bandwidth variant, then a real media segment — and requires actual
+container bytes. A `200` on the manifest is close to worthless on its own: this
+catalogue has had a channel whose master and variant both answered `200` while
+every media segment returned `403`, so it passed every check that stopped short
+of the media and could never play.
+
+Two things it deliberately does:
+
+- **It retries before calling a stream dead.** A live playlist is rewritten
+  continuously, so a segment listed a moment ago can `404` by the time it is
+  fetched. On a first run three streams failed and all three passed seconds later;
+  a tool that trusted the first answer would have had working channels deleted.
+  Streams that verify but not first try are reported as `flaky`.
+- **It reports time-to-first-playlist.** That is the gap between pressing OK and
+  seeing video, and it is invisible in the source. Three channels were on bare
+  origins at 424-1027 ms and are now on CDN edge copies at 42-51 ms.
+
+> Latency is measured from wherever the script runs. Ratios between two origins
+> hold up reasonably; absolute milliseconds describe the runner, not a viewer's
+> sofa. Treat the slow list as "look here next", not as a verdict.
+
+It is a maintenance tool, not a build step, and is wired to no assemble task —
+the build must never fail because a broadcaster is having a bad afternoon.
+
 **Category mapping.** `KurdishTvParser` maps playlist group titles to the twelve
 categories. The ordering is load-bearing: sports is tested before the broad
 Kurdish/news rules (which would otherwise swallow sports channels carrying a
@@ -315,16 +370,24 @@ it, and it carries the CI run number that is also compiled into the APK as
 [`.github/workflows/github.yaml`](.github/workflows/github.yaml) runs on pushes
 to `main`, on `v*` tags, and on pull requests. It:
 
-1. sets up JDK 21 and Gradle
+1. sets up JDK 21 and Gradle 9.3.1 (the version the wrapper pins)
 2. lints the workflow files themselves with `actionlint`
 3. decodes and verifies the release signing key, failing loudly if it is unusable
 4. resolves the release version and tag
 5. runs Android Lint
-6. builds the release APK with `-PversionCode=${{ github.run_number }}`
+6. builds a single universal release APK with `-PversionCode=${{ github.run_number }}`
 7. publishes a GitHub release
 8. rewrites `update.json` and commits it back
 
 Pull requests build and lint but never publish a release.
+
+**One artifact, one APK.** There is no `splits` block, so the release is a single
+universal APK that runs on phones, tablets and televisions alike — there is
+nothing to choose between and no per-ABI download to pick the wrong one from.
+
+Note that the Android Lint step is **advisory**: `lint { abortOnError = false }`
+means lint reports findings without failing the build, so that step annotates the
+run summary but would not stop a release even if it found an error.
 
 ## Testing
 
@@ -345,6 +408,27 @@ silently-missed updates have actually happened. The format-migration tests in
 particular exist so the comma-delimited history bug cannot come back.
 
 ## Performance notes
+
+### Launch time
+
+[`app/src/main/baseline-prof.txt`](app/src/main/baseline-prof.txt) is an ART
+baseline profile. AGP compiles it into `assets/dexopt/baseline.prof` at build
+time, and `androidx.profileinstaller` installs it on first run so ART
+AOT-compiles the startup path instead of discovering it at runtime. This is the
+largest single launch-time lever available to an Android app, and it costs no
+new toolchain.
+
+The rules are hand-written and use `**` wildcards throughout, so a class rename
+or move cannot invalidate one. `S` marks the startup path, `H` the hot path, and
+a rule with no `->` pre-allocates the class so it is not loaded lazily on the
+critical frame.
+
+> The canonical way to produce this file is `./gradlew generateBaselineProfile`
+> from a `macrobenchmark` module, which walks a real device and records what
+> actually ran. The hand-written rules here are a good starting point; a
+> generated profile would supersede them once you have hardware to run it on.
+
+### Runtime
 
 The app is built around the fact that the merged list can exceed a thousand
 channels and the grid holds several hundred cards. The decisions that follow from

@@ -6,15 +6,45 @@ import com.example.kurdishtv.data.FavoriteStorage
 import com.example.kurdishtv.data.RecentStorage
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.model.KurdishChannelCatalog
-import com.example.kurdishtv.network.NetworkClient.fetchString
+import com.example.kurdishtv.network.FetchOutcome
+import com.example.kurdishtv.network.NetworkClient
+import com.example.kurdishtv.network.NetworkClient.fetchBody
+import com.example.kurdishtv.network.retryDelayMs
 import com.example.kurdishtv.parser.KurdishTvParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import kotlin.random.Random
+
+/**
+ * Whether a freshly merged list should replace what is already on disk.
+ *
+ * A refresh that produces *fewer* channels than the cache almost always means
+ * some source failed rather than that the catalogue genuinely shrank. The
+ * bundled offline catalogue is a floor, so a merge can only get this small by
+ * losing a remote source — and a lost source is a temporary condition, while
+ * the cache is treated as current for [TvRepository.CACHE_FRESH_MS].
+ *
+ * Writing it anyway is how one bad refresh becomes thirty minutes of missing
+ * channels: the gap is written to disk, the next cold start reads the cache as
+ * fresh, and nothing prompts a refetch. The viewer sees a smaller grid and no
+ * way to tell that a transient network blip did it.
+ *
+ * The trade is accepted in the other direction too: if a viewer removes a custom
+ * playlist, its channels linger in the cache until it expires. That is the
+ * right way round — a few extra channels that stop appearing after one interval
+ * is a far smaller harm than hundreds that vanish and stay vanished.
+ *
+ * Pinned by [com.example.CachePolicyTest] so the comparison cannot be silently
+ * inverted, which is the one way this could be edited into the bug it prevents.
+ */
+internal fun shouldReplaceCache(mergedSize: Int, cachedSize: Int): Boolean =
+    mergedSize >= cachedSize
 
 /**
  * What [TvRepository.getInstantInitialChannels] produced, and where it came from.
@@ -210,22 +240,77 @@ class TvRepository(
             // cancelled the instant `withContext` returns, because the Job in
             // `currentCoroutineContext()` there is the `withContext` block's own.
             // The write has to finish inside this block, or be given a real owner.
-            channelCacheStorage.saveChannels(channelsWithFavs)
+            //
+            // Guarded against a partial merge overwriting a good cache. The retry
+            // above makes a source failing much less likely, but it does not make
+            // it impossible, and the cost of getting this wrong is thirty minutes
+            // of missing channels that no subsequent launch will even try to
+            // replace — see [shouldReplaceCache].
+            val cachedCount = channelCacheStorage.getCachedChannels()?.size ?: 0
+            if (shouldReplaceCache(channelsWithFavs.size, cachedCount)) {
+                channelCacheStorage.saveChannels(channelsWithFavs)
+            } else {
+                NetworkClient.logDebug(
+                    "Merge shrank the catalogue ($cachedCount -> ${channelsWithFavs.size}); " +
+                        "keeping the richer cache."
+                )
+            }
 
             Result.success(channelsWithFavs)
         }
 
+    /**
+     * Fetches one source, retrying the failures that can change their mind.
+     *
+     * This is the difference between a blip and half an hour of missing channels.
+     *
+     * A source is fetched once per refresh and the merged result is written to a
+     * cache the app then treats as current for [CACHE_FRESH_MS]. So a source that
+     * gave up on the first dropped connection did not lose a request, it lost
+     * every channel from that playlist for thirty minutes — and the next cold
+     * start would serve the gap from cache without ever asking again.
+     *
+     * The community playlists this app depends on are exactly the kind of host
+     * that hiccups: an audit of all 98 catalogue streams found several that only
+     * returned media on a second attempt, seconds after a first that had failed.
+     * That is the population a single-shot fetch handles worst.
+     *
+     * Permanent failures — a 404, a 403 — are not retried. They are the source's
+     * answer, and repeating the request would only make the viewer wait for
+     * nothing.
+     */
     suspend fun fetchUrlContent(url: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): String? {
-        return withTimeoutOrNull(timeoutMs) {
-            try {
-                val request = Request.Builder()
-                    .url(url)
-                    .addHeader("User-Agent", "KurdishTV-Android/3.5")
-                    .addHeader("Accept", "*/*")
-                    .build()
-                okHttpClient.fetchString(request)
-            } catch (_: Exception) {
-                null
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("User-Agent", "KurdishTV-Android/3.5")
+            .addHeader("Accept", "*/*")
+            .build()
+
+        var attempt = 0
+        while (true) {
+            attempt++
+            val outcome = try {
+                withTimeoutOrNull(timeoutMs) { okHttpClient.fetchBody(request) }
+                    ?: FetchOutcome.Transient("timeout")
+            } catch (e: Exception) {
+                FetchOutcome.Transient(e.javaClass.simpleName)
+            }
+
+            when (outcome) {
+                is FetchOutcome.Success -> return outcome.body
+                is FetchOutcome.Permanent -> {
+                    NetworkClient.logDebug("Source gave a final answer: $url -> ${outcome.code}")
+                    return null
+                }
+                is FetchOutcome.Transient -> {
+                    if (attempt >= MAX_FETCH_ATTEMPTS) {
+                        NetworkClient.logDebug(
+                            "Source still failing after $attempt attempts: $url (${outcome.reason})"
+                        )
+                        return null
+                    }
+                    delay(retryDelayMs(attempt, Random.nextFloat()))
+                }
             }
         }
     }
@@ -251,8 +336,18 @@ class TvRepository(
     fun clearChannelCache(): Boolean = channelCacheStorage.clearCache()
 
     private companion object {
-        /** Per-source fetch ceiling. A dead source must not stall the whole merge. */
+        /** Per-attempt fetch ceiling. A dead source must not stall the whole merge. */
         const val DEFAULT_TIMEOUT_MS = 8_000L
+
+        /**
+         * How many times a source is asked before it is written off.
+         *
+         * Three, not two and not five. One retry covers the transient case this
+         * exists for; a third absorbs a source that is genuinely struggling. Past
+         * three the source is not having a moment, it is down, and the viewer is
+         * waiting on the rest of the merge for nothing.
+         */
+        const val MAX_FETCH_ATTEMPTS = 3
 
         /**
          * A cached list this young is still considered current, so an automatic load

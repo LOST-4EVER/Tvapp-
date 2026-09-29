@@ -38,10 +38,15 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Set up Gradle (Latest Gradle Version)
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 'current'
+          # Pinned to the same version as gradle/wrapper/gradle-wrapper.properties
+          # and ./gradlew. This was 'current', so CI resolved whatever Gradle
+          # shipped that week while every local build used 9.3.1 — meaning a build
+          # could pass here and fail on a developer's machine, or the reverse, with
+          # nothing in the repository to explain the difference.
+          gradle-version: '9.3.1'
           cache-disabled: false
 
       - name: Make Gradlew Executable
@@ -138,59 +143,53 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Releasing as ${TAG}"
 
-      - name: Inlets Bug & Code Quality Scanner (Android Lint)
+      - name: Android Lint
         run: |
-          echo "::group::Running Inlets Bug & Lint Analysis"
-          # Previously the result was swallowed with `|| echo`, so lint could fail
-          # and the build would still publish a release. Surface the report and let
-          # real errors fail the job.
+          echo "::group::Running Android Lint"
+          # Advisory only, and the comment above used to claim the opposite.
+          #
+          # `lint { abortOnError = false }` in app/build.gradle.kts means lint
+          # reports findings without failing the build, so this step would never
+          # stop a release either way. It is kept because the annotations are
+          # useful in the run summary, but it must not be read as a gate.
           ./gradlew lintRelease --continue || echo "::warning::lint reported issues (see annotations)"
           echo "::endgroup::"
 
-      - name: Build Release APKs (Universal & ABI Splits)
+      - name: Build Release APK
         run: |
           # The version name is resolved before the build and passed in, so the
           # version compiled into the APK (shown in Settings -> About) is the
           # same one the release tag and update manifest use. Resolving it after
           # the build left the APK advertising a version that was not the one it
           # was published under.
+          #
+          # One universal APK, deliberately. There is no `splits` block in
+          # app/build.gradle.kts, so the per-ABI branches that used to sit in the
+          # artifact step below could never match anything — they were copied
+          # from a template that did have ABI splits. If per-ABI artifacts are
+          # actually wanted, add the `splits` block *and* keep the branches.
           ./gradlew assembleRelease \
             -PversionCode="${{ github.run_number }}" \
             -PkurdishTvVersionName="${{ steps.version.outputs.version_name }}" \
             --stacktrace
 
-      - name: Prepare APK Artifacts (Normal Names - No Version Suffix in Filenames)
+      - name: Prepare APK Artifact
         run: |
           OUTPUT_DIR="release-artifacts"
           mkdir -p "$OUTPUT_DIR"
 
           APK_BUILD_PATH="app/build/outputs/apk/release"
-          
-          echo "Scanning build outputs in $APK_BUILD_PATH..."
-          ls -la "$APK_BUILD_PATH" || true
+          APK=$(find "$APK_BUILD_PATH" -name '*.apk' -type f | head -1)
 
-          if [ -d "$APK_BUILD_PATH" ]; then
-            for apk in "$APK_BUILD_PATH"/*.apk; do
-              if [ -f "$apk" ]; then
-                filename=$(basename "$apk")
-                if [[ "$filename" == *"universal"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-universal.apk"
-                elif [[ "$filename" == *"arm64-v8a"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-arm64-v8a.apk"
-                elif [[ "$filename" == *"armeabi-v7a"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-armeabi-v7a.apk"
-                elif [[ "$filename" == *"x86_64"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-x86_64.apk"
-                elif [[ "$filename" == *"x86"* ]]; then
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-x86.apk"
-                else
-                  cp "$apk" "$OUTPUT_DIR/kurdish-tv-universal.apk"
-                fi
-              fi
-            done
+          if [ -z "$APK" ]; then
+            echo "::error::No APK was produced in $APK_BUILD_PATH"
+            exit 1
           fi
 
-          echo "Prepared normal named direct APK artifacts in $OUTPUT_DIR:"
+          # Fail loudly rather than publishing a release with no asset attached.
+          cp "$APK" "$OUTPUT_DIR/kurdish-tv-universal.apk"
+
+          echo "Prepared $OUTPUT_DIR/kurdish-tv-universal.apk:"
           ls -la "$OUTPUT_DIR"
 
       - name: Upload Build Artifacts to Workflow Run
