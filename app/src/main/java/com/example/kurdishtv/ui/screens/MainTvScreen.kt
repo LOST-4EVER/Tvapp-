@@ -203,15 +203,16 @@ fun MainTvScreen(
     val stepChannelFromRemote: (Int, Boolean) -> Boolean = { delta, isRepeat ->
         val now = SystemClock.uptimeMillis()
         if (isRepeat && !acceptsChannelStep(now, lastChannelStepAt)) {
-            return@stepChannelFromRemote false
+            false
+        } else {
+            lastChannelStepAt = now
+            // The number on screen names a position in the list. Stepping away from
+            // it and leaving it up means the idle timer commits a channel the viewer
+            // deliberately navigated past, a second and a half after they stopped.
+            if (channelJump != null) onNumericCancel()
+            onStepChannel(delta)
+            true
         }
-        lastChannelStepAt = now
-        // The number on screen names a position in the list. Stepping away from it
-        // and leaving it up means the idle timer commits a channel the viewer
-        // deliberately navigated past, a second and a half after they stopped.
-        if (channelJump != null) onNumericCancel()
-        onStepChannel(delta)
-        true
     }
 
     BoxWithConstraints(
