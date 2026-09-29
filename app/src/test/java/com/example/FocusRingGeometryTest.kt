@@ -43,10 +43,19 @@ class FocusRingGeometryTest {
 
     @Test
     fun `growth is never negative`() {
-        // A negative outset and a zero-width stroke would otherwise put the ring's
-        // path inside the element and the stroke over its content.
+        // A negative outset would otherwise put the ring's path inside the element
+        // and the stroke over its content.
         assertEquals(0f, focusRingGrowth(-20f, stroke), 0.001f)
-        assertEquals(0f, focusRingGrowth(outset, 0f).coerceAtLeast(0f), 0.001f)
+        assertEquals(0f, focusRingGrowth(-20f, -5f), 0.001f)
+    }
+
+    @Test
+    fun `a hairline ring still clears the element by the outset`() {
+        // A zero-width stroke halves the growth but does not remove it. The outset is
+        // the distance between the element and the ring, and it is a property of the
+        // design rather than of the stroke; collapsing it to zero would put a
+        // hairline ring directly on the element's edge.
+        assertEquals(outset, focusRingGrowth(outset, 0f), 0.001f)
     }
 
     @Test
