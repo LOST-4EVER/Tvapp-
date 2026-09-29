@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -204,6 +205,8 @@ private fun RailCategoryItem(
 ) {
     val colors = LocalAppColors.current
     var isFocused by remember(category) { mutableStateOf(false) }
+    // The click keeps the focus target; the ring observes it. See `expressiveFocusRing`.
+    val focusSource = remember { MutableInteractionSource() }
 
     // The indicator is a fixed 60x34dp box, so its longest safe radius is 17dp --
     // half the short side. A 20dp "active" radius made the four corners overlap and
@@ -226,15 +229,17 @@ private fun RailCategoryItem(
         modifier = Modifier
             .width(80.dp)
             .clip(containerShape)
-            // The ring below owns the focus lift; see the note in `bouncyClickable`.
+            // One focus target on the item: the click's own, watched by the ring below.
+            // `liftOnFocus = false` because the ring draws the lift too.
             .bouncyClickable(
                 scaleDown = 0.92f,
-                focusable = false,
+                interactionSource = focusSource,
                 liftOnFocus = false,
                 onClick = onClick
             )
             .expressiveFocusRing(
                 ringColor = colors.primary,
+                interactionSource = focusSource,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = M3ExpressivePolygons.Cookie6Sided,
                 focusScale = 1.06f,

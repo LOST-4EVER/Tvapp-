@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +57,8 @@ fun FeaturedHeroCard(
     val colors = LocalAppColors.current
     val accent = monogramAccent(channel.name)
     var isFocused by remember(channel.id) { mutableStateOf(false) }
+    // The click keeps the focus target; the ring observes it. See `expressiveFocusRing`.
+    val focusSource = remember { MutableInteractionSource() }
 
     // The hero's corners open up when it takes focus, and its logo tile — which holds
     // an image and no text — becomes properly expressive. The silhouette of the card
@@ -82,14 +85,16 @@ fun FeaturedHeroCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            // The ring below owns the focus lift; see the note in `bouncyClickable`.
+            // One focus target: the click's own, watched by the ring below.
+            // `liftOnFocus = false` because the ring draws the lift too.
             .bouncyClickable(
                 scaleDown = 0.97f,
-                focusable = false,
+                interactionSource = focusSource,
                 liftOnFocus = false
             ) { onWatchClick(channel) }
             .expressiveFocusRing(
                 ringColor = colors.primary,
+                interactionSource = focusSource,
                 restShape = M3ExpressivePolygons.Square,
                 // The same ring the cards and the rail use. The hero had its own
                 // `SoftBurst`, so the two surfaces you are most likely to move

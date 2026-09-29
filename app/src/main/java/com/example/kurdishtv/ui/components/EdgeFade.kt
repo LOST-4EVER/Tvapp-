@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -66,6 +67,103 @@ fun Modifier.horizontalEdgeFade(
             ),
             topLeft = Offset(bounds.width - fadePx, 0f),
             size = Size(fadePx, bounds.height)
+        )
+    }
+}
+
+/**
+ * Fades the top and bottom edges of a vertically scrolling grid into the page
+ * background.
+ *
+ * The channel grid clips a card wherever the viewport ends, and a card clipped
+ * mid-logo looks like a rendering fault rather than like a list that continues —
+ * on a phone the screenshot that prompted this showed a row reduced to a
+ * floating "Religious 1080p" chip with the rest of the card scrolled out of
+ * sight above it. Fading the last few dp says "this continues" instead, and is
+ * what Material's own scrolling containers do at a clipped edge.
+ *
+ * Only an edge with content beyond it is painted, for the same reason
+ * [horizontalEdgeFade] does it: fading both unconditionally dims the first and
+ * last card of a list that has nothing more to scroll to.
+ */
+fun Modifier.verticalEdgeFade(
+    gridState: LazyGridState,
+    background: Color,
+    height: Dp = 24.dp
+): Modifier = this.drawWithContent {
+    drawContent()
+
+    val fadePx = height.toPx()
+    val bounds = size
+    if (bounds.height <= fadePx * 2f) return@drawWithContent
+
+    // Read in the draw phase: `canScrollBackward`/`canScrollForward` are derived state,
+    // so reading them here registers this node as an observer and re-runs the draw only
+    // when they actually flip. See [horizontalEdgeFade] for why that matters.
+    if (gridState.canScrollBackward) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(background, Color.Transparent),
+                startY = 0f,
+                endY = fadePx
+            ),
+            topLeft = Offset.Zero,
+            size = Size(bounds.width, fadePx)
+        )
+    }
+    if (gridState.canScrollForward) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Transparent, background),
+                startY = bounds.height - fadePx,
+                endY = bounds.height
+            ),
+            topLeft = Offset(0f, bounds.height - fadePx),
+            size = Size(bounds.width, fadePx)
+        )
+    }
+}
+
+/**
+ * The same fade for a lazily-laid-out grid.
+ *
+ * [LazyGridState] and [LazyListState] are unrelated types with no shared supertype —
+ * both implement `ScrollableState`, which has no scroll-position or can-scroll
+ * properties — so this cannot be an overload of the list version. It is duplicated
+ * rather than generalised on purpose: a common interface would have to be invented and
+ * every caller converted to it, to share sixteen lines.
+ */
+fun Modifier.verticalEdgeFade(
+    listState: LazyListState,
+    background: Color,
+    height: Dp = 24.dp
+): Modifier = this.drawWithContent {
+    drawContent()
+
+    val fadePx = height.toPx()
+    val bounds = size
+    if (bounds.height <= fadePx * 2f) return@drawWithContent
+
+    if (listState.canScrollBackward) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(background, Color.Transparent),
+                startY = 0f,
+                endY = fadePx
+            ),
+            topLeft = Offset.Zero,
+            size = Size(bounds.width, fadePx)
+        )
+    }
+    if (listState.canScrollForward) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Transparent, background),
+                startY = bounds.height - fadePx,
+                endY = bounds.height
+            ),
+            topLeft = Offset(0f, bounds.height - fadePx),
+            size = Size(bounds.width, fadePx)
         )
     }
 }
