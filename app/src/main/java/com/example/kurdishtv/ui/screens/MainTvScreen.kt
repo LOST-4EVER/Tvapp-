@@ -847,7 +847,10 @@ private fun ChannelGrid(
             // The two full-width sections are given their own type so they cannot
             // be handed a channel cell's recycled composition, which is what would
             // otherwise happen the moment one of them scrolled off the top.
-            contentType = { _ -> "channel" }
+            //
+            // Two parameters, not one: the indexed overload of itemsIndexed hands
+            // its content-type factory the index as well as the item.
+            contentType = { _, _ -> "channel" }
         ) { index, channel ->
             ChannelCard(
                 channel = channel,

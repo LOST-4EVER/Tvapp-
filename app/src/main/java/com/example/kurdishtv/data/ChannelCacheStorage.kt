@@ -210,11 +210,11 @@ class ChannelCacheStorage(context: Context) {
 
     /** Serialises [channels] as a JSON array, one field at a time. */
     private fun writeChannels(out: BufferedWriter, channels: List<Channel>) {
-        out.write('[')
+        out.writeChar('[')
         for (i in channels.indices) {
-            if (i > 0) out.write(',')
+            if (i > 0) out.writeChar(',')
             val ch = channels[i]
-            out.write('{')
+            out.writeChar('{')
             writeField(out, "id", ch.id, first = true)
             writeField(out, "name", ch.name)
             writeField(out, "streamUrl", ch.streamUrl)
@@ -231,9 +231,18 @@ class ChannelCacheStorage(context: Context) {
             // because the cache short-circuits the fetch that would
             // otherwise have corrected it.
             writeField(out, "originalId", ch.originalId)
-            out.write('}')
+            out.writeChar('}')
         }
-        out.write(']')
+        out.writeChar(']')
+    }
+
+    /**
+     * `java.io.Writer` has no `write(Char)`; the single-character overload takes
+     * an `Int` code unit. Without this the call is a type error rather than a
+     * coercion, and it is a type error at seven call sites rather than one.
+     */
+    private fun BufferedWriter.writeChar(c: Char) {
+        write(c.code)
     }
 
     private fun writeField(
@@ -242,8 +251,8 @@ class ChannelCacheStorage(context: Context) {
         value: String,
         first: Boolean = false
     ) {
-        if (!first) out.write(',')
-        out.write('"')
+        if (!first) out.writeChar(',')
+        out.writeChar('"')
         out.write(name)
         out.write("\":")
         out.write(JSONObject.quote(value))
