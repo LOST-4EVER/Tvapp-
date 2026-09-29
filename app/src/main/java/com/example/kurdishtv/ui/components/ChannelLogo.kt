@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -23,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.ImageRequest
@@ -179,23 +183,30 @@ fun ChannelLogo(
         }
     }
 
-    // The monogram is drawn first and the image on top of it, rather than swapped
-    // in through `SubcomposeAsyncImage`'s `loading`/`error` slots.
+    // Whether the bitmap has actually arrived.
     //
-    // `SubcomposeAsyncImage` builds a whole second composition for every state it
-    // needs, per cell. A screen of channel cards is dozens of them, and it paid
-    // that cost on every scroll of the grid — for content that is, by construction,
-    // the same two lines of monogram every time. Drawing the monogram underneath
-    // and letting the image cover it once it arrives is the same result with no
-    // subcomposition at all: while the load is in flight and if it fails, nothing
-    // is drawn over the monogram, so it shows through; when the bitmap arrives it
-    // is simply painted on top.
+    // The monogram used to be drawn underneath the image permanently, on the theory
+    // that the image would simply cover it. Most logos do not cover it: a `tvg-logo`
+    // is very often a PNG with a transparent background, and a transparent pixel
+    // draws nothing — so the monogram's letters and its accent gradient showed
+    // straight through the artwork. MBC Iraq's logo rendered with a stray "M" sitting
+    // across it. An opaque logo hid the bug, which is why it went unnoticed.
     //
-    // This is also what the crossfade note in [LogoLoader] always claimed was
-    // happening. It was not — the `loading` slot replaced the composable output
-    // rather than layering over it.
+    // Tracking the state is what `SubcomposeAsyncImage` would have done through its
+    // `loading` slot, and the reason this file avoids `SubcomposeAsyncImage` in the
+    // first place still stands: it builds a whole second composition per cell, and a
+    // screen of cards is dozens of them, paid on every scroll of the grid. Reading
+    // `onState` off a plain `AsyncImage` costs one boolean and no subcomposition.
+    //
+    // The monogram therefore shows while the load is in flight and if it fails, and
+    // is removed the moment the bitmap arrives — which is also the right behaviour for
+    // a failed load, since the tile must not be left empty.
+    var loaded by remember(logoUrl) { mutableStateOf(false) }
+
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        fallback()
+        if (!loaded) {
+            fallback()
+        }
 
         if (request != null) {
             AsyncImage(
@@ -205,7 +216,10 @@ fun ChannelLogo(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding),
-                imageLoader = loader
+                imageLoader = loader,
+                onState = { state ->
+                    loaded = state is AsyncImagePainter.State.Success
+                }
             )
         }
     }

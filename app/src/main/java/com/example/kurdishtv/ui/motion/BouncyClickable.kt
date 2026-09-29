@@ -24,26 +24,29 @@ import androidx.compose.ui.input.pointer.pointerInput
  * Also focusable, so the element is reachable with a D-pad or TV remote: the click
  * modifier this wraps brings a focus target of its own, and that target is the one
  * the tab order uses. Because `indication = null` removes the default click ripple,
- * focus is signalled by a small springy scale-up — see [tvFocusable] and
- * [expressiveFocusRing] for the ringed variants used on larger surfaces.
+ * focus is signalled by a small springy scale-up — or, on larger surfaces, by
+ * [expressiveFocusRing], which can be handed this element's [interactionSource] so
+ * that the ring and the click are driven by one piece of state.
  *
  * @param interactionSource pass an existing source when the caller also needs to
  *   observe the press — that is how [com.example.kurdishtv.ui.components.AppIconButton]
  *   morphs its outline while it is held. Left null, one is created here.
- * @param focusable set false when the element already gets its focus handling from
- *   somewhere else — pair it with [expressiveFocusRing], which supplies the focus
- *   behaviour and draws it.
+ * @param focusable set false when the element should be **removed from the D-pad tab
+ *   order entirely**. `Modifier.clickable` brings a focus target of its own and there is
+ *   no flag to switch that off, so this marks the click's target `canFocus = false`,
+ *   which takes it out of traversal.
  *
- *   Setting it false does more than skip a `focusable` modifier, and it has to.
- *   `Modifier.clickable` brings a focus target of its own, so a plain `focusable = false`
- *   left every such element a D-pad stop *anyway* — and, worse, a stop that was not the
- *   one the caller's focus ring was watching, so the ring never lit. The click is
- *   therefore marked `canFocus = false` as well, which takes its focus target out of the
- *   tab order and lets focus fall through to the ring's own target underneath it: one
- *   stop on the element, owned by the ring. This is what makes the flag honest for
- *   cards, hero tiles, recent chips and rail items alike.
+ *   Do **not** set it false in order to hand focus to an
+ *   [expressiveFocusRing]. That was the old arrangement and it was wrong: it put two
+ *   focus targets on one card and relied on `Modifier.focusProperties` not reaching the
+ *   ring's, which is a framework detail the D-pad should not be betting on. Pass the
+ *   same `interactionSource` to both instead and leave this at its default — the click
+ *   keeps its target, the ring watches it, and there is exactly one stop per element.
  *
- *   Use [tapOnly] instead when the element should never be a stop at all.
+ *   `focusable = false` remains correct where there is no ring underneath and the
+ *   element genuinely should not be reachable — a card's heart, whose action is a long
+ *   press on the card instead. See [tapOnly] for a surface that should never be a stop
+ *   at all.
  * @param liftOnFocus draw a small springy scale-up while the element holds D-pad
  *   focus. Turn this off when something else on the same node is already animating
  *   focus — [expressiveFocusRing] lifts and draws the ring together, and two lifts
@@ -83,8 +86,11 @@ fun Modifier.bouncyClickable(
         label = "BouncyScaleAnimation"
     )
 
-    // See the note on `focusable`: a click brings its own focus target, so asking not to
-    // be focusable has to say so to the click as well.
+    // See the note on `focusable`: a click brings its own focus target, so asking not
+    // to be focusable has to say so to the click as well.
+    //
+    // Unambiguous here because there is nothing focusable below it in the chain — the
+    // ring case that used to sit in this slot now passes a shared source instead.
     val focusOverride =
         if (focusable) Modifier else Modifier.focusProperties { canFocus = false }
 

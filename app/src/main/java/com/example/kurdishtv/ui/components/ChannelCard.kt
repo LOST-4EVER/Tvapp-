@@ -2,6 +2,8 @@ package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -102,6 +104,9 @@ fun ChannelCard(
     compact: Boolean = false
 ) {
     val colors = LocalAppColors.current
+    // Shared by the click and the focus ring below, so both are driven by the same
+    // object and cannot disagree about where the viewer is.
+    val focusSource = remember { MutableInteractionSource() }
     // The accent is derived from the channel's name, so it is the same for the whole
     // life of the card. Recomputing it on every recomposition meant a hash and a
     // modulo per card per frame for as long as the grid was on show; it is also what
@@ -124,28 +129,28 @@ fun ChannelCard(
         modifier = modifier
             .testTag("channel_card_${channel.id}")
             .fillMaxWidth()
-            // `liftOnFocus = false`: `expressiveFocusRing` below already lifts this
-            // node by 1.05 while it is focused. Two lifts on one node multiply, so
-            // the card was jumping 10% instead of the 5% that was asked for — and
-            // the jump was large enough to be visible as a pop every time the D-pad
-            // moved.
+            // The click and the ring share one interaction source, so there is exactly
+            // one focus target on this card and the ring is driven by the same state
+            // that the viewer actually lands on. See `expressiveFocusRing`.
+            //
+            // `liftOnFocus = false`: the ring below already lifts this node by 1.05
+            // while it is focused. Two lifts on one node multiply, so the card was
+            // jumping 10% instead of the 5% that was asked for.
             //
             // `onLongClick` is how a remote user reaches the favourite, now that the
             // heart is out of the tab order. See [CardFavoriteButton].
             .bouncyClickable(
                 scaleDown = 0.94f,
-                focusable = false,
+                interactionSource = focusSource,
                 liftOnFocus = false,
                 onLongClick = onFavoriteToggle
             ) { onClick() }
-            // The requester sits *after* the click for a reason.
-            //
-            // `Modifier.clickable` brings a focus target of its own, and a
-            // `focusRequester` binds to the first focus target below it in the chain.
-            // Placed before the click — where it used to be — it therefore bound to the
-            // click's target, which is not the target that owns the visible focus
-            // state: `expressiveFocusRing` supplies its own. Asking it for focus lit
-            // nothing up. After the click, the only target below it is the ring's.
+            // After the click, and that is now the whole story: `clickable` brings the
+            // one focus target this card has, and the requester binds to it. It used to
+            // be here because the ring supplied a *second* target further down and the
+            // requester had to be aimed past the click's. With one target, either order
+            // binds to the same node — so this sits in the natural place rather than
+            // around a corner to compensate for a target that no longer exists.
             .then(
                 if (focusRequester != null) {
                     Modifier.focusRequester(focusRequester)
@@ -155,6 +160,7 @@ fun ChannelCard(
             )
             .expressiveFocusRing(
                 ringColor = colors.primary,
+                interactionSource = focusSource,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
                 focusScale = 1.05f,

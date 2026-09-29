@@ -71,6 +71,56 @@ fun Modifier.horizontalEdgeFade(
 }
 
 /**
+ * Fades the top and bottom edges of a vertically scrolling grid into the page
+ * background.
+ *
+ * The channel grid clips a card wherever the viewport ends, and a card clipped
+ * mid-logo looks like a rendering fault rather than like a list that continues —
+ * on a phone the screenshot that prompted this showed a row reduced to a
+ * floating "Religious 1080p" chip with the rest of the card scrolled out of
+ * sight above it. Fading the last few dp says "this continues" instead, and is
+ * what Material's own scrolling containers do at a clipped edge.
+ *
+ * Only an edge with content beyond it is painted, for the same reason
+ * [horizontalEdgeFade] does it: fading both unconditionally dims the first and
+ * last card of a list that has nothing more to scroll to.
+ */
+fun Modifier.verticalEdgeFade(
+    listState: LazyListState,
+    background: Color,
+    height: Dp = 24.dp
+): Modifier = this.drawWithContent {
+    drawContent()
+
+    val fadePx = height.toPx()
+    val bounds = size
+    if (bounds.height <= fadePx * 2f) return@drawWithContent
+
+    if (listState.canScrollBackward) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(background, Color.Transparent),
+                startY = 0f,
+                endY = fadePx
+            ),
+            topLeft = Offset.Zero,
+            size = Size(bounds.width, fadePx)
+        )
+    }
+    if (listState.canScrollForward) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(Color.Transparent, background),
+                startY = bounds.height - fadePx,
+                endY = bounds.height
+            ),
+            topLeft = Offset(0f, bounds.height - fadePx),
+            size = Size(bounds.width, fadePx)
+        )
+    }
+}
+
+/**
  * [horizontalEdgeFade] against the app's own background colour.
  *
  * The row's [listState] is required rather than optional on purpose: without it

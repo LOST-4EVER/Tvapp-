@@ -2,6 +2,7 @@ package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -161,9 +162,16 @@ private fun ChannelSidebarRow(
     onClick: () -> Unit,
     onFocused: () -> Unit,
     onFavoriteToggle: () -> Unit
-) {
-    val colors = LocalAppColors.current
+) {    val colors = LocalAppColors.current
     var isFocused by remember(channel.id) { mutableStateOf(false) }
+
+    // One focus target for the row: the click's own. The ring observes it rather than
+    // adding a second. See `expressiveFocusRing`.
+    val rowFocusSource = remember { MutableInteractionSource() }
+    // The heart is a genuinely separate stop, reached with the right arrow and left
+    // with the left — a second target in a *different place* on the row, which is not
+    // the stacked-two-on-one-box problem the comment below is about.
+    val heartFocusSource = remember { MutableInteractionSource() }
 
     // Selected and focused are drawn differently on purpose. Focus is the yellow
     // turning ring the viewer is looking for *right now*; selection is a quieter
@@ -183,17 +191,20 @@ private fun ChannelSidebarRow(
             .fillMaxWidth()
             .clip(plateShape)
             .background(if (isSelected) colors.surfaceVariant else colors.surface)
-            // `focusable = false` because the ring below owns the focus target and
-            // draws the lift; two lifts on one node multiply. `onLongClick` is how a
-            // remote reaches the favourite, since the heart is out of the tab order.
+            // The click keeps its own focus target and the ring watches the same
+            // source, so there is one stop on this row rather than two competing ones.
+            // `liftOnFocus = false` because the ring below draws the lift; two lifts on
+            // one node multiply. `onLongClick` is how a remote reaches the favourite,
+            // since the heart is out of the tab order.
             .bouncyClickable(
                 scaleDown = 0.96f,
-                focusable = false,
+                interactionSource = rowFocusSource,
                 liftOnFocus = false,
                 onLongClick = onFavoriteToggle
             ) { onClick() }
             .expressiveFocusRing(
                 ringColor = colors.primary,
+                interactionSource = rowFocusSource,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
                 focusScale = 1.03f,
@@ -281,12 +292,13 @@ private fun ChannelSidebarRow(
                 // composed at all, so the cost is bounded by the viewport.
                 .bouncyClickable(
                     scaleDown = 0.86f,
-                    focusable = false,
+                    interactionSource = heartFocusSource,
                     liftOnFocus = false,
                     onClick = onFavoriteToggle
                 )
                 .expressiveFocusRing(
                     ringColor = colors.primary,
+                    interactionSource = heartFocusSource,
                     restShape = M3ExpressivePolygons.Square,
                     ringShape = M3ExpressivePolygons.Cookie6Sided,
                     focusScale = 1.08f,

@@ -54,6 +54,7 @@ import com.example.kurdishtv.ui.components.RecentChannelsRow
 import com.example.kurdishtv.ui.components.SearchBarM3
 import com.example.kurdishtv.ui.components.SidePlayerPane
 import com.example.kurdishtv.ui.components.TopHeaderBar
+import com.example.kurdishtv.ui.components.verticalEdgeFade
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.rememberTvFocusRequester
 import com.example.kurdishtv.ui.motion.staggeredEntrance
@@ -776,7 +777,17 @@ private fun ChannelGrid(
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            // The grid clips a card wherever the viewport ends, and a card clipped
+            // through its logo reads as a rendering fault rather than as a list that
+            // continues — a phone screenshot caught exactly that, a row reduced to a
+            // floating category chip with the rest of the card sliced off above it.
+            // Fading the clipping edge turns the same pixels into "there is more".
+            .verticalEdgeFade(
+                listState = gridState,
+                background = colors.background
+            )
     ) {
         val heroChannel = uiState.selectedChannel ?: filtered.firstOrNull()
 
