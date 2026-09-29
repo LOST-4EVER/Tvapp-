@@ -198,17 +198,35 @@ fun ChannelLogo(
     // screen of cards is dozens of them, paid on every scroll of the grid. Reading
     // `onState` off a plain `AsyncImage` costs one boolean and no subcomposition.
     //
-    // The monogram therefore shows while the load is in flight and if it fails, and
-    // is removed the moment the bitmap arrives — which is also the right behaviour for
-    // a failed load, since the tile must not be left empty.
-    var loaded by remember(logoUrl) { mutableStateOf(false) }
+    // ## Why there are three states and not one boolean
+    //
+    // The previous version was a single `loaded` flag, and the monogram was drawn
+    // whenever it was false — which is to say during the load *and* after a failure.
+    // That makes the monogram stand in for two completely different things, and the
+    // first of them is wrong: the monogram is the channel's *fallback identity*, not
+    // a placeholder. Every tile in the grid therefore drew letters and an accent
+    // gradient that it then tore down the instant the real artwork arrived. On a
+    // cold start that is the whole first screen changing its mind at once, and it is
+    // slower to read than a neutral block would be, because the eye has already read
+    // the monogram and then has to read the logo again.
+    //
+    // So: a neutral [LogoSkeleton] while the load is in flight, the artwork once it
+    // lands, and the monogram only when there is genuinely no artwork to show —
+    // either the load failed, or this channel has no `tvg-logo` at all.
+    var state by remember(request) { mutableStateOf(LogoLoadState.Idle) }
 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (!loaded) {
+        // No request at all means there is nothing to wait for: logos are switched
+        // off, or the channel has no `tvg-logo`. The monogram is the answer, not a
+        // placeholder for one.
+        if (request == null || state == LogoLoadState.Error) {
             fallback()
         }
 
         if (request != null) {
+            if (state != LogoLoadState.Success) {
+                LogoSkeleton(modifier = Modifier.fillMaxSize())
+            }
             AsyncImage(
                 model = request,
                 contentDescription = channelName,
@@ -217,13 +235,30 @@ fun ChannelLogo(
                     .fillMaxSize()
                     .padding(contentPadding),
                 imageLoader = loader,
-                onState = { state ->
-                    loaded = state is AsyncImagePainter.State.Success
+                onState = { painterState ->
+                    state = when (painterState) {
+                        // `Empty` is the state before the request is even handed to
+                        // the loader, so it is still "not arrived" — treating it as
+                        // anything else would flash the wrong thing on every cell.
+                        is AsyncImagePainter.State.Empty -> LogoLoadState.Idle
+                        is AsyncImagePainter.State.Loading -> LogoLoadState.Loading
+                        is AsyncImagePainter.State.Success -> LogoLoadState.Success
+                        is AsyncImagePainter.State.Error -> LogoLoadState.Error
+                    }
                 }
             )
         }
     }
 }
+
+/**
+ * Where a logo tile is in its load.
+ *
+ * [Loading] and [Idle] draw the same thing; they are separate because
+ * `AsyncImagePainter.State` distinguishes them and collapsing them at the call site
+ * is where the old off-by-one crept in.
+ */
+private enum class LogoLoadState { Idle, Loading, Success, Error }
 
 /**
  * A small, fixed set of accents used for logo-less channels.

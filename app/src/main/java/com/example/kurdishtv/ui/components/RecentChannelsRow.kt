@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -79,9 +80,7 @@ fun RecentChannelsRow(
             Text(
                 text = "RECENTLY WATCHED",
                 color = colors.textSecondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
+                style = MaterialTheme.typography.labelSmall
             )
         }
 
@@ -110,14 +109,14 @@ fun RecentChannelsRow(
 /**
  * One entry in the recently-watched row.
  *
- * Both the chip and its small leading tile sit on the corner scale. The tile is only
- * 22dp, which is well below the size at which a lobed outline is still legible, and
- * because the tile is a `background` rather than a `Surface` its outline *is* its
- * clip — a polygon that bulged past its own bounds drew the tint outside the tile and
- * left the glyph behind it, which is exactly what this row was doing.
+ * A flat chip on [AppColors.surfaceHigh] — one step above a card, because this sits
+ * on the page rather than on a card. It was on the card's own surface, and against
+ * the page that made a row of them read as cards rather than as controls.
  *
- * The focus ring is still a rotating Expressive shape, so "where am I" keeps its
- * distinct look everywhere in the app.
+ * The chip is ~54dp tall, so half its short side is 27dp and 20dp stays well inside
+ * it. The leading tile is a circle: it is 24dp, which is below the size at which
+ * any outline other than a circle's is still legible, and it is a `background`
+ * rather than a `Surface`, so its clip *is* its outline.
  */
 @Composable
 private fun RecentChannelChip(
@@ -127,9 +126,6 @@ private fun RecentChannelChip(
     val colors = LocalAppColors.current
     var isFocused by remember(channel.id) { mutableStateOf(false) }
 
-    // The chip is ~54dp tall, so half its short side is 27dp. 20dp stays well inside
-    // it; the shared "cardFocused" radius of 30dp would have made this chip's own
-    // corners overlap into each other.
     val chipShape = CornerScale.uniform(20.dp).toShape()
     val tileShape: Shape = remember { RoundedCornerShape(percent = 50) }
     // The click keeps the focus target; the ring observes it. See `expressiveFocusRing`.
@@ -137,7 +133,7 @@ private fun RecentChannelChip(
 
     Surface(
         shape = chipShape,
-        color = colors.surfaceVariant,
+        color = colors.surfaceHigh,
         modifier = Modifier
             // One focus target: the click's own, watched by the ring below.
             .tvClickable(
@@ -149,7 +145,7 @@ private fun RecentChannelChip(
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = focusSource,
-                scrim = colors.background,
+                scrim = colors.focusScrim,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
                 onFocusChanged = { isFocused = it }

@@ -2,6 +2,8 @@ package com.example.kurdishtv.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,9 +22,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -56,13 +60,17 @@ import com.example.kurdishtv.model.DeviceMode
 import com.example.kurdishtv.model.ThemeMode
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.SvgIcon
+import com.example.kurdishtv.ui.components.TopEdgeHighlight
 import com.example.kurdishtv.ui.components.UpdateCard
 import com.example.kurdishtv.ui.components.edgeFade
 import com.example.kurdishtv.update.AppUpdate
 import com.example.kurdishtv.update.UpdateState
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoColorFilter
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 import com.example.ui.theme.LocalIsTv
@@ -456,9 +464,21 @@ private enum class PendingAction(val title: String, val body: String) {
 private fun Modifier.readableColumn(isTv: Boolean): Modifier =
     if (isTv) this.widthIn(max = 760.dp) else this
 
+/**
+ * The outline a focused settings row's plate is drawn in.
+ *
+ * Small on purpose. A row's plate runs the full width of the screen, so its corners
+ * are barely on screen at all; a large radius only makes the ends of the highlight
+ * look lopsided.
+ */
+private val RowPlate = RoundedCornerShape(6.dp)
+
 @Composable
 private fun SettingsHeader(onBack: () -> Unit) {
     val colors = LocalAppColors.current
+    // Shared by the click and the ring, so the two cannot disagree about where the
+    // viewer is.
+    val backSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -468,11 +488,27 @@ private fun SettingsHeader(onBack: () -> Unit) {
     ) {
         Surface(
             shape = CircleShape,
-            color = colors.surfaceElevated,
+            color = colors.surfaceHigh,
             modifier = Modifier
                 .size(44.dp)
                 .border(1.dp, colors.border, CircleShape)
-                .tvClickable(onClick = onBack)
+                .tvClickable(
+                    interactionSource = backSource,
+                    pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                    pressedShape = CircleShape,
+                    onClick = onBack
+                )
+                // A ring, because this one can carry one: 44dp and round, with room
+                // on all four sides. Without it the back button had no focus state
+                // at all, which on the first screen a viewer reaches after leaving
+                // Settings is the worst place for one.
+                .expressiveFocusRing(
+                    ringColor = colors.primary,
+                    interactionSource = backSource,
+                    scrim = colors.focusScrim,
+                    restShape = M3ExpressivePolygons.Circle,
+                    ringShape = M3ExpressivePolygons.Circle
+                )
         ) {
             Box(contentAlignment = Alignment.Center) {
                 SvgIcon(
@@ -503,6 +539,9 @@ private fun SettingsHeader(onBack: () -> Unit) {
     }
 }
 
+/** [M3ExpressiveShapes.LargeCard]'s radius, as a number, for [TopEdgeHighlight]. */
+private val SectionCorner = 26.dp
+
 @Composable
 private fun SettingsSection(
     title: String,
@@ -519,44 +558,61 @@ private fun SettingsSection(
             .readableColumn(LocalIsTv.current)
             .border(1.dp, colors.border, M3ExpressiveShapes.LargeCard)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    // A soft cookie rather than the spiked Burst, which made every
-                    // section header look like a cog instead of an icon tile.
-                    shape = M3ExpressiveShapes.MediumCard,
-                    color = colors.primaryContainer
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(38.dp)
+        Box {
+            // The same hairline every other card in the app carries. See
+            // `TopEdgeHighlight` for why it is a line rather than a gradient.
+            TopEdgeHighlight(inset = SectionCorner)
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        // A soft cookie rather than the spiked Burst, which made every
+                        // section header look like a cog instead of an icon tile.
+                        shape = M3ExpressiveShapes.MediumCard,
+                        color = colors.primaryContainer
                     ) {
-                        SvgIcon(
-                            resId = iconRes,
-                            contentDescription = null,
-                            tint = colors.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            SvgIcon(
+                                resId = iconRes,
+                                contentDescription = null,
+                                tint = colors.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = title,
+                            color = colors.textPrimary,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            text = subtitle,
+                            color = colors.textSecondary,
+                            fontSize = 12.sp
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = title,
-                        color = colors.textPrimary,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = subtitle,
-                        color = colors.textSecondary,
-                        fontSize = 12.sp
-                    )
-                }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            content()
+                Spacer(modifier = Modifier.height(14.dp))
+                // A rule between the header and what it heads, which is a different
+                // job from the hairline at the top of the card. That one separates
+                // the card from the page; this one separates two parts of the same
+                // surface, so it is a step lighter than a card outline — otherwise
+                // a settings list reads as a stack of boxes each holding a title
+                // and some text.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(colors.divider)
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                content()
+            }
         }
     }
 }
@@ -739,11 +795,26 @@ private fun SettingsSwitchRow(
 ) {
     val colors = LocalAppColors.current
     val contentAlpha = if (enabled) 1f else 0.45f
+    // Focus is a plate, not a ring, and the reason is geometric rather than a
+    // preference. This row is `fillMaxWidth()`: an outset focus ring would put 7dp
+    // of accent off each end of the screen, so a viewer would see the top and bottom
+    // of a rectangle and nothing at either side. A full-width row is the one shape
+    // in the app that cannot carry an outline, so it is filled instead — which is
+    // also the idiom every other full-width list in the app already uses.
+    val rowSource = remember { MutableInteractionSource() }
+    val isFocused by rowSource.collectIsFocusedAsState()
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .tvClickable(enabled = enabled) { onCheckedChange(!checked) }
+                .clip(RowPlate)
+                .background(if (isFocused) colors.surfaceHigh else Color.Transparent)
+                .tvClickable(
+                    interactionSource = rowSource,
+                    enabled = enabled,
+                    pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                    pressedShape = RowPlate
+                ) { onCheckedChange(!checked) }
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -810,11 +881,22 @@ private fun SettingsActionRow(
     onClick: () -> Unit
 ) {
     val colors = LocalAppColors.current
+    // The same full-width plate as the switch row above, and for the same reason: a
+    // ring on a `fillMaxWidth()` row runs off both ends of the screen.
+    val rowSource = remember { MutableInteractionSource() }
+    val isFocused by rowSource.collectIsFocusedAsState()
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .tvClickable(onClick = onClick)
+                .clip(RowPlate)
+                .background(if (isFocused) colors.surfaceHigh else Color.Transparent)
+                .tvClickable(
+                    interactionSource = rowSource,
+                    pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                    pressedShape = RowPlate,
+                    onClick = onClick
+                )
                 .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

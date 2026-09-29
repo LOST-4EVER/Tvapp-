@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -216,13 +215,15 @@ private fun RailCategoryItem(
         active = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.40f)),
         isActive = isSelected
     )
-    val containerShape: Shape = M3ExpressiveShapes.Corners.largeCard.toShape()
-
+    // No `clip` on this Column. It used to clip to a 26dp rounded square, which cut
+    // the focus ring in half: the ring is drawn *outset* from the element, and a clip
+    // applied before it in the chain removes everything outside the element's own
+    // bounds. Nothing inside needed it — the selection pill is a 60x34dp box centred
+    // in an 80dp column, and the label is a single line.
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(80.dp)
-            .clip(containerShape)
             // One focus target on the item: the click's own, watched by the ring below.
             .tvClickable(
                 interactionSource = focusSource,
@@ -232,7 +233,7 @@ private fun RailCategoryItem(
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = focusSource,
-                scrim = colors.background,
+                scrim = colors.focusScrim,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = M3ExpressivePolygons.Cookie6Sided,
                 onFocusChanged = { isFocused = it }

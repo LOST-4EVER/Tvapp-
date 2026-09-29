@@ -18,7 +18,44 @@ data class AppColors(
     val surface: Color,
     val surfaceVariant: Color,
     val surfaceElevated: Color,
+
+    /**
+     * One step above [surfaceElevated]: icon buttons, pressed chips, the surfaces
+     * that sit *on* a card.
+     *
+     * Added because the old ramp had four steps and the app stacks five: page,
+     * card, chip, control, and a control on a chip. The fifth was being drawn in
+     * [surfaceElevated] and reading as the same level as the card it sat on.
+     */
+    val surfaceHigh: Color,
+
+    /** Outlines a card: a surface with content in it. */
     val border: Color,
+
+    /** A rule between rows, where a card border would read as a box per item. */
+    val divider: Color,
+
+    /**
+     * The scrim laid under a focused element's ring.
+     *
+     * The ring used to turn, which is what made it findable from a sofa. It does
+     * not any more, so it leans on contrast instead: a band of the page colour
+     * between the element and the ring, which keeps the ring legible against a
+     * bright logo or a light panel without dimming the artwork itself.
+     */
+    val focusScrim: Color,
+
+    /**
+     * A hairline of light along the top edge of a card.
+     *
+     * Replaces the vertical gradient the cards used to carry. On a near-black
+     * surface a flat card reads as a hole with a border around it, and the
+     * gradient was the cheapest fix — but a full-height ramp is a per-card draw,
+     * and it also made the top of the card look like the "front" of something
+     * three-dimensional. One 1dp line does the separating without the shading.
+     */
+    val edgeHighlight: Color,
+
     val borderGlow: Color,
     val glass: Color,
     val textPrimary: Color,
@@ -86,6 +123,22 @@ internal fun onColorFor(background: Color): Color =
  */
 private val OnAccentInk = Color(0xFF0B0B0F)
 
+/**
+ * Moves a colour towards white by [amount] without touching its hue much.
+ *
+ * `lerp` towards white is the obvious implementation and it desaturates: at 6%
+ * the result is close enough that a hairline does not go grey, but the same
+ * helper at the 40%-plus strengths a *fill* would need is a different colour
+ * entirely, which is why container tints go through [tonalPair] instead and this
+ * is only for the one-pixel case.
+ */
+private fun Color.lighten(amount: Float): Color = Color(
+    red = red + (1f - red) * amount,
+    green = green + (1f - green) * amount,
+    blue = blue + (1f - blue) * amount,
+    alpha = alpha
+)
+
 private fun channel(value: Float): Float =
     if (value <= 0.03928f) value / 12.92f else Math.pow(((value + 0.055f) / 1.055f).toDouble(), 2.4).toFloat()
 
@@ -133,14 +186,29 @@ fun appColorsFor(settings: AppSettings, dynamicScheme: ColorScheme? = null): App
         tonalPair(primary, surface)
     }
 
+    // Named up front because [focusScrim] below *is* this colour, and a constructor
+    // call cannot refer to a sibling named argument of itself.
+    val background = if (amoled) AmoledBackground else DarkBackground
+    val elevated = if (amoled) AmoledSurfaceElevated else DarkSurfaceElevated
+
     return AppColors(
-        background = if (amoled) AmoledBackground else DarkBackground,
+        background = background,
         surface = surface,
         surfaceVariant = variant,
-        surfaceElevated = if (amoled) AmoledSurfaceElevated else DarkSurfaceElevated,
+        surfaceElevated = elevated,
+        surfaceHigh = if (amoled) AmoledSurfaceHigh else DarkSurfaceHigh,
         border = if (amoled) AmoledCardBorder else DarkCardBorder,
+        divider = if (amoled) AmoledDivider else DarkDivider,
+        // Opaque, not a tint of the accent. A translucent ring scrim over a
+        // bright logo left the logo showing through the middle of the mark; the
+        // job here is a gap of flat background around the element, and a gap has
+        // to be flat or it is not a gap.
+        focusScrim = background,
+        // A shade lighter than the card it sits on, which is what makes a flat
+        // card read as a surface rather than as a hole.
+        edgeHighlight = elevated.lighten(0.06f),
         borderGlow = primary.copy(alpha = 0.20f),
-        glass = if (amoled) Color(0xCC000000) else GlassOverlay,
+        glass = if (amoled) Color(0xE6000000) else GlassOverlay,
         textPrimary = TextPrimary,
         textSecondary = TextSecondary,
         textTertiary = TextTertiary,

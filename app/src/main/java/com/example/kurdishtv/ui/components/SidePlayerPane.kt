@@ -248,7 +248,7 @@ fun SidePlayerPane(
                     },
                     shape = M3ExpressiveShapes.Pill,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.surfaceElevated,
+                        containerColor = colors.surfaceHigh,
                         contentColor = colors.textPrimary
                     ),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),

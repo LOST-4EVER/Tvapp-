@@ -7,6 +7,148 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **A logo tile now shows a neutral placeholder while it loads, instead of the
+  channel's monogram.** The monogram is the channel's real fallback identity - it is
+  what a channel with no `tvg-logo` is *supposed* to look like - but it was also being
+  used as the loading state, so every tile in the grid drew letters and an accent
+  gradient that it then tore down the instant the artwork arrived. On a cold start
+  that is the whole first screen changing its mind at once, and it reads *slower*
+  than a neutral block, because the eye has already read the monogram and then has to
+  read the logo again. The load state is now three-valued rather than one boolean:
+  a static `LogoSkeleton` in flight, the artwork once it lands, and the monogram only
+  when there is genuinely nothing to show - the load failed, or the channel has no
+  logo at all.
+  - The skeleton does not shimmer. A shimmer is a per-frame shader pass and a render
+    node held open for the whole wait, and a placeholder moving while the real content
+    sits still beside it would be the one thing on screen contradicting the app's no
+    animation rule.
+  - **The grid deliberately does not get one.** The bundled catalogue is on screen
+    before any load starts and stays there while a refresh runs behind it, so there is
+    never blank space for a skeleton to stand in for. Replacing a hundred real cards
+    with a hundred grey rectangles would throw away something the viewer can already
+    use and make the screen slower, not faster. A card-shaped skeleton was written and
+    cut, because nothing could reach it.
+
+- **The focus ring's geometry is now three pure functions, and they have tests.**
+  #39's own note records that nothing in this repository covers the UI layer - "the
+  focus ring, the player, the D-pad flow" - and the ring is where that gap had already
+  cost something, because all three of its layout bugs were invisible without a device.
+  `FocusRingGeometryTest` pins the growth, the path box, the promised gap and the
+  scrim's reach, using the numbers the app actually ships (3dp stroke, 4dp outset).
+  - The scrim's width was wrong in the fix as much as in the original. Centred on the
+    ring's path it spans 0-11dp from a card's edge, and the grid's gutter is 14dp, so
+    an opaque band that size reaches 4dp into the *neighbouring* card - a visible
+    notch rather than a focus ring. It now runs from the element's own edge to the
+    ring's outer edge and stops, which is exactly half the gutter.
+
+- **The interface no longer animates. At all.** Every spring, easing curve, frame
+  loop and shape morph in the app has been deleted rather than switched off. A
+  `snap()` spec still creates an animation, still registers a frame callback and
+  still schedules a recomposition for the frame it lands on, so a reduced-motion
+  switch would have bought none of the cost back - only the appearance of the
+  setting.
+  - Gone: `ExpressiveMotion`'s spring table, easing curves, durations and stagger;
+    two app-wide `withFrameNanos` loops (the LIVE pulse and the focus rotation);
+    `WatchedFloat`, `LocalLivePulse`, `LocalFocusRotation`; `LocalReduceMotion` and
+    the two Settings rows that fed it; `staggeredEntrance` and the grid's
+    `animateItem` fade; the whole morphing shape layer, under which chips, cards,
+    wells, rails and fields all changed outline under the viewer; every press and
+    focus scale; `AnimatedVisibility` on the offline banner, the update card, the
+    player's transport controls and the buffering panel;
+    `animateColorAsState` / `animateDpAsState` on the category chips;
+    `animateScrollToItem` in the chip row and the sidebar; the number overlay's
+    pop; and the header logo's swell.
+  - Kept, because they are feedback rather than decoration: press fills, which
+    still switch instantly, because a D-pad press is a *hold* and nothing at all
+    happening for a third of a second reads as a dead app; the focus ring, now
+    heavier and outset rather than inset over a flat band of the page colour,
+    which is what replaces its rotation as the thing that makes focus findable
+    from a sofa; and selection states, which switch rather than transition.
+  - `BouncingLoader` was a hand-drawn copy of Material's seven-shape morphing
+    sequence rather than a spinner, and it is now three static dots. A frozen
+    spinner reads as a hung app; an ellipsis reads as working because it always
+    did.
+  - Renamed to match what they now do: `bouncyClickable` -> `tvClickable`,
+    `BouncingLoader` -> `LoadingIndicator`, `SquishyPillButton` ->
+    `LabelPillButton`, `rememberMorphingCorners` -> `staticCornerShape`.
+  - The **Motion** setting and the **Animated LIVE badge** switch are gone from
+    Settings, along with the `motion`, `live_pulse` and `reduceMotion` keys in
+    settings storage. Existing installs carrying those keys are unaffected; the
+    values are simply no longer read.
+  - Removing the motion is what exposed the rest of the focus story, and three
+    things in it turned out to be broken or missing. All three are fixed here
+    rather than shipped, and none of them reached a released version.
+    - **The ring was off-centre and the `outset` did not exist on two of its four
+      sides.** `fittedPath` anchors a shape's *top-left* at the origin — it
+      translates by `-bounds.left`/`-bounds.top` and then scales, and a Compose
+      matrix has no pivot — so the outline spanned `0..ringSize` rather than being
+      centred in it. Drawn as it came, the ring's top and left edges landed on the
+      element's own top-left corner, eating 1.5dp into the content it was marking,
+      while only the bottom and right carried the intended 4dp gap. The ring is now
+      shifted back by the growth amount, so the gap is even on all four sides.
+    - **The contrast scrim did nothing at all.** It was stroked at the ring's own
+      width on the same path, and the ring was drawn immediately after it over the
+      top — so six call sites passed a colour and got no band. It is now stroked at
+      `2 * outset + stroke`, which fills the gap the outset left and puts the ring
+      on the outer part of it.
+    - **Two surfaces clipped the ring in half.** The sidebar row and the navigation
+      rail item both applied `Modifier.clip` *before* the ring in the chain, which
+      removes everything outside the element's bounds — which, for an outset ring,
+      is all of it. Neither clip was doing any work: their backgrounds and press
+      fills are already shape-aware and their content sits inside their padding.
+    - **Six control families had no focus indication whatsoever.** The old springy
+      click scaled an element 4% larger on D-pad focus, so removing the scale
+      removed the only thing marking where the viewer was, and only the callers that
+      had also passed a `pressedFill` got anything back. The Settings back button,
+      both Settings row types, the sleep-timer options, every icon button and every
+      labelled pill — the player's transport controls, reached by remote, over
+      video — showed nothing at all when focused. All six carry a ring again. The
+      two full-width Settings rows are the exception: a ring on a `fillMaxWidth()`
+      row puts 7dp of accent off each end of the screen, so those are filled rather
+      than outlined, which is the idiom every other full-width list here already
+      uses.
+
+- **A new colour system, and a flat, quieter way to draw a card.** With the motion
+  gone the surfaces had to carry the interface on their own, and the old ramp was
+  doing two jobs badly: a four-step neutral ramp for a five-level stack of
+  surfaces, and a vertical gradient on every card so a near-black card would not
+  read as a hole.
+  - The palette is rebuilt on cool neutrals, so the warm accents and the LIVE red
+    are the only warm things on screen and an accent reads as an accent.
+  - `surfaceHigh` is a new fifth step for the surfaces that sit *on* a card -
+    icon buttons, text fields, chips. They were drawn at the card's own level and
+    read as part of the card rather than as controls on it.
+  - `divider` separates two parts of one surface from a card's outline
+    separating it from the page, so the sidebar's edge and the rule under each
+    Settings heading are no longer the same weight as a card border.
+  - `edgeHighlight` is a 1dp line of light along the inside top of a card, and it
+    replaces the per-card `Brush.verticalGradient` outright. The gradient was a
+    per-card draw in a grid of several hundred, and it made the top of every card
+    look like the front face of something solid. The featured hero keeps an accent
+    wash: it is one surface on the page, and the tint is what tells the viewer it
+    is a channel rather than a section header.
+  - The focus ring's scrim is now the app's own `focusScrim` role rather than
+    `background` spelled out at each of the six call sites.
+
+- **Numerals are monospaced, and the type scale is retuned.** This is a television:
+  the sidebar numbers every row, the remote's number pad is the fastest way to
+  reach a channel, and the number-pad overlay exists to be read from a sofa. In a
+  proportional face a `1` is about half the width of an `8`, so a column of channel
+  numbers wobbles and the overlay visibly changes width on every keystroke - which
+  reads as a digit being replaced rather than as one being added. `ChannelNumber`
+  and `NumeralLarge` are fixed-width for that reason and are the only two slots in
+  the scale that are. The rest of the scale is retuned a step down and a notch
+  tighter, and all-caps Latin markers such as FEATURED and RECENTLY WATCHED now
+  share the one `labelSmall` style built for them.
+  - Line heights still leave room for stacked vowel marks: Sorani is written with
+    diacritics above *and* below the baseline, and a display line height tight
+    enough for Latin puts the top and bottom of those marks on the line boundary.
+  - Kurdish text still carries no positive letter spacing. Tracking is inserted as
+    an extra advance between glyph clusters, and Arabic script is written as
+    *connected* clusters, so on several Android releases that advance visibly opens
+    the joins.
+
 ### Fixed
 - **Three channels could never play, and looked fine.** `BNAR Action` and `Soz Quran`
   return 404 on their master playlist. `Iraqia Kurdish` is worse: its playlist and
