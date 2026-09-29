@@ -2,6 +2,7 @@ package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,9 +37,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoPlayerView
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -73,6 +77,8 @@ fun SidePlayerPane(
     // Toggling play/pause alone does not make ExoPlayer retry a stream that has
     // already moved to STATE_IDLE on error.
     var retryToken by remember(channel.id) { mutableIntStateOf(0) }
+    // Shared by the favourite button's click and its focus ring.
+    val favSource = remember(channel.id) { MutableInteractionSource() }
 
     Surface(
         color = colors.surface,
@@ -114,7 +120,25 @@ fun SidePlayerPane(
                     color = colors.glass,
                     modifier = Modifier
                         .size(36.dp)
-                        .tvClickable { onFavoriteToggle(channel.id) }
+                        // Shared by the click and the ring, so the heart's highlight
+                        // cannot disagree with the mark drawn around it.
+                        .tvClickable(
+                            interactionSource = favSource,
+                            pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                            pressedShape = CircleShape,
+                            onClick = { onFavoriteToggle(channel.id) }
+                        )
+                        // A focus ring, and this one is round so it can carry a
+                        // circular outline: the pane's heart is D-pad reachable and
+                        // previously had no focus mark, so on a television there was
+                        // no way to tell the remote was sitting on it.
+                        .expressiveFocusRing(
+                            ringColor = colors.primary,
+                            interactionSource = favSource,
+                            scrim = colors.focusScrim,
+                            restShape = M3ExpressivePolygons.Circle,
+                            ringShape = M3ExpressivePolygons.Circle
+                        )
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         SvgIcon(
