@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import com.example.kurdishtv.ui.theme.ExpressiveMorph
@@ -48,6 +49,14 @@ import com.example.kurdishtv.ui.theme.fittedPath
  *    actually does the work of surviving a bright room.
  *  - The lift is gone, which is a small loss. It made the focused card read as
  *    nearer. The scrim and the ring carry that now.
+ *
+ * ## The element must not clip
+ *
+ * The ring is drawn outside the element's bounds, so a `Modifier.clip` applied
+ * *before* it in the chain cuts the ring in half. Two surfaces used to do exactly
+ * that — the sidebar row and the navigation rail item — and both were clipping for
+ * no reason, because the background and the press fill were already shape-aware and
+ * nothing inside them needed a hard edge. Their clips are gone.
  *
  * ## Why instant, not quick
  *
@@ -83,8 +92,15 @@ import com.example.kurdishtv.ui.theme.fittedPath
  *   target, which is the right answer only when the element has no click of its own.
  * @param outset how far outside the element's bounds the ring is drawn. Positive is
  *   outwards; the ring never covers the content it is marking.
- * @param scrim a translucent fill laid under the ring, which is what keeps it legible
- *   against a bright or busy background. Pass [Color.Transparent] for no scrim.
+ * @param scrim a band of colour laid under the ring, which is what keeps it legible
+ *   against a bright or busy background. It fills the gap [outset] leaves between
+ *   the element and the ring, and the ring is drawn over the outer part of it.
+ *   Pass [Color.Transparent] for no scrim.
+ *
+ *   It has to be opaque to do that job. A translucent scrim was tried and left the
+ *   bright logo it was meant to hide showing through the middle of the mark, so the
+ *   call sites pass the page colour; [com.example.ui.theme.AppColors.focusScrim] is
+ *   the role for it.
  * @param ringShape the outline. A rectangle by default — see the note above on why
  *   the lobed silhouette went.
  */
@@ -120,6 +136,9 @@ fun Modifier.expressiveFocusRing(
     val strokePx = with(density) { ringWidth.toPx() }
     val outsetPx = with(density) { outset.toPx() }
     val ringStroke = remember(strokePx) { Stroke(width = strokePx) }
+    // The width that makes the scrim span from the element's own edge outward to
+    // `outset + stroke`. See the note where it is drawn.
+    val scrimStroke = remember(outsetPx, strokePx) { Stroke(width = outsetPx * 2f + strokePx) }
 
     this
         // A focus target only when this element has no click of its own. When a shared
@@ -155,10 +174,36 @@ fun Modifier.expressiveFocusRing(
                 rotationDegrees = 0f,
                 out = ringPath
             )
-            if (scrim != Color.Transparent) {
-                drawPath(path = ringPath, color = scrim, style = ringStroke)
+
+            // `fittedPath` puts the shape's **top-left** at the origin: it translates
+            // by `-bounds.left`/`-bounds.top` and then scales, and a Compose matrix
+            // scales about no pivot, so the outline it returns spans 0..ringSize
+            // rather than being centred in it.
+            //
+            // Drawn as it comes, the ring therefore sits [outset] too far right and
+            // down. Its top and left edges land on the element's own top-left corner,
+            // where the stroke eats 1.5dp *into* the content it is supposed to be
+            // marking and the 4dp outset is simply not there, while only the bottom
+            // and right carry it. On a clipped row that asymmetry is what made the
+            // ring look like an L: the two sides drawn outside the clip were the two
+            // that got cut off. Shifting the whole thing back by `grown` centres it
+            // and puts an even `outset` on all four sides.
+            translate(left = -grown, top = -grown) {
+                // The scrim is what keeps the ring legible against a bright logo or a
+                // light panel, and it works by being a band of page colour in the gap
+                // that the outset left between the element and the ring.
+                //
+                // At the ring's own width it is painted at exactly the same place as
+                // the ring drawn immediately after it, so it contributed nothing at
+                // all — six call sites passed a colour and got no band. At
+                // `2 * outset + stroke` it spans from the element's edge out past the
+                // ring, so the ring lands on the outer part of it and the inner part
+                // is the visible gap.
+                if (scrim != Color.Transparent) {
+                    drawPath(path = ringPath, color = scrim, style = scrimStroke)
+                }
+                drawPath(path = ringPath, color = ringColor, style = ringStroke)
             }
-            drawPath(path = ringPath, color = ringColor, style = ringStroke)
         }
 }
 

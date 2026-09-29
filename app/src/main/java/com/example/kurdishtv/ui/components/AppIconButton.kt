@@ -14,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
@@ -25,7 +24,9 @@ import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.tvClickable
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.ui.theme.LocalAppColors
 
 /**
@@ -112,8 +113,7 @@ fun AppIconButton(
     val shape: Shape = CornerScale.uniform(ShapeMorph.cornerRadius(size, 0.5f)).toShape()
 
     // The background is drawn with `background(color, shape)` and the glyph is a
-    // *sibling* of nothing — it is a child of a Box that is only clipped, never
-    // shape-owned.
+    // plain child of the Box.
     //
     // `Surface(shape, color) { glyph }` was the previous arrangement, and it is the
     // one arrangement that cannot be got right by reasoning: `Surface` clips its
@@ -123,13 +123,18 @@ fun AppIconButton(
     // the button look wrong, it deletes the icon and leaves a bare disc. That is
     // what the three header buttons and the card hearts were rendering as.
     //
-    // Here the two are independent: the Box is sized and clipped, the background
-    // follows the same shape, and the glyph is centred inside. A wrong shape now
-    // costs a wrong outline and nothing else.
+    // Here the two are independent: the background follows the shape and the glyph
+    // is centred inside it. A wrong shape now costs a wrong outline and nothing
+    // else.
     Box(
         modifier = modifier
             .size(size)
-            .clip(shape)
+            // Deliberately **not** clipped. The focus ring below is drawn outset
+            // from this Box, and a `clip` applied before it in the chain removes
+            // everything outside the element's own bounds — which for a ring is all
+            // of it. The glyph does not need the clip either: it is 16-19dp inside a
+            // 36-44dp circle, so it is well within the inscribed square at every size
+            // this is called with.
             .background(container, shape)
             // A filled circle needs no ring; the silhouette is already the shape.
             .then(
@@ -144,6 +149,24 @@ fun AppIconButton(
                 pressedFill = content.copy(alpha = ExpressiveMotion.Press.heldAlpha),
                 pressedShape = shape,
                 onClick = onClick
+            )
+            // This control had **no focus indication at all** for a while. The
+            // springy click used to scale it 4% larger when the D-pad landed on it,
+            // so removing the scale removed the only thing that said "you are here"
+            // — on the player's transport controls, which are reached by remote and
+            // sit over video where a 1dp border is invisible. The ring is what
+            // carries focus here now.
+            //
+            // It is a circle, because the control is one, and it is drawn in the
+            // glyph's own colour: a `Glass` button over video gets a white ring,
+            // which is the only thing about it that stays legible against whatever
+            // is playing.
+            .expressiveFocusRing(
+                ringColor = content,
+                interactionSource = interactionSource,
+                scrim = colors.focusScrim,
+                restShape = M3ExpressivePolygons.Circle,
+                ringShape = M3ExpressivePolygons.Circle
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -184,6 +207,7 @@ fun LabelPillButton(
     // that is 15dp, so the 20dp "active" radius it used to take made its own corners
     // overlap. A pill is a pill at every size, and this is a pill.
     val shape: Shape = ShapeMorph.pill
+    val colors = LocalAppColors.current
 
     // A blank label used to render as `icon + 5dp gap + an empty Text` inside a 50%
     // radius, which is a circle roughly one glyph wide: a bare disc sitting in a
@@ -198,6 +222,10 @@ fun LabelPillButton(
     // text.
     val hasLabel = label.isNotBlank()
 
+    // Shared by the click and the ring, so the two cannot disagree about where the
+    // viewer is.
+    val pillSource = remember { MutableInteractionSource() }
+
     Row(
         modifier = modifier
             .then(
@@ -207,9 +235,26 @@ fun LabelPillButton(
                     Modifier.size(40.dp)
                 }
             )
-            .clip(shape)
             .background(containerColor, shape)
-            .tvClickable(onClick = onClick),
+            .tvClickable(
+                interactionSource = pillSource,
+                pressedFill = contentColor.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                pressedShape = shape,
+                onClick = onClick
+            )
+            // See the note on the same ring in [AppIconButton]. These are the
+            // labelled controls on the player — reached by remote, over video — and
+            // the press fill alone is not a focus mark.
+            //
+            // No `clip` on this Row either, for the same reason: it would take the
+            // ring with it. The label and glyph sit inside the pill's own padding.
+            .expressiveFocusRing(
+                ringColor = contentColor,
+                interactionSource = pillSource,
+                scrim = colors.focusScrim,
+                restShape = M3ExpressivePolygons.Square,
+                ringShape = ShapeMorph.focusRing
+            ),
         // Centred when there is no label. A fixed-size Row defaults to
         // `Arrangement.Start`, which would pin a lone glyph against the leading edge
         // of its own circle instead of in the middle of it.

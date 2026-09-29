@@ -42,6 +42,38 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     Settings, along with the `motion`, `live_pulse` and `reduceMotion` keys in
     settings storage. Existing installs carrying those keys are unaffected; the
     values are simply no longer read.
+  - Removing the motion is what exposed the rest of the focus story, and three
+    things in it turned out to be broken or missing. All three are fixed here
+    rather than shipped, and none of them reached a released version.
+    - **The ring was off-centre and the `outset` did not exist on two of its four
+      sides.** `fittedPath` anchors a shape's *top-left* at the origin — it
+      translates by `-bounds.left`/`-bounds.top` and then scales, and a Compose
+      matrix has no pivot — so the outline spanned `0..ringSize` rather than being
+      centred in it. Drawn as it came, the ring's top and left edges landed on the
+      element's own top-left corner, eating 1.5dp into the content it was marking,
+      while only the bottom and right carried the intended 4dp gap. The ring is now
+      shifted back by the growth amount, so the gap is even on all four sides.
+    - **The contrast scrim did nothing at all.** It was stroked at the ring's own
+      width on the same path, and the ring was drawn immediately after it over the
+      top — so six call sites passed a colour and got no band. It is now stroked at
+      `2 * outset + stroke`, which fills the gap the outset left and puts the ring
+      on the outer part of it.
+    - **Two surfaces clipped the ring in half.** The sidebar row and the navigation
+      rail item both applied `Modifier.clip` *before* the ring in the chain, which
+      removes everything outside the element's bounds — which, for an outset ring,
+      is all of it. Neither clip was doing any work: their backgrounds and press
+      fills are already shape-aware and their content sits inside their padding.
+    - **Six control families had no focus indication whatsoever.** The old springy
+      click scaled an element 4% larger on D-pad focus, so removing the scale
+      removed the only thing marking where the viewer was, and only the callers that
+      had also passed a `pressedFill` got anything back. The Settings back button,
+      both Settings row types, the sleep-timer options, every icon button and every
+      labelled pill — the player's transport controls, reached by remote, over
+      video — showed nothing at all when focused. All six carry a ring again. The
+      two full-width Settings rows are the exception: a ring on a `fillMaxWidth()`
+      row puts 7dp of accent off each end of the screen, so those are filled rather
+      than outlined, which is the idiom every other full-width list here already
+      uses.
 
 - **A new colour system, and a flat, quieter way to draw a card.** With the motion
   gone the surfaces had to carry the interface on their own, and the old ramp was

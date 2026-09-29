@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,13 +16,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.ShapeMorph
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.tvClickable
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -143,6 +149,9 @@ private fun TimerChip(
     onClick: () -> Unit
 ) {
     val colors = LocalAppColors.current
+    // Shared by the click and the ring, so the two cannot disagree about where the
+    // viewer is.
+    val chipSource = remember { MutableInteractionSource() }
     Surface(
         shape = M3ExpressiveShapes.Pill,
         color = if (isSelected) colors.primary else colors.surfaceHigh,
@@ -152,7 +161,24 @@ private fun TimerChip(
                 if (isSelected) colors.primary else colors.border,
                 M3ExpressiveShapes.Pill
             )
-            .tvClickable(onClick = onClick)
+            .tvClickable(
+                interactionSource = chipSource,
+                pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                pressedShape = M3ExpressiveShapes.Pill,
+                onClick = onClick
+            )
+            // These chips are picked with the remote, and selection is a *choice*
+            // while focus is where the viewer *is* — a chip can be focused without
+            // being the current duration, so the selected/unselected fill says
+            // nothing about where the highlight is. Without a ring these were
+            // indistinguishable under the D-pad.
+            .expressiveFocusRing(
+                ringColor = colors.primary,
+                interactionSource = chipSource,
+                scrim = colors.focusScrim,
+                restShape = M3ExpressivePolygons.Square,
+                ringShape = ShapeMorph.focusRing
+            )
     ) {
         Text(
             text = "${minutes}m",

@@ -2,6 +2,8 @@ package com.example.kurdishtv.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -62,9 +65,12 @@ import com.example.kurdishtv.ui.components.UpdateCard
 import com.example.kurdishtv.ui.components.edgeFade
 import com.example.kurdishtv.update.AppUpdate
 import com.example.kurdishtv.update.UpdateState
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoColorFilter
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 import com.example.ui.theme.LocalIsTv
@@ -459,8 +465,21 @@ private fun Modifier.readableColumn(isTv: Boolean): Modifier =
     if (isTv) this.widthIn(max = 760.dp) else this
 
 @Composable
+/**
+ * The outline a focused settings row's plate is drawn in.
+ *
+ * Small on purpose. A row's plate runs the full width of the screen, so its corners
+ * are barely on screen at all; a large radius only makes the ends of the highlight
+ * look lopsided.
+ */
+private val RowPlate = RoundedCornerShape(6.dp)
+
+@Composable
 private fun SettingsHeader(onBack: () -> Unit) {
     val colors = LocalAppColors.current
+    // Shared by the click and the ring, so the two cannot disagree about where the
+    // viewer is.
+    val backSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -474,7 +493,23 @@ private fun SettingsHeader(onBack: () -> Unit) {
             modifier = Modifier
                 .size(44.dp)
                 .border(1.dp, colors.border, CircleShape)
-                .tvClickable(onClick = onBack)
+                .tvClickable(
+                    interactionSource = backSource,
+                    pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                    pressedShape = CircleShape,
+                    onClick = onBack
+                )
+                // A ring, because this one can carry one: 44dp and round, with room
+                // on all four sides. Without it the back button had no focus state
+                // at all, which on the first screen a viewer reaches after leaving
+                // Settings is the worst place for one.
+                .expressiveFocusRing(
+                    ringColor = colors.primary,
+                    interactionSource = backSource,
+                    scrim = colors.focusScrim,
+                    restShape = M3ExpressivePolygons.Circle,
+                    ringShape = M3ExpressivePolygons.Circle
+                )
         ) {
             Box(contentAlignment = Alignment.Center) {
                 SvgIcon(
@@ -761,11 +796,26 @@ private fun SettingsSwitchRow(
 ) {
     val colors = LocalAppColors.current
     val contentAlpha = if (enabled) 1f else 0.45f
+    // Focus is a plate, not a ring, and the reason is geometric rather than a
+    // preference. This row is `fillMaxWidth()`: an outset focus ring would put 7dp
+    // of accent off each end of the screen, so a viewer would see the top and bottom
+    // of a rectangle and nothing at either side. A full-width row is the one shape
+    // in the app that cannot carry an outline, so it is filled instead — which is
+    // also the idiom every other full-width list in the app already uses.
+    val rowSource = remember { MutableInteractionSource() }
+    val isFocused by rowSource.collectIsFocusedAsState()
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .tvClickable(enabled = enabled) { onCheckedChange(!checked) }
+                .clip(RowPlate)
+                .background(if (isFocused) colors.surfaceHigh else Color.Transparent)
+                .tvClickable(
+                    interactionSource = rowSource,
+                    enabled = enabled,
+                    pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                    pressedShape = RowPlate
+                ) { onCheckedChange(!checked) }
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -832,11 +882,22 @@ private fun SettingsActionRow(
     onClick: () -> Unit
 ) {
     val colors = LocalAppColors.current
+    // The same full-width plate as the switch row above, and for the same reason: a
+    // ring on a `fillMaxWidth()` row runs off both ends of the screen.
+    val rowSource = remember { MutableInteractionSource() }
+    val isFocused by rowSource.collectIsFocusedAsState()
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .tvClickable(onClick = onClick)
+                .clip(RowPlate)
+                .background(if (isFocused) colors.surfaceHigh else Color.Transparent)
+                .tvClickable(
+                    interactionSource = rowSource,
+                    pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                    pressedShape = RowPlate,
+                    onClick = onClick
+                )
                 .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

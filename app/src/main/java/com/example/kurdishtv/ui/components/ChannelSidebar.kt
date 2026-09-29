@@ -197,7 +197,12 @@ private fun ChannelSidebarRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(plateShape)
+            // No `clip` on the row. It used to clip to the plate's shape, which cut
+            // the focus ring in half — the ring is drawn outset from the element, and
+            // a clip applied before it in the chain removes everything outside the
+            // element's own bounds. Nothing needed it: the plate below is already
+            // shape-aware, the press fill carries its own shape, and the row's
+            // content sits inside its padding.
             .background(if (isSelected) colors.surfaceHigh else colors.surface)
             // The click keeps its own focus target and the ring watches the same
             // source, so there is one stop on this row rather than two competing ones.
