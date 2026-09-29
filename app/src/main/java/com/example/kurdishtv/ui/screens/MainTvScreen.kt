@@ -111,7 +111,19 @@ fun MainTvScreen(
     onStepChannel: (Int) -> Unit = {},
     onNumericBackspace: () -> Unit = {},
     onNumericCommit: () -> Unit = {},
-    onNumericCancel: () -> Unit = {}
+    onNumericCancel: () -> Unit = {},
+    /**
+     * Called once an [TvUiState.importMessage] has been shown.
+     *
+     * The message has to be cleared after it is displayed, and it was never
+     * cleared: `LaunchedEffect(uiState.importMessage)` is keyed on the *text*, so
+     * a second identical message — importing a second bad link, or a second good
+     * one — produced exactly the same string, the key did not change, the effect
+     * did not re-run, and the viewer got no confirmation at all for an action
+     * they had just taken. The state also stayed set forever, so nothing could
+     * tell "shown" from "not yet shown".
+     */
+    onImportMessageShown: () -> Unit = {}
 ) {
     val colors = LocalAppColors.current
     val isTv = LocalIsTv.current
@@ -152,6 +164,11 @@ fun MainTvScreen(
         val msg = uiState.importMessage
         if (!msg.isNullOrBlank()) {
             snackbarHostState.showSnackbar(msg)
+            // Cleared *after* the snackbar has been shown rather than before, so
+            // that returning to null cannot race the display. The state now means
+            // "there is something new to say" again, which is what makes a repeat
+            // of the same message show a second time.
+            onImportMessageShown()
         }
     }
 

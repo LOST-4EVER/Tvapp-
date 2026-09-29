@@ -53,6 +53,27 @@ object NetworkClient {
     @Volatile
     private var mediaClientInstance: OkHttpClient? = null
 
+    /**
+     * Safe DNS lookup, shared by both clients.
+     *
+     * Hoisted out of [buildClient] so the media client can use it too. Held as a
+     * single immutable value rather than rebuilt per client: it is stateless, and
+     * two identical wrappers guarding two clients was one more thing that could
+     * be applied to one and forgotten on the other.
+     */
+    private val safeDns: Dns = object : Dns {
+        override fun lookup(hostname: String): List<InetAddress> {
+            return try {
+                Dns.SYSTEM.lookup(hostname)
+            } catch (se: SecurityException) {
+                throw UnknownHostException("Permission denied during DNS lookup: ${se.message}")
+            } catch (t: Throwable) {
+                if (t is UnknownHostException) throw t
+                throw UnknownHostException("Unable to resolve host '$hostname': ${t.message}")
+            }
+        }
+    }
+
     fun getOkHttpClient(context: Context): OkHttpClient {
         return clientInstance ?: synchronized(this) {
             clientInstance ?: buildClient(context.applicationContext).also { clientInstance = it }
@@ -80,6 +101,13 @@ object NetworkClient {
     private fun getMediaClient(context: Context): OkHttpClient {
         return mediaClientInstance ?: synchronized(this) {
             mediaClientInstance ?: OkHttpClient.Builder()
+                // The same DNS wrapper the playlist client uses. It was missing
+                // here, so the protection only covered half the app: a
+                // restricted-profile device that denied the lookup raised a raw
+                // SecurityException out of the media client, which surfaces as an
+                // unplayable stream rather than as the UnknownHostException the
+                // other half of the app turns into a retryable failure.
+                .dns(safeDns)
                 .dispatcher(
                     Dispatcher().apply {
                         maxRequests = 16
@@ -132,20 +160,6 @@ object NetworkClient {
         // request. Channel logos alone can mean dozens of requests per screen.
         val connectionPool = ConnectionPool(16, 10, TimeUnit.MINUTES)
 
-        // Safe DNS lookup preventing SecurityException / EPERM crashes
-        val safeDns = object : Dns {
-            override fun lookup(hostname: String): List<InetAddress> {
-                return try {
-                    Dns.SYSTEM.lookup(hostname)
-                } catch (se: SecurityException) {
-                    throw UnknownHostException("Permission denied during DNS lookup: ${se.message}")
-                } catch (t: Throwable) {
-                    if (t is UnknownHostException) throw t
-                    throw UnknownHostException("Unable to resolve host '$hostname': ${t.message}")
-                }
-            }
-        }
-
         val builder = OkHttpClient.Builder()
             .dispatcher(dispatcher)
             .dns(safeDns)
@@ -197,7 +211,18 @@ object NetworkClient {
         var total = 0
         while (total < MAX_RESPONSE_BYTES) {
             val read = read(buffer, 0, minOf(buffer.size, MAX_RESPONSE_BYTES - total))
-            if (read < 0) break
+            // `read <= 0`, not `read < 0`.
+            //
+            // `InputStream.read` is permitted to return 0 for a non-zero length,
+            // and a `BufferedInputStream` over some socket-backed sources does.
+            // The old `if (read < 0) break` treated that as progress and kept
+            // looping: `total` never advanced, the loop condition never changed,
+            // and the call spun on a stream that was never going to produce
+            // another byte. That is a busy-wait holding a dispatcher thread and
+            // burning battery, on the IO dispatcher every playlist fetch runs on,
+            // against a server that had already stalled. Zero is not progress
+            // either way, so both cases end the read.
+            if (read <= 0) break
             out.write(buffer, 0, read)
             total += read
         }

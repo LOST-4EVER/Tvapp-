@@ -224,7 +224,16 @@ fun ChannelLogo(
         }
 
         if (request != null) {
-            if (state != LogoLoadState.Success) {
+            // The skeleton is for the load *in flight* only.
+            //
+            // The test was `state != Success`, which also covers [LogoLoadState.Error]
+            // — and because the monogram above is drawn first and this second, a
+            // failed logo left an opaque grey block sitting on top of the fallback
+            // forever. The fallback exists precisely for the failed case, so the one
+            // state in which it was needed was the one state that hid it. Error and
+            // not-yet-arrived are both "no artwork", so both show the monogram, and
+            // only the two states where artwork may still be coming get a block.
+            if (state == LogoLoadState.Idle || state == LogoLoadState.Loading) {
                 LogoSkeleton(modifier = Modifier.fillMaxSize())
             }
             AsyncImage(
