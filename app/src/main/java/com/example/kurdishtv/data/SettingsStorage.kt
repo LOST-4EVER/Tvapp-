@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.example.kurdishtv.model.AccentColor
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.model.CategoryFilter
+import com.example.kurdishtv.model.DeviceMode
 import com.example.kurdishtv.model.MotionLevel
 import com.example.kurdishtv.model.ThemeMode
 import com.example.kurdishtv.ui.player.ResizeMode
@@ -21,6 +22,7 @@ class SettingsStorage(context: Context) {
                 accent = enumOrDefault(prefs.getString(KEY_ACCENT, null), AccentColor.SUN_GOLD),
                 themeMode = enumOrDefault(prefs.getString(KEY_THEME, null), ThemeMode.DARK),
                 motion = enumOrDefault(prefs.getString(KEY_MOTION, null), MotionLevel.FULL),
+                deviceMode = enumOrDefault(prefs.getString(KEY_DEVICE_MODE, null), DeviceMode.AUTO),
                 startCategory = enumOrDefault(prefs.getString(KEY_START_CATEGORY, null), CategoryFilter.ALL),
                 autoplay = prefs.getBoolean(KEY_AUTOPLAY, true),
                 showLogos = prefs.getBoolean(KEY_SHOW_LOGOS, true),
@@ -44,6 +46,7 @@ class SettingsStorage(context: Context) {
                 .putString(KEY_ACCENT, settings.accent.name)
                 .putString(KEY_THEME, settings.themeMode.name)
                 .putString(KEY_MOTION, settings.motion.name)
+                .putString(KEY_DEVICE_MODE, settings.deviceMode.name)
                 .putString(KEY_START_CATEGORY, settings.startCategory.name)
                 .putBoolean(KEY_AUTOPLAY, settings.autoplay)
                 .putBoolean(KEY_SHOW_LOGOS, settings.showLogos)
@@ -63,6 +66,7 @@ class SettingsStorage(context: Context) {
         private const val KEY_ACCENT = "accent"
         private const val KEY_THEME = "theme_mode"
         private const val KEY_MOTION = "motion"
+        private const val KEY_DEVICE_MODE = "device_mode"
         private const val KEY_START_CATEGORY = "start_category"
         private const val KEY_AUTOPLAY = "autoplay"
         private const val KEY_SHOW_LOGOS = "show_logos"

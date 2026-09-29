@@ -29,8 +29,17 @@ fun KurdishTvTheme(
     // Read into a local first: `remember`'s calculation lambda is a plain block,
     // so reading `LocalConfiguration.current` *inside* it is a composable call in
     // a non-composable context.
+    //
+    // The device-mode preference is the second key, and it is what makes the setting
+    // work at all: keying on the configuration alone would cache the *detected*
+    // answer and never notice the viewer overriding it, so the control in Settings
+    // would look live and change nothing. Keyed on both, flipping it recomposes
+    // only the handful of `LocalIsTv` readers, which is what this local's tracking
+    // variant is for.
     val configuration = LocalConfiguration.current
-    val isTv = remember(configuration) { configuration.isTvMode() }
+    val isTv = remember(configuration, settings.deviceMode) {
+        settings.deviceMode.resolveIsTv(configuration.isTvMode())
+    }
 
     // Material You (Android 12+): pull the accent from the user's wallpaper palette.
     // Falls back to the bundled accent on older releases or if extraction fails.

@@ -203,6 +203,28 @@ object ExpressiveMotion {
     const val LIVE_PULSE_PERIOD_MS = 1800L
 
     /**
+     * The granularity the LIVE pulse is published at.
+     *
+     * The pulse is one shared float read in the draw phase by *every* badge on
+     * screen, and the browse grid has a badge on every card — so one write here is
+     * one draw invalidation per visible badge, and the write happens whether or not
+     * the badge's drawn result actually changed.
+     *
+     * A 1.8s breath at 60fps is 108 frames, and over the fast middle of the cosine
+     * consecutive frames differ by only about 0.012 in scale. Publishing in hundredths
+     * turns that into 77 writes per cycle instead of 108 — 39 distinct values rather
+     * than 108 — for a worst-case step of 0.02 in scale, which on the 8dp dot is a
+     * sixth of a pixel. The dot breathes exactly as before; it just stops asking the
+     * compositor to redraw thirty identical circles twice a second.
+     *
+     * Finer than this stops helping: at 0.005 and below almost every frame during
+     * the fast middle still lands on a new step, so the writes come back without the
+     * motion being any smoother. Coarser than this starts to show — 0.02 makes the
+     * dot visibly step through the middle of the breath.
+     */
+    const val LIVE_PULSE_STEP = 0.01f
+
+    /**
      * Per-item delay for a staggered grid entrance.
      *
      * Small on purpose: with dozens of cards on screen a large stagger makes the last
@@ -433,13 +455,26 @@ fun rememberLivePulse(enabled: Boolean): WatchedFloat {
         val period = ExpressiveMotion.LIVE_PULSE_PERIOD_MS * 1_000_000L
         val low = ExpressiveMotion.LIVE_PULSE_MIN
         val span = ExpressiveMotion.LIVE_PULSE_MAX - low
+        val step = ExpressiveMotion.LIVE_PULSE_STEP
+        // The last value actually published, so a frame that snaps to the same step
+        // as the one before it is not written at all. A write would invalidate the
+        // draw of every badge on screen for no visible difference; see
+        // [ExpressiveMotion.LIVE_PULSE_STEP] for where the step size comes from.
+        var published = ExpressiveMotion.RESTING_PULSE
         while (true) {
             withFrameNanos { now ->
                 // Shared origin — see the note on the rotation loop above.
                 val phase = ((now - pulse.epoch(now)) % period) / period.toFloat()
                 // A cosine breath rather than a tween's easing curve: the same smooth
                 // in-and-out, with no cubic solve between the two ends.
-                pulse.state.floatValue = low + span * (0.5f - 0.5f * cos(2f * PI.toFloat() * phase))
+                val raw = low + span * (0.5f - 0.5f * cos(2f * PI.toFloat() * phase))
+                // Truncating toward the step below, so the value is always one the dot
+                // has been drawn at before and never overshoots [ExpressiveMotion.LIVE_PULSE_MAX].
+                val snapped = (raw / step).toInt() * step
+                if (snapped != published) {
+                    published = snapped
+                    pulse.state.floatValue = snapped
+                }
             }
         }
     }

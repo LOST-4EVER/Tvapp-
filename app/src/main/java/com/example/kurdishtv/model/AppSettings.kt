@@ -23,6 +23,39 @@ enum class MotionLevel(val displayName: String) {
 }
 
 /**
+ * Which of the app's two layout families to present.
+ *
+ * The app draws a genuinely different interface for a television and for a handheld —
+ * a ten-foot grid with large cards, a navigation rail, a channel sidebar and D-pad
+ * focus rings, against a compact touch-first layout — and every layout decision reads
+ * `LocalIsTv` rather than the window size, because a TV box and a tablet report
+ * comparable sizes.
+ *
+ * [AUTO] keeps that single signal: the device's declared `uiMode`, which is right
+ * almost always. The two overrides exist because it is not right always, and the two
+ * cases that come up are not exotic:
+ *
+ *  - Plenty of Android TV boxes, projectors and HDMI sticks declare a phone or tablet
+ *    `uiMode`. The app then draws the compact touch layout on the one device with the
+ *    most pixels to spend, and every card is a thumbnail from a sofa.
+ *  - Conversely, a tablet or a phone on a stand with a Bluetooth keyboard is being
+ *    driven with a D-pad from across the room, and wants the room-sized targets.
+ *
+ * So this is a user-facing override of a heuristic, not a second code path: nothing
+ * downstream branches on anything but `LocalIsTv`, which this setting resolves.
+ */
+enum class DeviceMode(val displayName: String) {
+    /** Follow the device's declared `uiMode`. The default, and right almost always. */
+    AUTO("Auto"),
+
+    /** Force the ten-foot layout: large cells, D-pad focus, permanent sidebar. */
+    TV("TV"),
+
+    /** Force the handheld layout: dense grid, touch-first, no D-pad furniture. */
+    MOBILE("Phone")
+}
+
+/**
  * User preferences. Immutable so the UI can safely diff it, and persisted by
  * [com.example.kurdishtv.data.SettingsStorage].
  */
@@ -30,6 +63,13 @@ data class AppSettings(
     val accent: AccentColor = AccentColor.SUN_GOLD,
     val themeMode: ThemeMode = ThemeMode.DARK,
     val motion: MotionLevel = MotionLevel.FULL,
+    /**
+     * Which layout family to present. [DeviceMode.AUTO] follows the device; the other
+     * two override it. Resolved into `LocalIsTv` by the theme layer, which is the only
+     * place the answer is turned into a boolean — see
+     * [com.example.ui.theme.resolveIsTv].
+     */
+    val deviceMode: DeviceMode = DeviceMode.AUTO,
     val startCategory: CategoryFilter = CategoryFilter.ALL,
     val autoplay: Boolean = true,
     val showLogos: Boolean = true,

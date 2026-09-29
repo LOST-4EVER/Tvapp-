@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -86,6 +87,22 @@ fun Modifier.tvFocusable(
     )
 
     this
+        // The element's own focus target, re-asserted as focusable immediately before
+        // it is created.
+        //
+        // `bouncyClickable(focusable = false)` takes the *click's* focus target out of
+        // the tab order with `Modifier.focusProperties { canFocus = false }`, and
+        // `focusProperties` is not scoped to the one target it was meant for: it
+        // applies to every focus target below it in the chain and every target in the
+        // layout below it. This modifier sits below that one, so without this line its
+        // own `focusable` would inherit `canFocus = false` and the element would not
+        // be a D-pad stop at all — it would be reachable by touch and by nothing else.
+        //
+        // Re-asserting the property here is correct under either reading of how far
+        // `focusProperties` reaches, which is why it is done rather than the
+        // `bouncyClickable` side being "fixed" instead: the click's target really does
+        // have to go, and this target really does have to stay.
+        .focusProperties { canFocus = enabled }
         .focusable(enabled = enabled, interactionSource = interactionSource)
         // As in `expressiveFocusRing`: the layer is only worth having while the
         // element is actually lifted.
@@ -198,6 +215,13 @@ fun Modifier.expressiveFocusRing(
     )
 
     this
+        // See `tvFocusable`: `focusProperties { canFocus = false }` from
+        // `bouncyClickable(focusable = false)` reaches every focus target below it in
+        // the chain, so this one has to say it is focusable for itself. Cards, sidebar
+        // rows, rail items and the sidebar's heart all pair the two modifiers, so
+        // without this line every large surface in the app would be a dead stop for the
+        // remote while still working perfectly well for a finger.
+        .focusProperties { canFocus = enabled }
         .focusable(enabled = enabled, interactionSource = interactionSource)
         // The layer exists only while the element is lifted. Six hundred cards each
         // holding a permanently scaled render node is the same problem as the other
