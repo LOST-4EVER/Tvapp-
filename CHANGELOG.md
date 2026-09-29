@@ -28,6 +28,23 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   by hand in a comment, and streams rot silently.
 
 ### Added
+- **A source that hiccups is now retried instead of written off.** Every remote
+  playlist was fetched exactly once per refresh and a failure meant the whole
+  source contributed nothing. That is worse than it sounds, because the merged
+  result is written to a cache the app then treats as current for thirty minutes
+  — so a two-second dropped connection did not cost a request, it cost every
+  channel from that playlist for half an hour, and the next cold start served
+  the gap from cache without asking again.
+  - The population this hurts is exactly the one this app depends on. An audit of
+    all 98 catalogue streams found several that only returned media on a second
+    attempt, seconds after a first that had failed.
+  - Failures are now split by whether retrying can help. A 404 or 403 is the
+    source's answer and is not repeated; a 5xx, a 408, a 429, a timeout or a
+    dropped connection is retried up to three times.
+  - The wait between attempts is exponential with equal jitter. Jitter matters
+    more than it looks: all four sources are fetched concurrently and tend to
+    fail together, so a backoff without it would have them all retry in lockstep
+    against the same origin at the same instant.
 - **`scripts/audit_streams.py`, and `./gradlew auditStreams`.** Walks every
   catalogue stream the full way down to media bytes — master, then the
   highest-bandwidth variant, then an actual segment — and requires real container

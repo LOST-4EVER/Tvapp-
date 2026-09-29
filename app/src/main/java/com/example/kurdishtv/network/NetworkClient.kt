@@ -205,9 +205,18 @@ object NetworkClient {
     }
 
     /**
-     * Asynchronously and cancellably fetches a URL string using OkHttp without blocking threads.
+     * Asynchronously and cancellably fetches a URL, reporting *why* it failed.
+     *
+     * This used to return `String?`, and the difference matters. A null cannot
+     * distinguish "the source is gone" from "the network hiccuped", so a caller
+     * has exactly two options: give up on the first failure, or retry blindly.
+     * Both are wrong. A 404 will still be a 404 after four attempts and four
+     * wasted round trips; a dropped connection is usually fine a second later.
+     *
+     * Splitting the two lets the caller retry exactly the failures that can
+     * change their mind.
      */
-    suspend fun OkHttpClient.fetchString(request: Request): String? =
+    suspend fun OkHttpClient.fetchBody(request: Request): FetchOutcome =
         suspendCancellableCoroutine { continuation ->
             try {
                 val call = newCall(request)
@@ -219,29 +228,85 @@ object NetworkClient {
                 call.enqueue(object : Callback {
                     override fun onFailure(call: Call, e: IOException) {
                         if (continuation.isActive) {
-                            continuation.resume(null)
+                            // No response was ever received, so this is always a
+                            // transport-level hiccup and always worth another try.
+                            continuation.resume(FetchOutcome.Transient(e.javaClass.simpleName))
                         }
                     }
 
                     override fun onResponse(call: Call, response: Response) {
-                        try {
+                        val outcome = try {
                             response.use { res ->
-                                val body = if (res.isSuccessful) res.body?.byteStream()?.use { it.readCapped() } else null
-                                if (continuation.isActive) {
-                                    continuation.resume(body)
+                                val body = if (res.isSuccessful) {
+                                    res.body?.byteStream()?.use { it.readCapped() }
+                                } else {
+                                    null
                                 }
+                                if (body == null) res.code.asOutcome() else FetchOutcome.Success(body)
                             }
-                        } catch (_: Throwable) {
-                            if (continuation.isActive) {
-                                continuation.resume(null)
-                            }
+                        } catch (t: Throwable) {
+                            FetchOutcome.Transient(t.javaClass.simpleName)
+                        }
+                        if (continuation.isActive) {
+                            continuation.resume(outcome)
                         }
                     }
                 })
-            } catch (_: Throwable) {
+            } catch (t: Throwable) {
                 if (continuation.isActive) {
-                    continuation.resume(null)
+                    continuation.resume(FetchOutcome.Transient(t.javaClass.simpleName))
                 }
             }
         }
+
+    /**
+     * Whether an HTTP status is worth trying again.
+     *
+     * 404 and the rest of the 4xx range are the source's answer, not a glitch,
+     * and repeating the request only delays the refresh. 408 (request timeout)
+     * and 429 (rate limited) are the exceptions: the server is explicitly saying
+     * "not now", which is the one case where waiting genuinely helps. Every 5xx
+     * is a server-side fault that frequently clears on its own.
+     */
+    private fun Int.asOutcome(): FetchOutcome = when {
+        this == 408 || this == 429 -> FetchOutcome.Transient("HTTP $this")
+        this >= 500 -> FetchOutcome.Transient("HTTP $this")
+        else -> FetchOutcome.Permanent(this)
+    }
 }
+
+/** The result of a single request, distinguishing the failures worth repeating. */
+sealed interface FetchOutcome {
+    data class Success(val body: String) : FetchOutcome
+
+    /** The server answered, and the answer was no. Retrying cannot change it. */
+    data class Permanent(val code: Int) : FetchOutcome
+
+    /** A hiccup — 5xx, rate limit, dropped connection, timeout. */
+    data class Transient(val reason: String) : FetchOutcome
+}
+
+/**
+ * How long to wait before attempt number [attempt] + 1.
+ *
+ * Exponential, with "equal jitter" — half the delay fixed, half random. Pure
+ * jitter can collapse to nearly zero and defeat the backoff; no jitter at all
+ * is worse here, because every source in a refresh fails at roughly the same
+ * moment and would otherwise retry in lockstep, hammering the same origin in
+ * the same instant.
+ *
+ * Split out as a pure function so the shape of the curve can be tested without
+ * a network, a clock, or a real backoff in a test's runtime.
+ *
+ * @param jitter a value in `[0, 1)`, injected so the curve is deterministic
+ *   under test. Production passes a real random draw.
+ */
+internal fun retryDelayMs(attempt: Int, jitter: Float): Long {
+    val exponential = BASE_RETRY_DELAY_MS shl (attempt - 1).coerceIn(0, 6)
+    val capped = exponential.coerceAtMost(MAX_RETRY_DELAY_MS)
+    val fixed = capped / 2
+    return (fixed + (capped - fixed) * jitter.coerceIn(0f, 1f)).toLong()
+}
+
+private const val BASE_RETRY_DELAY_MS = 400L
+private const val MAX_RETRY_DELAY_MS = 4_000L
