@@ -659,6 +659,9 @@ private fun ChannelGrid(
     // arbitrary because focus is being picked for the first time.
     val gridState = rememberLazyGridState()
     val gridFocus = rememberTvFocusRequester()
+    // Read here rather than passed in: the only thing the grid needs it for is the
+    // background the edge fade dissolves into, and that is the page background.
+    val colors = LocalAppColors.current
 
     // Where the viewer's focus was the last time this screen was on show.
     //
@@ -785,7 +788,7 @@ private fun ChannelGrid(
             // floating category chip with the rest of the card sliced off above it.
             // Fading the clipping edge turns the same pixels into "there is more".
             .verticalEdgeFade(
-                listState = gridState,
+                gridState = gridState,
                 background = colors.background
             )
     ) {
