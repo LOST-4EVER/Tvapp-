@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -24,8 +25,11 @@ import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.model.ChannelFilterEngine
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.tvClickable
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -132,11 +136,19 @@ fun CategoryBar(
     LazyRow(
         modifier = modifier,
         state = listState,
-        horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+        // 8dp between chips, and never less. The focus ring below reaches 7dp past
+        // the chip it marks (see `FocusRingGeometryTest`), so a 6dp gap let a focused
+        // chip's scrim band paint a sliver into its neighbour. The compact layout
+        // saves its vertical space from the chrome's height, not from a gap narrow
+        // enough to collide.
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = if (compact) 3.dp else 6.dp)
     ) {
         items(visible, key = { it.name }) { category ->
             val isSelected = selectedCategory == category
+            // Shared by the click and the ring below, so the two cannot disagree
+            // about where the highlight is.
+            val chipSource = remember(category) { MutableInteractionSource() }
 
             // Selection switches these three instantly. Each was a
             // `animateColorAsState` / `animateDpAsState` on a spring, and selecting a
@@ -162,9 +174,30 @@ fun CategoryBar(
                         color = if (isSelected) colors.primary else colors.border,
                         shape = pillShape
                     )
-                    .tvClickable {
+                    .tvClickable(
+                        interactionSource = chipSource,
+                        pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                        pressedShape = pillShape
+                    ) {
                         onCategorySelected(category)
                     }
+                    // A focus ring, which this row did not have at all.
+                    //
+                    // These chips are the app's primary navigation and `tvClickable`
+                    // gives each one a focus target, so the D-pad lands on them — and
+                    // a chip carried no focus mark of any kind, so arrowing along the
+                    // row moved an invisible highlight and the viewer had no way to
+                    // tell which of twelve categories they were about to open. This is
+                    // the one row where focus matters most: it is the first thing the
+                    // remote reaches on the browse screen, and the thing a viewer
+                    // arrows along without thinking.
+                    .expressiveFocusRing(
+                        ringColor = colors.primary,
+                        interactionSource = chipSource,
+                        scrim = colors.focusScrim,
+                        restShape = M3ExpressivePolygons.Square,
+                        ringShape = ShapeMorph.focusRing
+                    )
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

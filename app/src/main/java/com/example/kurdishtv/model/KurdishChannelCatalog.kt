@@ -90,13 +90,16 @@ object KurdishChannelCatalog {
             isHd = true
         ),
         Channel(
+            // `isHd` was true while the entry below states 720p, which put this in
+            // the "HD 1080p" tab at 720p. The id keeps its `_hd` suffix for the
+            // reason given on `trt_1`: ids are stored in favourites.
             id = "zagros_tv_hd",
             name = "Zagros TV",
             streamUrl = "https://5a3ed7a72ed4b.streamlock.net/zagrostv/SMIL:myStream.smil/playlist.m3u8",
             logoUrl = "https://i.imgur.com/UjIuIQX.png",
             category = "News",
             quality = "HLS / 720p",
-            isHd = true
+            isHd = false
         ),
         Channel(
             id = "gali_kurdistan_hd",
@@ -726,6 +729,9 @@ object KurdishChannelCatalog {
         Channel(
             id = "spi_kids",
             name = "Spi Kids",
+            // 4K, so genuinely HD; the variant is resolved by the manifest rather
+            // than named in the path, so the quality stays open rather than
+            // claiming a resolution this URL does not state.
             streamUrl = "https://live20.bozztv.com/giatv/giatv-spikids4k2025/spikids4k2025/chunks.m3u8",
             logoUrl = "https://i.postimg.cc/nFJkFmgm/KIDS.png",
             category = "Kids",
@@ -749,7 +755,7 @@ object KurdishChannelCatalog {
             logoUrl = "https://i.postimg.cc/by0Sfk4T/clip.png",
             category = "Documentary",
             quality = "HLS / 720p",
-            isHd = true
+            isHd = false
         ),
         Channel(
             id = "bnar_tv",
@@ -831,7 +837,7 @@ object KurdishChannelCatalog {
             logoUrl = "https://i.postimg.cc/ChRybCtn/halabja.png",
             category = "Kurdish",
             quality = "HLS / 720p",
-            isHd = true
+            isHd = false
         ),
         Channel(
             id = "denge_zelal",
@@ -866,7 +872,7 @@ object KurdishChannelCatalog {
             logoUrl = "https://i.postimg.cc/y1r0XkCp/minara.png",
             category = "Religious",
             quality = "HLS / 720p",
-            isHd = true
+            isHd = false
         ),
         Channel(
             id = "soran_entertainment",
@@ -906,7 +912,7 @@ object KurdishChannelCatalog {
             logoUrl = "https://i.postimg.cc/08Vjd4K2/EKURD.png",
             category = "Kurdish",
             quality = "HLS / 720p",
-            isHd = true
+            isHd = false
         ),
         Channel(
             id = "mmn_news",
@@ -961,16 +967,31 @@ object KurdishChannelCatalog {
             name = "TRT Arabic",
             streamUrl = "https://tv-trtarabi.medya.trt.com.tr/master_1080.m3u8",
             category = "General",
-            quality = "HLS / Auto",
+            // The variant is named in the URL, so the quality is not a guess.
+            // "HLS / Auto" was claiming the source does not say, about a source
+            // whose own path says 1080.
+            quality = "HLS / 1080p",
             isHd = true
         ),
         Channel(
             id = "trt_1",
             name = "TRT 1",
+            // A 720p variant listed as HD.
+            //
+            // This was `isHd = true`, so TRT 1 appeared in the "HD 1080p" tab
+            // alongside genuinely 1080p channels while streaming the 720p variant
+            // its own URL names. `isHd` is a flat flag with no other source — the
+            // HD tab and its count both read it directly — so the only way a viewer
+            // could tell this entry apart was to play it and look.
+            //
+            // The `id` keeps its `_hd` suffix. Ids are derived once and stored in
+            // favourites and watch history, so renaming one to match the corrected
+            // flag would orphan every saved favourite for this channel. The id is
+            // an opaque key, not a claim about the stream.
             streamUrl = "https://tv-trt1.medya.trt.com.tr/master_720.m3u8",
             category = "General",
-            quality = "HLS / Auto",
-            isHd = true
+            quality = "HLS / 720p",
+            isHd = false
         ),
         Channel(
             id = "sky_news_arabia",

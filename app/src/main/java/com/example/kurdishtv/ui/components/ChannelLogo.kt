@@ -32,6 +32,7 @@ import coil.memory.MemoryCache
 import coil.request.ImageRequest
 import coil.size.Precision
 import coil.size.Scale
+import com.example.kurdishtv.network.NetworkClient
 import java.io.File
 
 /**
@@ -49,6 +50,27 @@ private object LogoLoader {
     fun get(context: Context): ImageLoader =
         instance ?: synchronized(this) {
             instance ?: ImageLoader.Builder(context.applicationContext)
+                // The app's own OkHttp client, shared with the playlist fetches.
+                //
+                // Coil builds a private client of its own by default, and this
+                // loader was never given one. That is a second connection pool, a
+                // second set of dispatcher threads and a second set of timeouts
+                // living in the same process — and it silently undoes two things
+                // the rest of the network code is built around:
+                //
+                //  - The 64 MB HTTP cache. Logo responses are the bulk of the
+                //    requests a browse session makes, and the comments in
+                //    `NetworkClient` already describe them as going through this
+                //    cache. They were not: every logo was fetched over the wire
+                //    again on the next cold start.
+                //  - The pooled connections. Keeping them alive is what avoids a
+                //    fresh TLS handshake per logo, which is the whole reason the
+                //    pool is sized at 16 for 10 minutes.
+                //
+                // The media client is still separate, and still must be: video must
+                // not queue behind logos on the same host. That reasoning holds
+                // either way, because it is about the *video* client, not this one.
+                .okHttpClient(NetworkClient.getOkHttpClient(context.applicationContext))
                 .memoryCache {
                     // The memory cache holds *decoded bitmaps*, so its cost is
                     // width x height x 4 bytes per logo. At the 512px ceiling that is

@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,13 +12,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.tvClickable
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -28,6 +32,8 @@ fun OfflineBanner(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
+    // Shared by the retry click and its focus ring.
+    val retrySource = remember { MutableInteractionSource() }
 
     // Shown or not shown, with nothing in between.
     //
@@ -69,7 +75,28 @@ fun OfflineBanner(
             Surface(
                 shape = M3ExpressiveShapes.Pill,
                 color = Color.White.copy(alpha = 0.25f),
-                modifier = Modifier.tvClickable { onRetry() }
+                modifier = Modifier
+                    .tvClickable(
+                        interactionSource = retrySource,
+                        pressedFill = Color.White.copy(alpha = 0.35f),
+                        pressedShape = M3ExpressiveShapes.Pill,
+                        onClick = { onRetry() }
+                    )
+                    // A focus ring, and the one that matters most on this control.
+                    //
+                    // The retry button only exists while the app believes it is
+                    // offline, and it was a `tvClickable` with no focus mark at all:
+                    // on a television the D-pad could land on it and the viewer had
+                    // no way to tell, and the only way out of an offline state is
+                    // pressing it. Nothing about the banner itself tells you which
+                    // control is focused, because the text beside it is not focusable.
+                    .expressiveFocusRing(
+                        ringColor = Color.White,
+                        interactionSource = retrySource,
+                        scrim = colors.liveRed,
+                        restShape = M3ExpressivePolygons.Square,
+                        ringShape = M3ExpressivePolygons.Square
+                    )
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

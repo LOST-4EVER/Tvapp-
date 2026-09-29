@@ -1,6 +1,7 @@
 package com.example.kurdishtv.ui.components
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -22,8 +24,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.CornerScale
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
 import com.example.kurdishtv.ui.motion.tvClickable
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -41,6 +46,8 @@ fun TopHeaderBar(
     compact: Boolean = false
 ) {
     val colors = LocalAppColors.current
+    // Shared by the refresh tile's click and its focus ring.
+    val brandSource = remember { MutableInteractionSource() }
 
     // The brand tile is a fixed rounded square, sized off the tile rather than off a
     // shared token: it is 40-46dp, so half its short side is 20-23dp and the 22dp
@@ -98,7 +105,25 @@ fun TopHeaderBar(
                     modifier = Modifier
                         .size(logoSize)
                         .border(1.dp, colors.primary.copy(alpha = 0.5f), brandShape)
-                        .tvClickable { onRefresh() }
+                        // Shared by the click and the ring, so the refresh tile's
+                        // highlight cannot disagree with the mark drawn around it.
+                        .tvClickable(
+                            interactionSource = brandSource,
+                            pressedFill = colors.onPrimary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                            pressedShape = brandShape,
+                            onClick = { onRefresh() }
+                        )
+                        // The tile carries a focus ring because it is one of the four
+                        // controls in the header and the header had no focus mark on
+                        // any of them. It is small and has room on all four sides, so
+                        // an outset ring reads correctly here.
+                        .expressiveFocusRing(
+                            ringColor = colors.primary,
+                            interactionSource = brandSource,
+                            scrim = colors.focusScrim,
+                            restShape = M3ExpressivePolygons.Square,
+                            ringShape = M3ExpressivePolygons.Square
+                        )
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         SvgIcon(
