@@ -7,7 +7,49 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **Three channels could never play, and looked fine.** `BNAR Action` and `Soz Quran`
+  return 404 on their master playlist. `Iraqia Kurdish` is worse: its playlist and
+  its variant both resolve, and then *every media segment* 404s — so it passes any
+  check that stops at the manifest, and still cannot play. All three failed on
+  three separate attempts and have been removed rather than left in the grid where
+  they can only waste a viewer's time. A 200 on the master was never proof a
+  stream works, which is exactly the trap the earlier Channel 8 entry fell into.
+- **Three channels took 10-21x longer to start than they needed to.** Rudaw TV,
+  Waar TV and Payam TV all pointed at bare origins. Each is also published on the
+  Akamai edge, and measured over five requests per URL the edge copies are far
+  faster to first playlist:  Rudaw 424 ms -> 42 ms, Waar 813 ms -> 51 ms, Payam
+  1027 ms -> 49 ms. Since that wait is exactly the gap between pressing OK and
+  seeing video, this is the most visible latency in the app. Payam additionally
+  advertises 1080p on the new origin, so it was corrected from 720p at the same
+  time. Thirteen of the catalogue's channels now sit on that edge; these three
+  had been left on bare origins.
+- **The catalogue had no way to detect any of this.** Channel health was asserted
+  by hand in a comment, and streams rot silently.
+
 ### Added
+- **`scripts/audit_streams.py`, and `./gradlew auditStreams`.** Walks every
+  catalogue stream the full way down to media bytes — master, then the
+  highest-bandwidth variant, then an actual segment — and requires real container
+  magic bytes rather than trusting a 200. It also reports time-to-first-playlist,
+  which is what surfaced the three slow origins above.
+  - It **retries before calling a stream dead.** Probing a live endpoint once
+    produces false negatives: on the first run, three streams failed and all three
+    passed on a second attempt seconds later, because a live playlist is rewritten
+    continuously and a segment listed a moment ago can 404 by the time it is
+    fetched. A tool that reported those as dead would have had working channels
+    deleted from it. Streams that need a retry are reported separately as
+    unreliable-but-alive.
+  - Which streams land in that bucket **changes between runs** — successive audits
+    flagged different channels each time — so it reflects the network between the
+    runner and the origin, not a property of the channel. Read it as noise unless
+    the same name repeats.
+  - It **refuses to run on a partial parse.** The first version silently missed
+    three channels because a comment added between two fields in the catalogue
+    source was enough to break a strict pattern, so it reported a clean bill of
+    health for channels it never looked at. It now cross-checks the number of
+    parsed entries against the number of `id =` fields in the source and aborts
+    if they disagree.
 - **The remote's number pad works.** Every key on a television remote was ignored
   before, so reaching a channel on a screen of six hundred meant arcing across the
   grid and counting. The digits now build a channel number, shown large in the middle

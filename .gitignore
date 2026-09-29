@@ -16,3 +16,7 @@
 local.properties
 .env
 debug.keystore
+
+# Python bytecode from scripts/
+__pycache__/
+*.pyc

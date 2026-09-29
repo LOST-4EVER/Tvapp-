@@ -1,8 +1,6 @@
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
-  alias(libs.plugins.google.devtools.ksp)
-  alias(libs.plugins.secrets)
 }
 
 android {
@@ -132,12 +130,31 @@ android {
   }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
-secrets {
-  propertiesFileName = ".env"
-  defaultPropertiesFileName = ".env.example"
-  ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
+/**
+ * Audits every HLS stream in the bundled catalogue against the live network.
+ *
+ *   ./gradlew auditStreams
+ *
+ * Not part of any build task: this makes real network requests, takes a minute
+ * or two, and must never be something `assembleRelease` can fail because a
+ * broadcaster is having a bad afternoon. It is a maintenance tool, invoked by
+ * hand, whose output is what justifies changing a stream URL.
+ *
+ * It is deliberately a separate script rather than a unit test. A test that
+ * fails when a third-party origin 404s is a test that gets deleted.
+ */
+tasks.register<Exec>("auditStreams") {
+    group = "verification"
+    description = "Verify every catalogue HLS stream end to end (master, variant, media segment)."
+    commandLine(
+        "python3",
+        rootProject.file("scripts/audit_streams.py"),
+        "--concurrency", "6",
+        "--attempts", "3"
+    )
+    // Fails the task when a stream is dead, so it is usable as a gate in a
+    // maintenance branch even though it is never wired into the build.
+    isIgnoreExitValue = false
 }
 
 // Some unused dependencies are commented out below instead of being removed.
@@ -168,6 +185,12 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.navigation.compose)
+  // Lets ART AOT-compile the app's own startup path from the rules in
+  // src/main/baseline-prof.txt instead of discovering it at runtime. This is the
+  // dependency that matters on API 24-28, where there is no Play profile delivery.
+  // The library alone does nothing — the rules file next to AndroidManifest.xml
+  // is what it installs.
+  implementation(libs.androidx.profileinstaller)
   // implementation(libs.androidx.room.ktx)
   // implementation(libs.androidx.room.runtime)
   implementation(libs.coil.compose)

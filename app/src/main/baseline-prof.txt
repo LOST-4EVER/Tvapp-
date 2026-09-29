@@ -1,0 +1,87 @@
+# ART baseline profile.
+#
+# AGP compiles this file into assets/dexopt/baseline.prof at build time, and
+# androidx.profileinstaller copies it into place on first run. ART then
+# AOT-compiles the matched code instead of discovering it at runtime, which is
+# where the cold-start and first-frame jank in a Compose + ExoPlayer app comes
+# from.
+#
+# Rule syntax: [FLAGS][CLASS_DESCRIPTOR]->[METHOD_SIGNATURE]
+#   H = hot (called often)   S = startup   P = post-startup
+# A rule with no `->` is a *class* rule: the class is pre-allocated and loaded
+# eagerly, skipping class loading on the critical path.
+#
+# `**` wildcards are supported in both class descriptors and method signatures,
+# and are used throughout so a rule cannot start failing when a class is renamed
+# or moved. Nothing here names a specific method, so a refactor cannot invalidate
+# a rule.
+#
+# ---------------------------------------------------------------------------
+# S = on the startup critical path, before the first frame is drawn
+# ---------------------------------------------------------------------------
+HSPLcom/example/MainActivity;->**(**)**
+HSPLcom/example/kurdishtv/viewmodel/TvViewModel;->**(**)**
+HSPLcom/example/kurdishtv/viewmodel/SettingsViewModel;->**(**)**
+Lcom/example/kurdishtv/viewmodel/TvViewModel$Factory;
+Lcom/example/kurdishtv/viewmodel/SettingsViewModel$Factory;
+
+# The repository graph is constructed on the main thread during onCreate, and
+# the catalogue is built lazily the first time the UI state is created.
+HSPLcom/example/kurdishtv/repository/TvRepository;->**(**)**
+HSPLcom/example/kurdishtv/model/KurdishChannelCatalog;->**(**)**
+Lcom/example/kurdishtv/model/KurdishChannelCatalog;
+
+# Storage, theme and navigation all run before the first frame.
+HSPLcom/example/kurdishtv/data/ChannelCacheStorage;->**(**)**
+HSPLcom/example/kurdishtv/data/FavoriteStorage;->**(**)**
+HSPLcom/example/kurdishtv/data/SettingsStorage;->**(**)**
+HSPLcom/example/ui/theme/**;->**(**)**
+HSPLcom/example/kurdishtv/ui/theme/**;->**(**)**
+HSPLcom/example/kurdishtv/ui/navigation/**;->**(**)**
+HSPLandroidx/navigation/**;->**(**)**
+HSPLandroidx/activity/**;->**(**)**
+HSPLandroidx/lifecycle/**;->**(**)**
+HSPLandroidx/compose/runtime/**;->**(**)**
+HSPLandroidx/compose/ui/**;->**(**)**
+HSPLandroidx/compose/material3/**;->**(**)**
+HSPLandroidx/compose/foundation/**;->**(**)**
+Landroidx/compose/runtime/ComposerImpl;
+Landroidx/compose/runtime/CompositionImpl;
+Landroidx/compose/ui/node/LayoutNode;
+
+# ---------------------------------------------------------------------------
+# H = hot. Reached constantly once browsing, but not on the launch path.
+# ---------------------------------------------------------------------------
+# Parsing and filtering run over the whole merged catalogue, which can exceed a
+# thousand channels, on every refresh and every search keystroke.
+HSPLcom/example/kurdishtv/parser/KurdishTvParser;->**(**)**
+HSPLcom/example/kurdishtv/model/ChannelFilterEngine;->**(**)**
+HSPLcom/example/kurdishtv/data/RecentStorage;->**(**)**
+HSPLcom/example/kurdishtv/data/CustomPlaylistStorage;->**(**)**
+
+# Compose recomposition and layout for a grid holding several hundred cards.
+HSPLandroidx/compose/ui/node/**;->**(**)**
+HSPLandroidx/compose/foundation/layout/**;->**(**)**
+HSPLandroidx/compose/animation/**;->**(**)**
+HSPLandroidx/compose/ui/graphics/**;->**(**)**
+HSPLandroidx/compose/ui/text/**;->**(**)**
+HSPLandroidx/compose/ui/util/**;->**(**)**
+HSPLandroidx/collection/**;->**(**)**
+HSPLkotlinx/coroutines/**;->**(**)**
+HSPLkotlin/**;->**(**)**
+Lkotlin/coroutines/jobs/JobSupport;
+Lkotlin/coroutines/ContinuationImpl;
+
+# Playback and networking. The media client and OkHttp types are the ones the
+# player constructs during its first frame, so they are startup-adjacent too.
+HSPLcom/example/kurdishtv/network/**;->**(**)**
+HSPLcom/example/kurdishtv/ui/player/**;->**(**)**
+HSPLcom/example/kurdishtv/ui/components/**;->**(**)**
+HSPLcom/example/kurdishtv/ui/motion/**;->**(**)**
+HSPLandroidx/media3/**;->**(**)**
+HSPLokhttp3/**;->**(**)**
+HSPLokio/**;->**(**)**
+HSPLcoil/**;->**(**)**
+HSPLorg/json/**;->**(**)**
+Lcom/example/kurdishtv/network/NetworkClient;
+Lcom/example/kurdishtv/ui/player/VideoPlayerViewKt;
