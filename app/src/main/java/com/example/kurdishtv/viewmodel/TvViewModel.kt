@@ -375,7 +375,17 @@ class TvViewModel(
                 ChannelFilterEngine.filter(state.channels, state.selectedCategory, query)
             }
             _uiState.update { current ->
-                if (current.searchQuery != query) current
+                // The query is not the only thing that can have moved. A merge
+                // landing during the filter replaces `channels` with a different
+                // list, and publishing a result derived from the *old* one would
+                // leave the grid showing channels that are no longer in the
+                // catalogue — the search would silently answer a question about
+                // a list that had already been replaced.
+                //
+                // Identity, not equality: a re-merge produces a new object even
+                // when it holds the same channels, and in that case the merge's
+                // own filter pass is what should be published, not this one.
+                if (current.searchQuery != query || current.channels !== state.channels) current
                 else current.copy(filteredChannels = filtered)
             }
         }
@@ -403,15 +413,18 @@ class TvViewModel(
             val filtered = withContext(Dispatchers.Default) {
                 ChannelFilterEngine.filter(state.channels, category, state.searchQuery)
             }
-            // Only publish if this is still the newest request: same category, and
-            // the query that was in force when this pass started. The guard used to
-            // be inverted — it published when the world HAD moved — so a slower,
-            // older pass could land after a newer one and overwrite the newer
-            // category with its own, leaving the grid showing the wrong tab. A query
-            // that moved is the search job's to publish, not this one's.
+            // Only publish if this is still the newest request: same category, the
+            // query that was in force when this pass started, and the same channel
+            // list the pass was computed from. The guard used to be inverted — it
+            // published when the world HAD moved — so a slower, older pass could
+            // land after a newer one and overwrite the newer category with its own,
+            // leaving the grid showing the wrong tab. A query that moved is the
+            // search job's to publish, not this one's, and a catalogue that moved is
+            // the merge's.
             _uiState.update { current ->
                 if (current.selectedCategory == category &&
-                    current.searchQuery == state.searchQuery
+                    current.searchQuery == state.searchQuery &&
+                    current.channels === state.channels
                 ) {
                     current.copy(filteredChannels = filtered)
                 } else {

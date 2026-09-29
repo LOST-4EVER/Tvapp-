@@ -117,6 +117,9 @@ fun KurdishTvNavGraph(
                 onNumericBackspace = { viewModel.onNumericBackspace() },
                 onNumericCommit = { viewModel.commitChannelJump() },
                 onNumericCancel = { viewModel.cancelChannelJump() },
+                // The import snackbar clears its own message once shown, so the same
+                // text can be shown again. See `onImportMessageShown`.
+                onImportMessageShown = { viewModel.clearImportMessage() },
                 modifier = insetModifier
             )
         }

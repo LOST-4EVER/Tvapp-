@@ -63,19 +63,30 @@ fun CategoryBar(
     // Computing the counts from the live list means a tab disappears when it has
     // no content and reappears as soon as an imported playlist supplies some —
     // which is also why the current selection is preserved if it still matches.
-    val counts = remember(channels) {
-        if (channels.isEmpty()) {
-            // Before the list has loaded, show everything rather than flickering
-            // tabs in and out as the merge completes.
-            null
-        } else {
-            // One pass over the list, not one pass per category. Asking
-            // `filter(channels, category, "")` for each category in turn meant
-            // reading every channel twelve times and allocating twelve result lists,
-            // and it re-ran on every change to the channel list — which is to say, on
-            // every favourite toggle, for a number nobody looks at changing.
-            ChannelFilterEngine.countsByCategory(channels)
-        }
+    // Not wrapped in `remember(channels)`.
+    //
+    // `remember` compares its key with `equals`, and a `List<Channel>` of several
+    // hundred nine-field data classes is compared field by field — on every
+    // recomposition of this bar, which is the browse screen's permanent chrome, so
+    // on every keystroke of the search field. That is several hundred deep
+    // comparisons per character typed, to decide whether a list that had not
+    // changed had changed.
+    //
+    // [ChannelFilterEngine.countsByCategory] memoises by list *identity*, which is
+    // both the cheap test and the correct one: a merge, a favourite rebuild or a
+    // re-filter all replace the list wholesale, so a new object is exactly the
+    // signal that the counts are stale.
+    val counts = if (channels.isEmpty()) {
+        // Before the list has loaded, show everything rather than flickering
+        // tabs in and out as the merge completes.
+        null
+    } else {
+        // One pass over the list, not one pass per category. Asking
+        // `filter(channels, category, "")` for each category in turn meant
+        // reading every channel twelve times and allocating twelve result lists,
+        // and it re-ran on every change to the channel list — which is to say, on
+        // every favourite toggle, for a number nobody looks at changing.
+        ChannelFilterEngine.countsByCategory(channels)
     }
     // Keyed on the selection as well as the counts. The fallback below depends on
     // both, and keying only on `counts` meant that moving the selection to a category

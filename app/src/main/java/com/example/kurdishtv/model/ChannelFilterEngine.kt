@@ -122,8 +122,40 @@ object ChannelFilterEngine {
      * list, which includes every favourite toggle. One pass, one set of counters.
      *
      * `ALL` is the size of the list, so it is filled in without being tested.
+     *
+     * Memoised by list identity, for the same reason [searchKeysFor] memoises its
+     * keys. The single caller keys its `remember` on the channel list itself, and
+     * `remember` compares keys with `equals` — which for a list of several hundred
+     * data classes is a field-by-field comparison of every one of them, on every
+     * recomposition of the category bar. That bar sits in the browse screen's
+     * permanent chrome, so this ran on every keystroke of the search field, on a
+     * list that had not changed: several hundred nine-field comparisons to answer
+     * "is this the same list I already counted".
+     *
+     * Identity is the right test, not equality. The list is replaced wholesale by
+     * a merge, a favourite rebuild or a filter pass, so a *different* list object
+     * is exactly the signal that the counts are stale — and a fresh object holding
+     * identical channels cannot be distinguished from a changed one by equality
+     * without paying for it.
      */
     fun countsByCategory(channels: List<Channel>): Map<CategoryFilter, Int> {
+        countCache?.get()?.let { cached ->
+            if (cached.source === channels) return cached.counts
+        }
+        val computed = computeCounts(channels)
+        countCache = WeakReference(CountCache(channels, computed))
+        return computed
+    }
+
+    private class CountCache(
+        val source: List<Channel>,
+        val counts: Map<CategoryFilter, Int>
+    )
+
+    @Volatile
+    private var countCache: WeakReference<CountCache>? = null
+
+    private fun computeCounts(channels: List<Channel>): Map<CategoryFilter, Int> {
         val counts = IntArray(CategoryFilter.entries.size)
         counts[CategoryFilter.ALL.ordinal] = channels.size
 
