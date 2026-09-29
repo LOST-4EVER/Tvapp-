@@ -45,6 +45,20 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     more than it looks: all four sources are fetched concurrently and tend to
     fail together, so a backoff without it would have them all retry in lockstep
     against the same origin at the same instant.
+- **A partial refresh can no longer overwrite a good cache.** The retry above
+  makes a source failing much less likely, but not impossible — and a refresh
+  that lost a source used to write the smaller list to disk regardless. Because
+  the cache is then treated as current for thirty minutes, that turned a
+  two-second network blip into half an hour of missing channels, with no
+  subsequent launch even attempting a refetch. A merge that would shrink the
+  catalogue no longer replaces it.
+  - The trade is accepted knowingly in the other direction: remove a custom
+    playlist and its channels linger in the cache until it expires. That is the
+    right way round — a few extra channels that stop appearing after one interval
+    is a far smaller harm than hundreds that vanish and stay vanished.
+  - The rule is a single comparison, which is exactly why it has a test. A
+    predicate that small gets "tidied" — inverted, changed to `>` — and nothing
+    else in the build would notice.
 - **`scripts/audit_streams.py`, and `./gradlew auditStreams`.** Walks every
   catalogue stream the full way down to media bytes — master, then the
   highest-bandwidth variant, then an actual segment — and requires real container

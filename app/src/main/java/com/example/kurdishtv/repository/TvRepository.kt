@@ -22,6 +22,31 @@ import okhttp3.Request
 import kotlin.random.Random
 
 /**
+ * Whether a freshly merged list should replace what is already on disk.
+ *
+ * A refresh that produces *fewer* channels than the cache almost always means
+ * some source failed rather than that the catalogue genuinely shrank. The
+ * bundled offline catalogue is a floor, so a merge can only get this small by
+ * losing a remote source — and a lost source is a temporary condition, while
+ * the cache is treated as current for [TvRepository.CACHE_FRESH_MS].
+ *
+ * Writing it anyway is how one bad refresh becomes thirty minutes of missing
+ * channels: the gap is written to disk, the next cold start reads the cache as
+ * fresh, and nothing prompts a refetch. The viewer sees a smaller grid and no
+ * way to tell that a transient network blip did it.
+ *
+ * The trade is accepted in the other direction too: if a viewer removes a custom
+ * playlist, its channels linger in the cache until it expires. That is the
+ * right way round — a few extra channels that stop appearing after one interval
+ * is a far smaller harm than hundreds that vanish and stay vanished.
+ *
+ * Pinned by [com.example.CachePolicyTest] so the comparison cannot be silently
+ * inverted, which is the one way this could be edited into the bug it prevents.
+ */
+internal fun shouldReplaceCache(mergedSize: Int, cachedSize: Int): Boolean =
+    mergedSize >= cachedSize
+
+/**
  * What [TvRepository.getInstantInitialChannels] produced, and where it came from.
  *
  * A named pair rather than a bare list because the caller has to act on the second
@@ -215,7 +240,21 @@ class TvRepository(
             // cancelled the instant `withContext` returns, because the Job in
             // `currentCoroutineContext()` there is the `withContext` block's own.
             // The write has to finish inside this block, or be given a real owner.
-            channelCacheStorage.saveChannels(channelsWithFavs)
+            //
+            // Guarded against a partial merge overwriting a good cache. The retry
+            // above makes a source failing much less likely, but it does not make
+            // it impossible, and the cost of getting this wrong is thirty minutes
+            // of missing channels that no subsequent launch will even try to
+            // replace — see [shouldReplaceCache].
+            val cachedCount = channelCacheStorage.getCachedChannels()?.size ?: 0
+            if (shouldReplaceCache(channelsWithFavs.size, cachedCount)) {
+                channelCacheStorage.saveChannels(channelsWithFavs)
+            } else {
+                NetworkClient.logDebug(
+                    "Merge shrank the catalogue ($cachedCount -> ${channelsWithFavs.size}); " +
+                        "keeping the richer cache."
+                )
+            }
 
             Result.success(channelsWithFavs)
         }
