@@ -1,5 +1,6 @@
 package com.example.kurdishtv.ui.screens
 
+import android.os.SystemClock
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +55,9 @@ import com.example.kurdishtv.ui.components.SearchBarM3
 import com.example.kurdishtv.ui.components.SidePlayerPane
 import com.example.kurdishtv.ui.components.TopHeaderBar
 import com.example.kurdishtv.ui.components.verticalEdgeFade
+import com.example.kurdishtv.ui.keys.RemoteGridIndex
+import com.example.kurdishtv.ui.keys.RemoteKeyPolicy.acceptsChannelStep
+import com.example.kurdishtv.ui.keys.RemoteKeyPolicy.isAutoRepeat
 import com.example.kurdishtv.ui.motion.rememberTvFocusRequester
 import com.example.kurdishtv.viewmodel.ChannelJump
 import com.example.kurdishtv.viewmodel.TvUiState
@@ -184,6 +188,32 @@ fun MainTvScreen(
         )
     }
 
+    // When CH+ or CH- last stepped the selection, for the held-key rate limit; null
+    // until it has. Plain remembered state rather than saved: it describes *this*
+    // visit, and restoring a timestamp across a trip to the player would suppress the
+    // first press on the way back.
+    var lastChannelStepAt by remember { mutableStateOf<Long?>(null) }
+
+    // CH+/CH- with the two things a held key gets wrong handled here rather than in
+    // the event handler: the rate limit, and throwing away a half-typed number before
+    // stepping away from it.
+    //
+    // Returns whether the step was taken, so a dropped repeat is still consumed by
+    // the caller rather than falling through to whatever was focused.
+    val stepChannelFromRemote: (Int, Boolean) -> Boolean = { delta, isRepeat ->
+        val now = SystemClock.uptimeMillis()
+        if (isRepeat && !acceptsChannelStep(now, lastChannelStepAt)) {
+            return@stepChannelFromRemote false
+        }
+        lastChannelStepAt = now
+        // The number on screen names a position in the list. Stepping away from it
+        // and leaving it up means the idle timer commits a channel the viewer
+        // deliberately navigated past, a second and a half after they stopped.
+        if (channelJump != null) onNumericCancel()
+        onStepChannel(delta)
+        true
+    }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -195,42 +225,81 @@ fun MainTvScreen(
             // grid and counting. Digits build a channel number, and the number is a
             // position in the list on screen — the same list the sidebar numbers.
             //
-            // Only Key *Down* is handled. Key Up is the same physical press reported
-            // again, and acting on both would enter every digit twice.
+            // Key Up is ignored for the obvious reason: it is the same physical press
+            // reported again, and acting on both would enter every digit twice.
+            //
+            // Key Up is *not* what stops a held key, though, and treating it as if it
+            // were is the bug this used to have. Auto-repeat is delivered as a stream
+            // of **extra Key Down events** with a growing `repeatCount`, so holding
+            // `4` typed `4444` and landed the viewer on a channel they had never
+            // asked for — the four-digit cap in the view model quietly truncated the
+            // damage instead of preventing it. The two kinds of key want opposite
+            // treatment, and `RemoteKeyPolicy` is where that is written down: a key
+            // that builds a value ignores repeats, a key that moves a selection
+            // accepts them at a rate a person can follow.
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                // A viewer typing a search gets their digits.
-                if (searchFieldFocused) return@onKeyEvent false
+                // A viewer typing a search gets their digits, and a viewer typing a
+                // playlist URL gets them too. The dialog is its own window on Android
+                // and takes its own keys, but the number pad is answered here and
+                // "the dialog is open" is a far more honest guard than relying on
+                // window boundaries that differ by platform version.
+                if (searchFieldFocused || showImportDialog) return@onKeyEvent false
+                // `repeatCount` is the platform's own auto-repeat counter: 0 on the
+                // initial press, growing for as long as the key is held.
+                val repeat = event.nativeKeyEvent.repeatCount
                 when (event.key) {
                     // `NumPad*` is a separate set of key codes on Android, and
                     // several remotes send the keypad codes rather than the main
                     // ones, so both have to be accepted.
-                    Key.Zero, Key.NumPad0 -> { onNumericKey(0); true }
-                    Key.One, Key.NumPad1 -> { onNumericKey(1); true }
-                    Key.Two, Key.NumPad2 -> { onNumericKey(2); true }
-                    Key.Three, Key.NumPad3 -> { onNumericKey(3); true }
-                    Key.Four, Key.NumPad4 -> { onNumericKey(4); true }
-                    Key.Five, Key.NumPad5 -> { onNumericKey(5); true }
-                    Key.Six, Key.NumPad6 -> { onNumericKey(6); true }
-                    Key.Seven, Key.NumPad7 -> { onNumericKey(7); true }
-                    Key.Eight, Key.NumPad8 -> { onNumericKey(8); true }
-                    Key.Nine, Key.NumPad9 -> { onNumericKey(9); true }
+                    //
+                    // A digit builds a number, so a repeat would build a number
+                    // nobody asked for. The check is on the event rather than on the
+                    // key, so the keypad codes are covered by the same one.
+                    Key.Zero, Key.NumPad0 -> { if (!isAutoRepeat(repeat)) onNumericKey(0); true }
+                    Key.One, Key.NumPad1 -> { if (!isAutoRepeat(repeat)) onNumericKey(1); true }
+                    Key.Two, Key.NumPad2 -> { if (!isAutoRepeat(repeat)) onNumericKey(2); true }
+                    Key.Three, Key.NumPad3 -> { if (!isAutoRepeat(repeat)) onNumericKey(3); true }
+                    Key.Four, Key.NumPad4 -> { if (!isAutoRepeat(repeat)) onNumericKey(4); true }
+                    Key.Five, Key.NumPad5 -> { if (!isAutoRepeat(repeat)) onNumericKey(5); true }
+                    Key.Six, Key.NumPad6 -> { if (!isAutoRepeat(repeat)) onNumericKey(6); true }
+                    Key.Seven, Key.NumPad7 -> { if (!isAutoRepeat(repeat)) onNumericKey(7); true }
+                    Key.Eight, Key.NumPad8 -> { if (!isAutoRepeat(repeat)) onNumericKey(8); true }
+                    Key.Nine, Key.NumPad9 -> { if (!isAutoRepeat(repeat)) onNumericKey(9); true }
                     // The dedicated channel keys, which most television remotes
                     // carry and every one of which was ignored. They step the
                     // selection through the list on screen.
-                    Key.ChannelUp -> { onStepChannel(1); true }
-                    Key.ChannelDown -> { onStepChannel(-1); true }
+                    //
+                    // This is the one key here where holding it down is the point: a
+                    // viewer with six hundred channels and no pointer scrolls by
+                    // holding CH+. So repeats are allowed — at a rate a person can
+                    // follow, and the first press is always taken.
+                    Key.ChannelUp -> stepChannelFromRemote(1, isAutoRepeat(repeat))
+                    Key.ChannelDown -> stepChannelFromRemote(-1, isAutoRepeat(repeat))
                     // Commit early rather than waiting out the idle timer. Only while
-                    // a number is up, so OK still reaches the card it is on.
+                    // a number is up, so OK still reaches the card it is on — and only
+                    // on the first press, so leaning on OK does not commit a number
+                    // that is still being typed.
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter ->
-                        if (channelJump != null) { onNumericCommit(); true } else false
+                        if (channelJump != null) {
+                            if (!isAutoRepeat(repeat)) onNumericCommit()
+                            true
+                        } else false
                     Key.Backspace ->
-                        if (channelJump != null) { onNumericBackspace(); true } else false
+                        if (channelJump != null) {
+                            // One press, one digit: a held backspace used to clear
+                            // the whole number at once.
+                            if (!isAutoRepeat(repeat)) onNumericBackspace()
+                            true
+                        } else false
                     // Back cancels the number, and only the number. With nothing
                     // being typed it is not consumed at all, so the system back
                     // gesture still leaves the app as it always did.
                     Key.Back, Key.Escape ->
-                        if (channelJump != null) { onNumericCancel(); true } else false
+                        if (channelJump != null) {
+                            if (!isAutoRepeat(repeat)) onNumericCancel()
+                            true
+                        } else false
                     else -> false
                 }
             }
@@ -708,6 +777,26 @@ private fun ChannelGrid(
 
     val firstChannelId = filtered.firstOrNull()?.id
 
+    // The channel the hero card shows, and how many full-width sections sit above the
+    // channel cells.
+    //
+    // Hoisted out of the grid body because the scroll arithmetic below needs them: a
+    // `LazyVerticalGrid` counts *items*, and on the home tab the first two items are
+    // the recents row and the hero — not channels. So channel *n* is grid item
+    // `n + leadingSectionCount`, and a `scrollToItem` that used the index into
+    // `filtered` directly scrolled to the wrong place by one or two rows.
+    val heroChannel = uiState.selectedChannel ?: filtered.firstOrNull()
+    val leadingSectionCount = RemoteGridIndex.leadingSectionCount(
+        hasRecentsSection = isHome && uiState.recentChannels.isNotEmpty(),
+        hasHeroSection = isHome && heroChannel != null
+    )
+
+    // The grid item index of a channel id, or null when it is not in the list on show.
+    fun gridIndexOf(channelId: String): Int? {
+        val index = filtered.indexOfFirst { it.id == channelId }
+        return RemoteGridIndex.itemIndexOf(index, filtered.size, leadingSectionCount)
+    }
+
     LaunchedEffect(focusToken, firstChannelId) {
         if (firstChannelId == null) return@LaunchedEffect
         val restored = lastFocusedId?.takeIf { id -> filtered.any { it.id == id } }
@@ -739,14 +828,26 @@ private fun ChannelGrid(
         val anchor = focusAnchorId ?: return@LaunchedEffect
         // Getting the anchor into the tree is this effect's problem, not the focus
         // system's: a lazy grid does not compose a card that is scrolled a long way off
-        // screen, and `requestFocus` can only target a node that exists. That is the
-        // case this guards — the anchor has fallen back to the first card while the
-        // list is still scrolled — and it is checked against the scroll position rather
-        // than against the outcome of the request, because a request that finds nothing
-        // fails silently rather than reporting it.
-        val recovering = anchor == firstChannelId && gridState.firstVisibleItemIndex > 0
-        if (recovering) {
-            runCatching { gridState.scrollToItem(0) }
+        // screen, and `requestFocus` can only target a node that exists — failing
+        // *silently*, with no error and no effect, when it does not.
+        //
+        // So the anchor is scrolled to whenever it is not already on screen, rather
+        // than only in the one case where it happens to be the first channel while the
+        // list is scrolled. That narrower check missed the case that actually happens
+        // most: `rememberLazyGridState` is not saved state, so a grid scrolled down to
+        // channel 300 comes back from the player at the top, and the restored anchor is
+        // nowhere near the viewport. `requestFocus` then quietly did nothing, and the
+        // viewer returned to a screen where the remote did nothing at all — the exact
+        // dead end this whole arrangement exists to prevent.
+        //
+        // Asked of the laid-out items rather than of the scroll position, because that
+        // is the thing that decides whether the request can succeed.
+        val target = gridIndexOf(anchor)
+        if (target != null) {
+            val onScreen = gridState.layoutInfo.visibleItemsInfo.any { it.key == anchor }
+            if (!onScreen) {
+                runCatching { gridState.scrollToItem(target) }
+            }
         }
         withFrameNanos { }
         runCatching { gridFocus.requestFocus() }
@@ -761,13 +862,12 @@ private fun ChannelGrid(
     // `focusAnchorId` effect does the requesting.
     LaunchedEffect(focusChannelId) {
         val id = focusChannelId ?: return@LaunchedEffect
-        val index = filtered.indexOfFirst { it.id == id }
-        if (index < 0) return@LaunchedEffect
+        val target = gridIndexOf(id) ?: return@LaunchedEffect
         lastFocusedId = id
         // This grid is taking focus deliberately, so it must not be treated as a
         // screen that has never placed it and re-anchored somewhere else.
         focusPlaced = true
-        runCatching { gridState.scrollToItem(index) }
+        runCatching { gridState.scrollToItem(target) }
         withFrameNanos { }
         focusAnchorId = id
     }
@@ -790,8 +890,6 @@ private fun ChannelGrid(
                 background = colors.background
             )
     ) {
-        val heroChannel = uiState.selectedChannel ?: filtered.firstOrNull()
-
         // Recents come first when they exist.
         //
         // The hero was unconditionally above everything, which meant that for anyone

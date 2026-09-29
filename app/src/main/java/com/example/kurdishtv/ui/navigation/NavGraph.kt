@@ -154,7 +154,19 @@ fun KurdishTvNavGraph(
                     onColorFilterChange = { filter ->
                         settingsViewModel.updatePlayerPreferences(videoColorFilter = filter)
                     },
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { navController.popBackStack() },
+                    // The number pad on the player.
+                    //
+                    // A viewer watching live television changes channel by typing its
+                    // number, and until now the only way to do that was Back, then hunt
+                    // through the grid. It is the same jump the browse screen already
+                    // runs — same number, same list, same overlay — so it is wired to
+                    // the same view model calls rather than reimplemented.
+                    channelJump = channelJump,
+                    onNumericKey = { digit -> viewModel.onNumericKey(digit) },
+                    onNumericCommit = { viewModel.commitChannelJump() },
+                    onNumericBackspace = { viewModel.onNumericBackspace() },
+                    onNumericCancel = { viewModel.cancelChannelJump() }
                 )
             }
         }
