@@ -17,11 +17,6 @@ enum class ThemeMode(val displayName: String) {
     AMOLED("AMOLED Black")
 }
 
-enum class MotionLevel(val displayName: String) {
-    FULL("Expressive"),
-    REDUCED("Reduced")
-}
-
 /**
  * Which of the app's two layout families to present.
  *
@@ -62,7 +57,6 @@ enum class DeviceMode(val displayName: String) {
 data class AppSettings(
     val accent: AccentColor = AccentColor.SUN_GOLD,
     val themeMode: ThemeMode = ThemeMode.DARK,
-    val motion: MotionLevel = MotionLevel.FULL,
     /**
      * Which layout family to present. [DeviceMode.AUTO] follows the device; the other
      * two override it. Resolved into `LocalIsTv` by the theme layer, which is the only
@@ -74,7 +68,6 @@ data class AppSettings(
     val autoplay: Boolean = true,
     val showLogos: Boolean = true,
     val autoHideControls: Boolean = true,
-    val livePulse: Boolean = true,
     /**
      * Material You: derive accent colors from the device wallpaper palette.
      * Requires Android 12+ (API 31); ignored on older releases.
@@ -93,6 +86,5 @@ data class AppSettings(
     /** The video colour correction last chosen in the player, for the same reason. */
     val videoColorFilter: VideoColorFilter = VideoColorFilter.None
 ) {
-    val reduceMotion: Boolean get() = motion == MotionLevel.REDUCED
     val isAmoled: Boolean get() = themeMode == ThemeMode.AMOLED
 }

@@ -36,7 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
-import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoPlayerView
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
@@ -114,7 +114,7 @@ fun SidePlayerPane(
                     color = colors.glass,
                     modifier = Modifier
                         .size(36.dp)
-                        .bouncyClickable { onFavoriteToggle(channel.id) }
+                        .tvClickable { onFavoriteToggle(channel.id) }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         SvgIcon(

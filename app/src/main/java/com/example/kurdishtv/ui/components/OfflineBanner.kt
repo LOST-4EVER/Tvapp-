@@ -1,8 +1,5 @@
 package com.example.kurdishtv.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -20,7 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -32,14 +29,18 @@ fun OfflineBanner(
 ) {
     val colors = LocalAppColors.current
 
-    AnimatedVisibility(
-        visible = isOffline,
-        enter = expandVertically(),
-        exit = shrinkVertically(),
-        modifier = modifier.fillMaxWidth()
-    ) {
+    // Shown or not shown, with nothing in between.
+    //
+    // This was an `AnimatedVisibility` that expanded and shrank vertically, so the
+    // grid below it was measured twice per state change and slid as the banner came
+    // and went. A banner that arrives by pushing the content below it down is fine;
+    // one that arrives by *growing into* the space is the thing that reads as a
+    // layout fault, and on a television it is also the only animation on the screen
+    // when the network drops mid-film.
+    if (!isOffline) return
+
         Row(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
                 .background(colors.liveRed)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -68,7 +69,7 @@ fun OfflineBanner(
             Surface(
                 shape = M3ExpressiveShapes.Pill,
                 color = Color.White.copy(alpha = 0.25f),
-                modifier = Modifier.bouncyClickable { onRetry() }
+                modifier = Modifier.tvClickable { onRetry() }
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -90,5 +91,4 @@ fun OfflineBanner(
                 }
             }
         }
-    }
 }

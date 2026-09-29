@@ -39,9 +39,9 @@ import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
-import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.expressiveFocusRing
-import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import androidx.compose.ui.graphics.Shape
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -67,34 +67,27 @@ fun FeaturedHeroCard(
     // Fixed dp radii are safe here and nowhere else in the app: the hero is a
     // full-width card roughly 180dp tall on every layout, so even the widest radius
     // in play stays well inside half its short side.
-    val heroShape = rememberMorphingCorners(
-        rest = M3ExpressiveShapes.Corners.extraLarge,
-        active = M3ExpressiveShapes.Corners.extraLarge.copy(
-            topStart = 42.dp, topEnd = 22.dp, bottomEnd = 42.dp, bottomStart = 22.dp
-        ),
-        isActive = isFocused,
-        spec = ExpressiveMotion.spatialDefault
-    )
-    val logoShape = rememberMorphingCorners(
-        rest = ShapeMorph.logoRest,
-        active = ShapeMorph.logoActive,
-        isActive = isFocused,
-        spec = ExpressiveMotion.spatialDefault
-    )
+    // A fixed radius. The hero's outline used to squash on the vertical axis as it
+    // took focus — 42dp at the ends, 22dp at the top and bottom — which read as a
+    // lens rather than a card. It is a full-width surface roughly 180dp tall, so
+    // every radius in play stays well inside half its short side.
+    val heroShape: Shape = M3ExpressiveShapes.Corners.extraLarge.toShape()
+    val logoShape: Shape = ShapeMorph.logoRest.toShape()
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             // One focus target: the click's own, watched by the ring below.
-            // `liftOnFocus = false` because the ring draws the lift too.
-            .bouncyClickable(
-                scaleDown = 0.97f,
+            .tvClickable(
                 interactionSource = focusSource,
-                liftOnFocus = false
-            ) { onWatchClick(channel) }
+                pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                pressedShape = heroShape,
+                onClick = { onWatchClick(channel) }
+            )
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = focusSource,
+                scrim = colors.background,
                 restShape = M3ExpressivePolygons.Square,
                 // The same ring the cards and the rail use. The hero had its own
                 // `SoftBurst`, so the two surfaces you are most likely to move
@@ -103,11 +96,13 @@ fun FeaturedHeroCard(
                 // largest surface in the app, where it crosses the LIVE badge and
                 // the logo.
                 ringShape = ShapeMorph.focusRing,
-                focusScale = 1.02f,
-                ringWidth = 3.dp,
                 onFocusChanged = { isFocused = it }
             )
-            .border(1.dp, colors.border, heroShape),
+            .border(
+                width = if (isFocused) 0.dp else 1.dp,
+                color = colors.border,
+                shape = heroShape
+            ),
         shape = heroShape,
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)

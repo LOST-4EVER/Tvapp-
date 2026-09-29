@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.kurdishtv.data.ChannelCacheStorage
@@ -16,10 +15,6 @@ import com.example.kurdishtv.data.SettingsStorage
 import com.example.kurdishtv.network.NetworkClient
 import com.example.kurdishtv.network.NetworkMonitor
 import com.example.kurdishtv.repository.TvRepository
-import com.example.kurdishtv.ui.motion.LocalFocusRotation
-import com.example.kurdishtv.ui.motion.LocalLivePulse
-import com.example.kurdishtv.ui.motion.rememberFocusRotation
-import com.example.kurdishtv.ui.motion.rememberLivePulse
 import com.example.kurdishtv.ui.navigation.KurdishTvNavGraph
 import com.example.kurdishtv.update.UpdateChecker
 import com.example.kurdishtv.viewmodel.SettingsViewModel
@@ -74,21 +69,19 @@ class MainActivity : ComponentActivity() {
             val settings by settingsViewModel.settings.collectAsState()
 
             KurdishTvTheme(settings = settings) {
-                // One shared pulse drives every LIVE badge in the app.
-                val livePulse = rememberLivePulse(settings.livePulse && !settings.reduceMotion)
-                // ...and one shared turn drives every focus ring. Both are continuous
-                // animations over a surface that can hold hundreds of elements, so the
-                // number of running frame loops must not scale with what is on screen.
-                val focusRotation = rememberFocusRotation(!settings.reduceMotion)
-                CompositionLocalProvider(
-                    LocalLivePulse provides livePulse,
-                    LocalFocusRotation provides focusRotation
-                ) {
-                    KurdishTvNavGraph(
-                        viewModel = viewModel,
-                        settingsViewModel = settingsViewModel
-                    )
-                }
+                // No frame loops here any more.
+                //
+                // This used to stand up two of them for the whole life of the
+                // process: a shared `withFrameNanos` loop breathing every LIVE badge
+                // on screen, and another slowly turning every focus ring. Both were
+                // correctly demand-driven — they stopped when nothing was reading
+                // them and when the app left the foreground — and both were still
+                // there, which is the point: the demand was never the problem, the
+                // animation was.
+                KurdishTvNavGraph(
+                    viewModel = viewModel,
+                    settingsViewModel = settingsViewModel
+                )
             }
         }
     }

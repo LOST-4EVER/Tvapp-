@@ -41,11 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
-import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
-import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.expressiveFocusRing
-import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
@@ -111,18 +109,12 @@ fun ChannelCard(
     // modulo per card per frame for as long as the grid was on show; it is also what
     // makes `logoWell` below a stable value, so the tile is not re-measured either.
     val accent = remember(channel.name) { monogramAccent(channel.name) }
-    val reduceMotion = LocalReduceMotion.current
 
-    // Focus is tracked here as well as inside the modifier, because the logo well and
-    // the card's corners animate in response to it and the modifier owns the state.
+    // Focus is tracked here as well as inside the modifier, because the card's
+    // background is tinted in response to it and the modifier owns the state.
     var isFocused by remember(channel.id) { mutableStateOf(false) }
 
-    val cardShape = rememberMorphingCorners(
-        rest = M3ExpressiveShapes.Corners.logoTile,
-        active = M3ExpressiveShapes.Corners.cardFocused,
-        isActive = isFocused,
-        spec = ExpressiveMotion.spatialDefault
-    )
+    val cardShape: Shape = M3ExpressiveShapes.Corners.mediumCard.toShape()
 
     Card(
         modifier = modifier
@@ -132,16 +124,12 @@ fun ChannelCard(
             // one focus target on this card and the ring is driven by the same state
             // that the viewer actually lands on. See `expressiveFocusRing`.
             //
-            // `liftOnFocus = false`: the ring below already lifts this node by 1.05
-            // while it is focused. Two lifts on one node multiply, so the card was
-            // jumping 10% instead of the 5% that was asked for.
-            //
             // `onLongClick` is how a remote user reaches the favourite, now that the
             // heart is out of the tab order. See [CardFavoriteButton].
-            .bouncyClickable(
-                scaleDown = 0.94f,
+            .tvClickable(
                 interactionSource = focusSource,
-                liftOnFocus = false,
+                pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                pressedShape = cardShape,
                 onLongClick = onFavoriteToggle
             ) { onClick() }
             // After the click, and that is now the whole story: `clickable` brings the
@@ -160,15 +148,24 @@ fun ChannelCard(
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = focusSource,
+                // The scrim is what replaced the ring's rotation as the thing that
+                // makes focus findable from across a room. A 3dp outline in the
+                // accent is a bigger and higher-contrast mark than the 1dp hairline
+                // this card carries at rest, but on a bright panel a hairline can
+                // still be lost against the logo behind it.
+                scrim = colors.background,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
-                focusScale = 1.05f,
                 onFocusChanged = { focused ->
                     isFocused = focused
                     onFocusChanged(focused)
                 }
             )
-            .border(1.dp, colors.border, cardShape),
+            .border(
+                width = if (isFocused) 0.dp else 1.dp,
+                color = colors.border,
+                shape = cardShape
+            ),
         shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         // Depth comes from the gradient and the logo well below. A Material shadow on a
@@ -215,7 +212,6 @@ fun ChannelCard(
                     accent = accent,
                     showLogos = showLogos,
                     isActive = isFocused,
-                    allowAnimation = !reduceMotion,
                     compact = compact
                 )
 
@@ -302,22 +298,15 @@ private fun ChannelLogoWell(
     accent: Color,
     showLogos: Boolean,
     isActive: Boolean,
-    allowAnimation: Boolean,
     compact: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
 
-    // Built unconditionally and gated on the flag, rather than called from inside a
-    // branch: the composition has to keep the same shape whatever the setting is.
-    val animatedWell = rememberMorphingCorners(
-        rest = ShapeMorph.logoRest,
-        active = ShapeMorph.logoActive,
-        isActive = isActive && allowAnimation,
-        spec = ExpressiveMotion.spatialDefault
-    )
-    val stillWell = M3ExpressiveShapes.LogoTile
-    val wellShape: Shape = if (allowAnimation) animatedWell else stillWell
+    // A fixed rounded square. It used to open from 20dp to 28dp on a spring when the
+    // card took focus; the focus ring around the card is now what marks that, and a
+    // tile whose own outline also changes is two signals competing for one event.
+    val wellShape: Shape = M3ExpressiveShapes.LogoTile
 
     Box(
         modifier = modifier
@@ -414,7 +403,7 @@ internal fun CardFavoriteButton(
             // player uses for a list row's secondary action, and the heart remains a
             // tap target that announces itself and exposes a click action for touch and
             // for a screen reader.
-            .bouncyClickable(focusable = false, onClick = onClick)
+            .tvClickable(focusable = false, onClick = onClick)
     ) {
         Box(contentAlignment = Alignment.Center) {
             SvgIcon(

@@ -20,8 +20,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.CornerScale
-import com.example.kurdishtv.ui.motion.ExpressiveMotion
-import com.example.kurdishtv.ui.motion.rememberMorphingCorners
 import com.example.ui.theme.LocalAppColors
 
 @Composable
@@ -38,22 +36,17 @@ fun SearchBarM3(
     val colors = LocalAppColors.current
     val focusManager = LocalFocusManager.current
 
-    // The field rests as a pill and squares off as it takes focus. A search box that
-    // changes outline is far easier to notice on a television than one that only
-    // recolours its border, and the field holds a placeholder string, so this stays
-    // on the corner scale rather than reaching for a lobed silhouette.
+    // A fixed pill. It used to square off from 26dp to 18dp as the field took focus,
+    // on a spring. A search box that changes outline is easier to notice on a
+    // television than one that only recolours its border — and it still is, because
+    // the border colour changes with it. The outline itself no longer has to move to
+    // make the same point.
+    //
+    // 26dp rather than 28dp: a Material single-line text field is 56dp, so 28dp puts
+    // the four corner arcs exactly on the centre line and renders the pill slightly
+    // pinched at all four corners.
     val focused = remember { mutableStateOf(false) }
-    val fieldShape = rememberMorphingCorners(
-        // Sized off the field's own height rather than picked. A Material single-line
-        // text field is 56dp, so the longest legal radius is 28dp -- exactly the value
-        // this used, which left the four corner arcs meeting precisely on the centre
-        // line and rendered the resting pill slightly pinched at all four corners.
-        // 26dp is the largest radius that stays strictly inside it.
-        rest = CornerScale.uniform(26.dp),
-        active = CornerScale.uniform(18.dp),
-        isActive = focused.value,
-        spec = ExpressiveMotion.spatialDefault
-    )
+    val fieldShape = CornerScale.uniform(26.dp).toShape()
 
     OutlinedTextField(
         value = query,

@@ -53,7 +53,6 @@ import com.example.kurdishtv.model.AccentColor
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.DeviceMode
-import com.example.kurdishtv.model.MotionLevel
 import com.example.kurdishtv.model.ThemeMode
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.SvgIcon
@@ -61,7 +60,7 @@ import com.example.kurdishtv.ui.components.UpdateCard
 import com.example.kurdishtv.ui.components.edgeFade
 import com.example.kurdishtv.update.AppUpdate
 import com.example.kurdishtv.update.UpdateState
-import com.example.kurdishtv.ui.motion.bouncyClickable
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoColorFilter
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
@@ -207,15 +206,6 @@ fun SettingsScreen(
                         onSelect = { filter -> onUpdate { it.copy(videoColorFilter = filter) } }
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SettingsSwitchRow(
-                        iconRes = KurdishTvIcons.LiveTv,
-                        title = "Animated LIVE badge",
-                        subtitle = "Turn off to save battery on large lists",
-                        checked = settings.livePulse,
-                        onCheckedChange = { value -> onUpdate { it.copy(livePulse = value) } },
-                        showDivider = false
-                    )
                 }
             }
 
@@ -287,7 +277,7 @@ fun SettingsScreen(
             item(key = "appearance") {
                 SettingsSection(
                     title = "Appearance",
-                    subtitle = "Colors, theme and motion",
+                    subtitle = "Colors and theme",
                     iconRes = KurdishTvIcons.Tune
                 ) {
                     SectionLabel("Accent color")
@@ -328,15 +318,6 @@ fun SettingsScreen(
                         selected = settings.themeMode,
                         labelOf = { it.displayName },
                         onSelect = { mode -> onUpdate { it.copy(themeMode = mode) } }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SectionLabel("Motion")
-                    SegmentedOptions(
-                        options = MotionLevel.entries,
-                        selected = settings.motion,
-                        labelOf = { it.displayName },
-                        onSelect = { level -> onUpdate { it.copy(motion = level) } }
                     )
                 }
             }
@@ -491,7 +472,7 @@ private fun SettingsHeader(onBack: () -> Unit) {
             modifier = Modifier
                 .size(44.dp)
                 .border(1.dp, colors.border, CircleShape)
-                .bouncyClickable(onClick = onBack)
+                .tvClickable(onClick = onBack)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 SvgIcon(
@@ -632,7 +613,7 @@ private fun AccentSwatchRow(
                                 },
                                 shape = CircleShape
                             )
-                            .bouncyClickable(scaleDown = 0.88f) { onSelect(accent) },
+                            .tvClickable { onSelect(accent) },
                         contentAlignment = Alignment.Center
                     ) {
                         if (isSelected) {
@@ -682,7 +663,7 @@ private fun <T> SegmentedOptions(
                 color = if (isSelected) colors.primary else Color.Transparent,
                 modifier = Modifier
                     .weight(1f)
-                    .bouncyClickable(scaleDown = 0.95f) { onSelect(option) }
+                    .tvClickable { onSelect(option) }
             ) {
                 Text(
                     text = labelOf(option),
@@ -732,7 +713,7 @@ private fun <T> ChipRow(
                         if (isSelected) colors.primary else colors.border,
                         M3ExpressiveShapes.Pill
                     )
-                    .bouncyClickable(scaleDown = 0.92f) { onSelect(option) }
+                    .tvClickable { onSelect(option) }
             ) {
                 Text(
                     text = labelOf(option),
@@ -762,7 +743,7 @@ private fun SettingsSwitchRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .bouncyClickable(scaleDown = 0.98f, enabled = enabled) { onCheckedChange(!checked) }
+                .tvClickable(enabled = enabled) { onCheckedChange(!checked) }
                 .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -833,7 +814,7 @@ private fun SettingsActionRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .bouncyClickable(scaleDown = 0.98f, onClick = onClick)
+                .tvClickable(onClick = onClick)
                 .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

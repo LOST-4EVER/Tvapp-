@@ -1,9 +1,5 @@
 package com.example.kurdishtv.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -14,16 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.kurdishtv.ui.motion.LocalReduceMotion
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.kurdishtv.viewmodel.ChannelJump
 import com.example.ui.theme.LocalAppColors
@@ -49,48 +41,22 @@ fun ChannelNumberOverlay(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
-    val reduceMotion = LocalReduceMotion.current
     val target = jump.target
     val shape = M3ExpressiveShapes.LargeCard
 
-    // Re-armed on every digit, so a number reads as a short run of confirmations
-    // instead of one frozen panel. A single `Animatable` on one composable — not a
-    // frame loop over anything else on screen, and not the permanent rotation the
-    // focus ring uses, which would be the wrong signal for something transient.
+    // The panel used to pop from 0.88 to 1 on a bouncy spring, re-armed on every
+    // digit so `1` then `2` read as two confirmations. It is drawn at full size for
+    // every digit now.
     //
-    // The `snapTo` is what makes "re-armed" true. `animateTo(1f)` on an `Animatable`
-    // that is already at 1f has nothing to do, so without the reset the very first
-    // digit popped and every digit after it silently did nothing — the opposite of
-    // what a viewer typing `12` sees, which is one pop and then a frozen panel while
-    // the readout changes.
-    val pop = remember { Animatable(0.88f) }
-    LaunchedEffect(jump.digits) {
-        pop.snapTo(0.88f)
-        pop.animateTo(
-            targetValue = 1f,
-            // Reduced motion means nothing *moves*. A bouncy pop is the definition
-            // of movement, and this is a panel large enough to see it cross a screen.
-            animationSpec = if (reduceMotion) {
-                snap()
-            } else {
-                spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            }
-        )
-    }
-
+    // The confirmation it gave is still here, just carried by the digits themselves:
+    // they are redrawn at a very large size and the resolved channel name underneath
+    // changes on every keystroke, so the panel visibly answers each press. What is
+    // gone is a 240dp-wide surface crossing the screen on a spring every time.
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .width(240.dp)
-                .graphicsLayer {
-                    scaleX = pop.value
-                    scaleY = pop.value
-                    alpha = pop.value
-                }
                 .clip(shape)
                 .background(colors.glass)
                 .border(1.dp, colors.primary, shape)

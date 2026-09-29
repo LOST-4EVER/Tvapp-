@@ -38,9 +38,8 @@ import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
-import com.example.kurdishtv.ui.motion.bouncyClickable
 import com.example.kurdishtv.ui.motion.expressiveFocusRing
-import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.ui.theme.LocalAppColors
 
@@ -128,15 +127,10 @@ private fun RecentChannelChip(
     val colors = LocalAppColors.current
     var isFocused by remember(channel.id) { mutableStateOf(false) }
 
-    // The chip is ~54dp tall, so half its short side is 27dp. The shared
-    // "cardFocused" radius is 30dp, which made this chip's own corners overlap into
-    // each other the moment it took focus. 20 -> 24dp opens visibly and stays legal.
-    val chipShape = rememberMorphingCorners(
-        rest = CornerScale.uniform(20.dp),
-        active = CornerScale.uniform(24.dp),
-        isActive = isFocused,
-        spec = ExpressiveMotion.spatialFast
-    )
+    // The chip is ~54dp tall, so half its short side is 27dp. 20dp stays well inside
+    // it; the shared "cardFocused" radius of 30dp would have made this chip's own
+    // corners overlap into each other.
+    val chipShape = CornerScale.uniform(20.dp).toShape()
     val tileShape: Shape = remember { RoundedCornerShape(percent = 50) }
     // The click keeps the focus target; the ring observes it. See `expressiveFocusRing`.
     val focusSource = remember { MutableInteractionSource() }
@@ -146,23 +140,25 @@ private fun RecentChannelChip(
         color = colors.surfaceVariant,
         modifier = Modifier
             // One focus target: the click's own, watched by the ring below.
-            // `liftOnFocus = false` because the ring draws the lift too.
-            .bouncyClickable(
-                scaleDown = 0.92f,
+            .tvClickable(
                 interactionSource = focusSource,
-                liftOnFocus = false,
+                pressedFill = colors.primary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                pressedShape = chipShape,
                 onClick = onClick
             )
             .expressiveFocusRing(
                 ringColor = colors.primary,
                 interactionSource = focusSource,
+                scrim = colors.background,
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
-                focusScale = 1.04f,
-                ringWidth = 2.dp,
                 onFocusChanged = { isFocused = it }
             )
-            .border(1.dp, colors.border, chipShape)
+            .border(
+                width = if (isFocused) 0.dp else 1.dp,
+                color = colors.border,
+                shape = chipShape
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),

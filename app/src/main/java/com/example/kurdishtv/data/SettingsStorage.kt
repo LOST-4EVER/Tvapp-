@@ -6,7 +6,6 @@ import com.example.kurdishtv.model.AccentColor
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.DeviceMode
-import com.example.kurdishtv.model.MotionLevel
 import com.example.kurdishtv.model.ThemeMode
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoColorFilter
@@ -21,13 +20,11 @@ class SettingsStorage(context: Context) {
             AppSettings(
                 accent = enumOrDefault(prefs.getString(KEY_ACCENT, null), AccentColor.SUN_GOLD),
                 themeMode = enumOrDefault(prefs.getString(KEY_THEME, null), ThemeMode.DARK),
-                motion = enumOrDefault(prefs.getString(KEY_MOTION, null), MotionLevel.FULL),
                 deviceMode = enumOrDefault(prefs.getString(KEY_DEVICE_MODE, null), DeviceMode.AUTO),
                 startCategory = enumOrDefault(prefs.getString(KEY_START_CATEGORY, null), CategoryFilter.ALL),
                 autoplay = prefs.getBoolean(KEY_AUTOPLAY, true),
                 showLogos = prefs.getBoolean(KEY_SHOW_LOGOS, true),
                 autoHideControls = prefs.getBoolean(KEY_AUTO_HIDE, true),
-                livePulse = prefs.getBoolean(KEY_LIVE_PULSE, true),
                 dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
                 resizeMode = enumOrDefault(prefs.getString(KEY_RESIZE_MODE, null), ResizeMode.FILL),
                 videoColorFilter = enumOrDefault(
@@ -45,13 +42,11 @@ class SettingsStorage(context: Context) {
             prefs.edit()
                 .putString(KEY_ACCENT, settings.accent.name)
                 .putString(KEY_THEME, settings.themeMode.name)
-                .putString(KEY_MOTION, settings.motion.name)
                 .putString(KEY_DEVICE_MODE, settings.deviceMode.name)
                 .putString(KEY_START_CATEGORY, settings.startCategory.name)
                 .putBoolean(KEY_AUTOPLAY, settings.autoplay)
                 .putBoolean(KEY_SHOW_LOGOS, settings.showLogos)
                 .putBoolean(KEY_AUTO_HIDE, settings.autoHideControls)
-                .putBoolean(KEY_LIVE_PULSE, settings.livePulse)
                 .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColor)
                 .putString(KEY_RESIZE_MODE, settings.resizeMode.name)
                 .putString(KEY_VIDEO_FILTER, settings.videoColorFilter.name)
@@ -65,13 +60,11 @@ class SettingsStorage(context: Context) {
     companion object {
         private const val KEY_ACCENT = "accent"
         private const val KEY_THEME = "theme_mode"
-        private const val KEY_MOTION = "motion"
         private const val KEY_DEVICE_MODE = "device_mode"
         private const val KEY_START_CATEGORY = "start_category"
         private const val KEY_AUTOPLAY = "autoplay"
         private const val KEY_SHOW_LOGOS = "show_logos"
         private const val KEY_AUTO_HIDE = "auto_hide_controls"
-        private const val KEY_LIVE_PULSE = "live_pulse"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_RESIZE_MODE = "player_resize_mode"
         private const val KEY_VIDEO_FILTER = "player_video_filter"

@@ -3,9 +3,6 @@ package com.example.kurdishtv.ui.player
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -258,15 +255,12 @@ fun VideoPlayerView(
                 }
         )
 
-        AnimatedVisibility(
-            visible = isBuffering && !areControlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(24.dp)
-        ) {
-            PlayerBufferingIndicator()
+        if (isBuffering && !areControlsVisible) {
+            PlayerBufferingIndicator(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+            )
         }
     }
 }

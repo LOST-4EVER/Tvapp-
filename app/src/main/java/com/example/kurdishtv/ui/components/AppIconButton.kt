@@ -4,7 +4,6 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,8 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.kurdishtv.ui.motion.CornerScale
 import com.example.kurdishtv.ui.motion.ExpressiveMotion
 import com.example.kurdishtv.ui.motion.ShapeMorph
-import com.example.kurdishtv.ui.motion.bouncyClickable
-import com.example.kurdishtv.ui.motion.rememberMorphingCorners
+import com.example.kurdishtv.ui.motion.tvClickable
 import com.example.ui.theme.LocalAppColors
 
 /**
@@ -60,14 +57,13 @@ enum class AppIconButtonStyle {
  * Everything that renders an icon inside a tappable circle goes through here, so press
  * feedback, glyph size and the border treatment stay identical across screens.
  *
- * The shape is the interesting part. The button rests as a circle and squares off
- * while it is held. A circle that becomes a rounded square under a finger is the
- * clearest possible reading of "this is being pressed", and unlike a ripple it is still
- * visible from across a room and to someone who has reduced motion switched on at the
- * system level.
+ * The outline is a circle and stays a circle. It used to square off into a rounded
+ * rectangle while held, on a spring — a circle that becomes a squircle is a good
+ * reading of "pressed", and it is gone now, so the press is carried by a flat tint
+ * laid over the same circle instead. Same instant acknowledgement, no animation, and
+ * the outline never changes shape under a glyph.
  *
- * It is a circle-to-squircle morph on the corner scale, not a lobed polygon, and the
- * glyph is drawn into a plain `Box` that the shape only clips — never owns. That
+ * The glyph is drawn into a plain `Box` that the shape only clips — never owns. That
  * separation is the point: a control's outline is also its clip, and a shape that is
  * even slightly wrong then deletes the icon along with the outline. See the comment
  * on the `Box` below.
@@ -81,7 +77,6 @@ fun AppIconButton(
     style: AppIconButtonStyle = AppIconButtonStyle.Tonal,
     size: Dp = 40.dp,
     iconSize: Dp = 20.dp,
-    scaleDown: Float = 0.90f,
     active: Boolean = false
 ) {
     val colors = LocalAppColors.current
@@ -103,22 +98,18 @@ fun AppIconButton(
         else -> colors.primary
     }
 
-    // The press state is read here rather than inside `bouncyClickable` so the outline
-    // can react to it; the modifier handles the scale, this handles the silhouette.
+    // The press state is read here rather than inside the click modifier so the
+    // container can tint along with it.
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
 
     // Sized as a fraction of this button's own [size], not a fixed dp radius: the
     // same token is a circle at 40dp, at 44dp and at the rail's 36dp, and the clamp
     // in `cornerRadius` means no caller can request a radius its button is too small
     // to carry. A hard-coded 20dp was a circle on one of those and a broken shape on
     // another.
-    val shape: Shape = rememberMorphingCorners(
-        rest = CornerScale.uniform(ShapeMorph.cornerRadius(size, 0.5f)),
-        active = CornerScale.uniform(ShapeMorph.cornerRadius(size, 0.28f)),
-        isActive = isPressed,
-        spec = ExpressiveMotion.spatialFast
-    )
+    // The outline is a circle, and stays a circle whether the button is held or not.
+    // It used to flatten from 0.5 to 0.28 of the button's short side on a spring.
+    val shape: Shape = CornerScale.uniform(ShapeMorph.cornerRadius(size, 0.5f)).toShape()
 
     // The background is drawn with `background(color, shape)` and the glyph is a
     // *sibling* of nothing — it is a child of a Box that is only clipped, never
@@ -148,9 +139,10 @@ fun AppIconButton(
                     Modifier.border(1.dp, colors.border, shape)
                 }
             )
-            .bouncyClickable(
-                scaleDown = scaleDown,
+            .tvClickable(
                 interactionSource = interactionSource,
+                pressedFill = content.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                pressedShape = shape,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -165,20 +157,19 @@ fun AppIconButton(
 }
 
 /**
- * A labelled pill that squashes under a finger.
+ * A labelled pill.
  *
  * The other half of the app's control family. [AppIconButton] is for a glyph alone;
- * this is for a glyph *and* a word, which is why its shape stays a pill at rest — a
- * rounded square around a 12sp label looks like a mistake, not a shape. What it does
- * share is the press behaviour: [bouncyClickable] springs the control down and back,
- * so a press over video is visible even when the controls fade out moments later.
+ * this is for a glyph *and* a word, which is why its shape is a pill — a rounded
+ * square around a 12sp label looks like a mistake, not a shape. What it shares is the
+ * press behaviour, so a press over video is still visible.
  *
  * Passing a blank [label] is supported and deliberate: the control then degrades to a
  * fixed-size round icon button rather than to a pill with a hole where its text
  * should be.
  */
 @Composable
-fun SquishyPillButton(
+fun LabelPillButton(
     @DrawableRes iconRes: Int,
     label: String,
     onClick: () -> Unit,
@@ -218,7 +209,7 @@ fun SquishyPillButton(
             )
             .clip(shape)
             .background(containerColor, shape)
-            .bouncyClickable(onClick = onClick),
+            .tvClickable(onClick = onClick),
         // Centred when there is no label. A fixed-size Row defaults to
         // `Arrangement.Start`, which would pin a lone glyph against the leading edge
         // of its own circle instead of in the middle of it.
