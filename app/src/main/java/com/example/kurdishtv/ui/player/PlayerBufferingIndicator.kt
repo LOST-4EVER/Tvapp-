@@ -108,8 +108,15 @@ fun PlayerBufferingIndicator(
         modifier = modifier
             // Read inside the layer lambda, so a frame of the breath redraws this one
             // node and recomposes nothing at all.
+            //
+            // `.value`, not `.floatValue`: the latter is on `MutableFloatState`, and
+            // `pulse` is typed `State<Float>` so the reduced-motion branch can hand it
+            // a plain `MutableFloatState` while the animated branch hands it the
+            // `State<Float>` an `animateFloat` returns. Reading a `State` in a layer
+            // block is a snapshot read in the draw phase, which is exactly the
+            // behaviour being asked for here.
             .graphicsLayer {
-                val s = pulse.floatValue
+                val s = pulse.value
                 scaleX = s
                 scaleY = s
             }
