@@ -11,6 +11,7 @@ import com.example.kurdishtv.network.NetworkClient
 import com.example.kurdishtv.network.NetworkClient.fetchBody
 import com.example.kurdishtv.network.retryDelayMs
 import com.example.kurdishtv.parser.KurdishTvParser
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -155,53 +156,59 @@ class TvRepository(
             allChannels.addAll(KurdishChannelCatalog.getDefaultChannels())
 
             try {
-                // supervisorScope so a single dead or malformed source cannot cancel the
-                // others. A plain coroutineScope would let one bad playlist throw away the
-                // channels that did load.
+                // supervisorScope so a single dead source cannot cancel the others
+                // while they are still running.
+                //
+                // It does NOT do the other half of that job, which is what made
+                // this silently lose every remote channel. A supervisorScope still
+                // rethrows a child's exception once its children finish, so a
+                // single `async` that threw propagated out of the scope — and
+                // because each result was collected with an `await()` *inside* the
+                // scope, the awaits after the failing one never ran. The channels
+                // that had already loaded were never added, and the catch below
+                // swallowed the evidence. The viewer got the 98-channel offline
+                // catalogue and no indication that three playlists had just
+                // answered.
+                //
+                // [fetchSource] is now a total function — it cannot throw, so
+                // there is nothing left for the scope to rethrow, and every await
+                // is reached.
                 supervisorScope {
-                    val gistDeferred = async {
-                        fetchUrlContent(gistChannelsUrl)?.let {
-                            KurdishTvParser.parseJson(it, "gist")
-                        } ?: emptyList()
+                    // Every source, as (url, id-tag, is-json). Built up front so
+                    // the four built-ins and the viewer's own playlists are
+                    // fetched by exactly the same code path — the difference
+                    // between them used to be four copies of the same block.
+                    val sources = buildList {
+                        add(Triple(gistChannelsUrl, "gist", true))
+                        add(Triple(primaryEndpointUrl, "krd", false))
+                        add(Triple(secondaryEndpointUrl, "iptv", false))
+                        add(Triple(fallbackGistUrl, "fbk", false))
+                        customPlaylistStorage.getCustomPlaylistUrls()
+                            .forEachIndexed { idx, url ->
+                                add(Triple(url, "usr$idx", false))
+                            }
                     }
 
-                    val primaryDeferred = async {
-                        fetchUrlContent(primaryEndpointUrl)?.let {
-                            KurdishTvParser.parse(it, "krd")
-                        } ?: emptyList()
-                    }
-
-                    val secondaryDeferred = async {
-                        fetchUrlContent(secondaryEndpointUrl)?.let {
-                            KurdishTvParser.parse(it, "iptv")
-                        } ?: emptyList()
-                    }
-
-                    val fallbackDeferred = async {
-                        fetchUrlContent(fallbackGistUrl)?.let {
-                            KurdishTvParser.parse(it, "fbk")
-                        } ?: emptyList()
-                    }
-
-                    val customUrls = customPlaylistStorage.getCustomPlaylistUrls()
-                    val customDeferreds = customUrls.mapIndexed { idx, url ->
-                        async {
-                            fetchUrlContent(url)?.let {
-                                KurdishTvParser.parse(it, "usr$idx")
-                            } ?: emptyList()
-                        }
-                    }
-
-                    allChannels.addAll(gistDeferred.await())
-                    allChannels.addAll(primaryDeferred.await())
-                    allChannels.addAll(secondaryDeferred.await())
-                    allChannels.addAll(fallbackDeferred.await())
-                    for (customDef in customDeferreds) {
-                        allChannels.addAll(customDef.await())
+                    for ((url, tag, asJson) in sources) {
+                        // Safe to await inline: fetchSource cannot throw, so this
+                        // loop is reached on every iteration regardless of what
+                        // the other sources did.
+                        allChannels.addAll(async { fetchSource(url, tag, asJson) }.await())
                     }
                 }
-            } catch (_: Exception) {
-                // Safe fallback to accumulated channels
+            } catch (e: CancellationException) {
+                // Rethrown, deliberately.
+                //
+                // This used to be `catch (_: Exception)`, which quietly ate
+                // cancellation. That is the worst version of this bug: a merge
+                // cancelled midway — by a refresh arriving, by a playlist being
+                // edited, by the ViewModel being cleared — did not stop, it
+                // carried on to a normal return with whatever it had managed to
+                // collect. Swallowing cancellation breaks structured concurrency
+                // and it also hid this failure behind a plausible-looking result.
+                throw e
+            } catch (e: Exception) {
+                NetworkClient.logDebug("Channel merge failed: ${e.javaClass.simpleName}")
             }
 
             // Deduplicate streams
@@ -279,6 +286,36 @@ class TvRepository(
      * answer, and repeating the request would only make the viewer wait for
      * nothing.
      */
+    /**
+     * Fetches and parses one source, and cannot throw.
+     *
+     * Total by design. Every caller treats a source as optional, so a source that
+     * throws is strictly worse than a source that returns nothing: it takes the
+     * surrounding [supervisorScope] down with it, and that is what used to cost
+     * the viewer every remote channel at once.
+     *
+     * Cancellation is the one thing it refuses to absorb. A cancelled merge must
+     * actually stop; returning an empty list instead would let the caller carry
+     * on and publish a half-finished result as if it were complete.
+     */
+    private suspend fun fetchSource(
+        url: String,
+        tag: String,
+        asJson: Boolean = false
+    ): List<Channel> = try {
+        val body = fetchUrlContent(url)
+        when {
+            body == null -> emptyList()
+            asJson -> KurdishTvParser.parseJson(body, tag)
+            else -> KurdishTvParser.parse(body, tag)
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        NetworkClient.logDebug("Source $tag failed: ${e.javaClass.simpleName}: ${e.message}")
+        emptyList()
+    }
+
     suspend fun fetchUrlContent(url: String, timeoutMs: Long = DEFAULT_TIMEOUT_MS): String? {
         val request = Request.Builder()
             .url(url)

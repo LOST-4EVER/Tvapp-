@@ -27,6 +27,26 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **The catalogue had no way to detect any of this.** Channel health was asserted
   by hand in a comment, and streams rot silently.
 
+- **One failing source could cost the viewer every remote channel.** The merge
+  fetched four sources concurrently and then collected each with an `await()`
+  *inside* the `supervisorScope`. A supervisor stops a failing child from
+  cancelling its siblings, but it still rethrows that child's exception once they
+  finish - so a single `async` that threw propagated out of the scope, every
+  `await()` after it never ran, and the sources that had already loaded were never
+  added. The catch below it swallowed the evidence, and the app quietly served the
+  98-channel offline catalogue as though that were all there was. A refresh that
+  arrived mid-merge, or an edit to a playlist, was enough to trigger it.
+  - Each source now goes through one total function that cannot throw, so there is
+    nothing left to rethrow and every result is collected. The four built-ins and
+    the viewer's own playlists also share that single code path instead of four
+    copies of the same block.
+- **A cancelled merge used to finish as if it had succeeded.** The catch around it
+  was `catch (_: Exception)`, which quietly ate `CancellationException`. A merge
+  cancelled halfway did not stop - it ran on to a normal return carrying whatever
+  it had collected, which is how a cancellation became a plausible-looking
+  short channel list instead of a cancellation. It is now rethrown, which is what
+  structured concurrency requires and what makes the real cause visible.
+
 ### Added
 - **A source that hiccups is now retried instead of written off.** Every remote
   playlist was fetched exactly once per refresh and a failure meant the whole

@@ -375,7 +375,7 @@ fun rememberFocusRotation(enabled: Boolean): WatchedFloat {
     // Keyed on the watcher count, the loop exists exactly while something is drawing
     // from it, and not one frame longer.
     //
-    // The phase comes from [WatchedFloat.epochNanos] rather than from a local `start`
+    // The phase comes from [WatchedFloat.epoch] rather than from a local `start`
     // captured inside the loop. That detail is what keeps arrowing smooth: moving
     // focus from one card to the next disposes one watcher and creates another, and
     // for an instant the count passes through zero and the effect restarts. With a
