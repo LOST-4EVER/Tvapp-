@@ -110,10 +110,12 @@ class StorageTest {
         val storage = RecentStorage(context)
         assertEquals(listOf("first"), storage.addRecentChannel("first"))
         assertEquals(listOf("second", "first"), storage.addRecentChannel("second"))
-        assertEquals(
-            storage.getRecentChannelIds(),
-            RecentStorage(context).addRecentChannel("first")
-        )
+
+        // A separate reader, standing in for the next launch, has to see exactly
+        // what the write reported.
+        val afterThird = RecentStorage(context).addRecentChannel("first")
+        assertEquals(listOf("first", "second"), afterThird)
+        assertEquals(afterThird, RecentStorage(context).getRecentChannelIds())
     }
 
     @Test

@@ -155,6 +155,29 @@ jobs:
           ./gradlew lintRelease --continue || echo "::warning::lint reported issues (see annotations)"
           echo "::endgroup::"
 
+      - name: Unit tests
+        run: |
+          # A real gate, not an advisory step.
+          #
+          # The repository carries StorageTest, CachePolicyTest, DeviceModeTest,
+          # RetryPolicyTest, ChannelFilterEngineTest, KurdishTvParserTest and
+          # UpdateManifestParserTest, and this workflow ran none of them: it
+          # linted (advisory only) and assembled a release APK. Every one of those
+          # tests exists because a specific bug got shipped - a comma delimiter
+          # that made watch history unreachable, a favourites write that reported
+          # the intent rather than what reached disk, a cache guard that could be
+          # silently inverted - and a test that is never executed is a comment.
+          #
+          # Robolectric needs to fetch its android-all jars on a cold runner, so
+          # this step is the slowest in the workflow. That is still cheaper than
+          # the alternative, which is finding out from a viewer's TV.
+          echo "::group::Running JVM unit tests"
+          # `test`, not `testReleaseUnitTest`: the per-variant task is not present
+          # under this AGP, and the lifecycle task runs every unit-test variant
+          # that does exist, which is what is wanted here anyway.
+          ./gradlew test --stacktrace
+          echo "::endgroup::"
+
       - name: Build Release APK
         run: |
           # The version name is resolved before the build and passed in, so the
