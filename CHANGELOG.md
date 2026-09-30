@@ -150,6 +150,30 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     the joins.
 
 ### Fixed
+- **The selected category tab vanished when it had nothing behind it.** The chip
+  row's "hide empty tabs" rule and its "keep the tab you are on" rule were written
+  as two branches on whether the selected category had a non-zero count, and the
+  branch that ran when it did not dropped the tab — so the one rule that existed
+  for the empty case was the one case it skipped. Selecting Favourites with no
+  favourites, or a category whose channels a refresh had just removed, left the
+  grid explaining an empty category while the navigation no longer showed which
+  one was open. The rail takes the same list, so it lost the selection too. Both
+  now keep the selected tab regardless of its count.
+- **Three catalogue streams had gone dead, and one of them was caught by the
+  audit's whole reason for existing.** `Al Sharqiya News` fails before its playlist
+  is read — the host's TLS certificate expired on 2026-09-29 — `Kurd 7`'s origin
+  returns 404 for the playlist path, and `Iraqya Sports` answers 200 on its master
+  *and* its variant while every media segment 404s, the exact manifest-stops-short
+  trap documented above. None of the three has an alternative in the community
+  gist that also carries it or in any public index, so all three were removed
+  rather than left holding a slot that can only fail on first play. `Al Sharqiya
+  News` is worth re-adding if the broadcaster renews its certificate.
+- **The merged channel list was hashed into a map on the main thread.** `loadChannels`
+  and the cold-start hydration both built `associateBy { it.id }` — a hash of every
+  channel, which runs past a thousand entries once the remote playlists land — on
+  the thread that draws the grid, and then read the two preference files through two
+  separate `withContext` hops. The hash and the history lookup now run on
+  `Dispatchers.Default` beside the filter, and the two file reads share one hop to IO.
 - **Three channels could never play, and looked fine.** `BNAR Action` and `Soz Quran`
   return 404 on their master playlist. `Iraqia Kurdish` is worse: its playlist and
   its variant both resolve, and then *every media segment* 404s — so it passes any
