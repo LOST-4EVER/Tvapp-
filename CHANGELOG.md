@@ -356,6 +356,14 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     its bundled `proguard.txt` keeps `com.startapp.**` for the release build's R8
     pass, so the app declares neither — repeating them would only create a second
     place to drift.
+  - **The SDK's transitive Kotlin stdlib is excluded from the build.** It is built
+    against Kotlin 2.4.0 and declares that as a plain compile dependency rather than a
+    range, so it outvoted the 2.2.10 stdlib this project compiles with — and a compiler
+    that can read metadata up to 2.3.0 does not degrade gracefully. It failed every
+    Kotlin file in the app, the SDK's own included, with an unresolved `lazy`,
+    `javaClass` and property-delegate error behind one "incompatible version of Kotlin"
+    line. The exclude leaves the stdlib the Kotlin plugin provides at the compiler's own
+    version, which is the only one this build can read.
   - Initialisation is idempotent, and it cannot take the app down: a device without
     Play services, a missing native library or a rejected app id all degrade to
     "no ads" rather than to a crash on launch.

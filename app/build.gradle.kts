@@ -212,7 +212,18 @@ dependencies {
   implementation(libs.okhttp)
   // Start.io (formerly StartApp) in-app ads. Carries its own consumer ProGuard rules
   // (proguard.txt in the AAR), so no hand-written keeps are needed here.
-  implementation(libs.startapp.inapp.sdk)
+  //
+  // Its transitive `kotlin-stdlib` is excluded. The SDK is built against Kotlin 2.4.0
+  // and declares that as a plain compile dependency rather than a range, so it outvoted
+  // the stdlib this project's compiler ships: "Class 'kotlin.Lazy' was compiled with an
+  // incompatible version of Kotlin ... the compiler version 2.2.0 can read versions up
+  // to 2.3.0", and then an unresolved `lazy`, `javaClass` and property-delegate error
+  // in every Kotlin file in the app, the SDK's own included. Excluding it leaves the
+  // stdlib the Kotlin plugin adds at the compiler's own version, which is the only one
+  // this build can read; nothing else here asks for a newer one.
+  implementation(libs.startapp.inapp.sdk) {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+  }
   // implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
