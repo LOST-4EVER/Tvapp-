@@ -1,5 +1,6 @@
 package com.example.kurdishtv.ui.player
 
+import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
@@ -33,9 +34,12 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
+import com.example.R
 import com.example.kurdishtv.network.NetworkClient
 
 /**
@@ -88,6 +92,8 @@ fun VideoPlayerView(
      * pre-loading is exactly what makes the first frames appear quickly.
      */
     loadOnlyWhenPlaying: Boolean = false,
+    /** Whether audio playback is muted. */
+    isMuted: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -116,16 +122,21 @@ fun VideoPlayerView(
         val httpDataSourceFactory = NetworkClient.createMediaDataSourceFactory(context)
         val defaultDataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
-        val mediaSourceFactory = DefaultMediaSourceFactory(context)
-            .setDataSourceFactory(defaultDataSourceFactory)
+        val renderersFactory = DefaultRenderersFactory(context)
+            .setEnableDecoderFallback(true)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(defaultDataSourceFactory)
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 15000,
+                /* minBufferMs = */ 6000,
                 /* maxBufferMs = */ MAX_BUFFER_MS,
-                /* bufferForPlaybackMs = */ 2500,
-                /* bufferForPlaybackAfterRebufferMs = */ 5000
+                /* bufferForPlaybackMs = */ 800,
+                /* bufferForPlaybackAfterRebufferMs = */ 1500
             )
+            .setBackBuffer(0, false)
+            .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
         val audioAttributes = AudioAttributes.Builder()
@@ -133,11 +144,12 @@ fun VideoPlayerView(
             .setUsage(C.USAGE_MEDIA)
             .build()
 
-        ExoPlayer.Builder(context)
+        ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setAudioAttributes(audioAttributes, true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
+            .setHandleAudioBecomingNoisy(true)
             .build().apply {
                 // Not `true`. Playback is now driven entirely by the load effect
                 // above, and starting out ready to play meant a preview pane began
@@ -178,7 +190,15 @@ fun VideoPlayerView(
                 exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString() == streamUrl
             if (!alreadyLoaded) {
                 isBuffering = true
-                exoPlayer.setMediaItem(MediaItem.fromUri(streamUrl))
+                val liveConfig = MediaItem.LiveConfiguration.Builder()
+                    .setMaxPlaybackSpeed(1.02f)
+                    .setMinPlaybackSpeed(0.98f)
+                    .build()
+                val mediaItem = MediaItem.Builder()
+                    .setUri(streamUrl)
+                    .setLiveConfiguration(liveConfig)
+                    .build()
+                exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
             }
             exoPlayer.play()
@@ -186,6 +206,10 @@ fun VideoPlayerView(
             isBuffering = false
             onPlaybackError("Failed to prepare channel stream: ${e.message}")
         }
+    }
+
+    LaunchedEffect(isMuted) {
+        exoPlayer.volume = if (isMuted) 0f else 1f
     }
 
     DisposableEffect(exoPlayer) {
@@ -221,10 +245,12 @@ fun VideoPlayerView(
     ) {
         AndroidView(
             factory = { ctx ->
-                PlayerView(ctx).apply {
+                val view = LayoutInflater.from(ctx).inflate(R.layout.exo_player_texture_view, null) as PlayerView
+                view.apply {
                     player = exoPlayer
                     useController = false
                     this.resizeMode = resizeMode.mode
+                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                     keepScreenOn = true
                     layoutParams = FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,

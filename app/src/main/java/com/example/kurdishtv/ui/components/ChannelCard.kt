@@ -126,7 +126,7 @@ fun ChannelCard(
     // 1dp hairline drawn under a 3dp ring is just a seam.
     var isFocused by remember(channel.id) { mutableStateOf(false) }
 
-    val cardShape: Shape = M3ExpressiveShapes.Corners.mediumCard.toShape()
+    val cardShape: Shape = M3ExpressiveShapes.MediumCard
 
     Card(
         modifier = modifier
@@ -180,7 +180,9 @@ fun ChannelCard(
                 shape = cardShape
             ),
         shape = cardShape,
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isFocused) colors.surfaceHigh else colors.surface
+        ),
         // No shadow. A Material shadow on a near-black surface is invisible, and it
         // still costs a render pass per item in a grid of several hundred cards. The
         // card's separation comes from the hairline below and the ring above it.
@@ -188,7 +190,12 @@ fun ChannelCard(
     ) {
         // A flat fill with a hairline of light along the top edge, which is what
         // keeps a near-black card from reading as a hole cut in the page.
-        Box(modifier = Modifier.background(colors.surface, cardShape)) {
+        Box(
+            modifier = Modifier.background(
+                color = if (isFocused) colors.surfaceHigh else colors.surface,
+                shape = cardShape
+            )
+        ) {
             TopEdgeHighlight(inset = CardCorner)
             Column {
                 // The status row is its own band rather than an overlay on the

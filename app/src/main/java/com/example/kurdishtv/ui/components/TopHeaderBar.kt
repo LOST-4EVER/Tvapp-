@@ -39,6 +39,7 @@ fun TopHeaderBar(
     onRefresh: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onHomeClick: () -> Unit = onRefresh,
     /**
      * Squeeze the row for a short window — a phone on its side, where every dp of
      * vertical space the header takes is a dp of grid that is not on show.
@@ -111,7 +112,7 @@ fun TopHeaderBar(
                             interactionSource = brandSource,
                             pressedFill = colors.onPrimary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
                             pressedShape = brandShape,
-                            onClick = { onRefresh() }
+                            onClick = { onHomeClick() }
                         )
                         // The tile carries a focus ring because it is one of the four
                         // controls in the header and the header had no focus mark on
@@ -128,13 +129,7 @@ fun TopHeaderBar(
                     Box(contentAlignment = Alignment.Center) {
                         SvgIcon(
                             resId = KurdishTvIcons.Tv,
-                            // Names the *action*, not the app. This tile is a refresh
-                            // button — it runs [onRefresh] — and it announced itself as
-                            // the app's title, so a screen reader read out "Kurdish TV
-                            // Live" where the viewer needed to hear what pressing it
-                            // would do. The brand is already the window title and the
-                            // text beside this tile.
-                            contentDescription = "Refresh channels",
+                            contentDescription = "Home / All channels",
                             tint = colors.onPrimary,
                             modifier = Modifier.size(if (isNarrow) 22.dp else 25.dp)
                         )

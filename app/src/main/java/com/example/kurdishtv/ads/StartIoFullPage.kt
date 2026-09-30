@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import java.lang.ref.WeakReference
 import com.example.kurdishtv.network.NetworkClient
 import com.startapp.sdk.adsbase.Ad
 import com.startapp.sdk.adsbase.StartAppAd
@@ -46,6 +47,7 @@ enum class FullPageAdState {
  *  - **An ad belongs to an activity.** The SDK resolves the activity to display through,
  *    so one loaded against an activity that has since been recreated cannot be shown
  *    against the new one. A changed activity drops the loaded ad and starts over.
+ *    Using WeakReference ensures the activity instance is not leaked statically.
  */
 object StartIoFullPage {
 
@@ -55,8 +57,8 @@ object StartIoFullPage {
     /** The loaded ad, or null when there is nothing to show. */
     private var ad: StartAppAd? = null
 
-    /** The activity [ad] was loaded against. */
-    private var owner: Activity? = null
+    /** Weak reference to the activity [ad] was loaded against, avoiding activity leaks. */
+    private var owner: WeakReference<Activity>? = null
 
     /** Set when the viewer asked for an ad that had not arrived yet. */
     private var showWhenReady = false
@@ -71,16 +73,17 @@ object StartIoFullPage {
     fun preload(activity: Activity) {
         // Nothing can be requested before the SDK is up — the request is dropped with no
         // callback and no error, and the screen would sit on "loading" for ever — and
-        // nothing may be requested for a viewer who has switched ads off.
-        if (!StartIoAds.canRequestAds) return
+        // nothing may be requested for a viewer who has switched ads off or in an unsupported
+        // virtualized/emulator environment without hardware rendering nodes.
+        if (!StartIoAds.canRequestAds || !AdEnvironment.isAdRenderingSupported()) return
 
         // A finishing activity is not something to load an ad against — the callback
         // would land after the screen it belongs to is gone.
         if (activity.isFinishing || activity.isDestroyed) return
 
-        if (owner !== activity) {
+        if (owner?.get() !== activity) {
             // A recreated activity invalidates whatever was loaded against the old one.
-            owner = activity
+            owner = WeakReference(activity)
             ad = null
             showWhenReady = false
             state = FullPageAdState.Unavailable
@@ -144,6 +147,7 @@ object StartIoFullPage {
      */
     fun release() {
         ad = null
+        owner = null
         showWhenReady = false
         state = FullPageAdState.Unavailable
     }
@@ -157,7 +161,7 @@ object StartIoFullPage {
                     // The activity may have been recreated while this was out. Keeping the
                     // ad would hand `show` one bound to a screen that no longer exists, so
                     // it is dropped and the new activity's own preload fetches another.
-                    if (owner !== activity) return
+                    if (owner?.get() !== activity) return
 
                     this@StartIoFullPage.ad = candidate
                     state = FullPageAdState.Ready

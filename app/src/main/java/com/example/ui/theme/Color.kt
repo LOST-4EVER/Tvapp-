@@ -38,24 +38,20 @@ val AccentAzure = Color(0xFF5CB0FF)
 // rank by eye but comfortably above what a badly-calibrated panel flattens. The
 // borders below are what actually separate the levels; the ramp only decides
 // which of two adjacent things is in front.
-val DarkBackground = Color(0xFF07080C)
-val DarkSurface = Color(0xFF0F1218)
-val DarkSurfaceVariant = Color(0xFF161A24)
-val DarkSurfaceElevated = Color(0xFF191D29)
-val DarkSurfaceHigh = Color(0xFF222739)
+val DarkBackground = Color(0xFF000000)
+val DarkSurface = Color(0xFF08080C)
+val DarkSurfaceVariant = Color(0xFF101218)
+val DarkSurfaceElevated = Color(0xFF141720)
+val DarkSurfaceHigh = Color(0xFF1B1F2A)
 
 // ── AMOLED surfaces ───────────────────────────────────────────────────────────
 //
-// True black for the page, and then as close to it as the four steps can get
-// while still being distinguishable. AMOLED panels switch those pixels off, so
-// anything above about #0A0A0C is visibly grey when the set is dark, and a card
-// that has to be told apart from its background by a border alone is a card that
-// costs a draw call to look wrong.
+// Pure black (0xFF000000) for complete black screen experience on OLED/AMOLED and TV panels.
 val AmoledBackground = Color(0xFF000000)
-val AmoledSurface = Color(0xFF08080B)
-val AmoledSurfaceVariant = Color(0xFF101014)
-val AmoledSurfaceElevated = Color(0xFF16161C)
-val AmoledSurfaceHigh = Color(0xFF1E1E25)
+val AmoledSurface = Color(0xFF000000)
+val AmoledSurfaceVariant = Color(0xFF0A0A0C)
+val AmoledSurfaceElevated = Color(0xFF121216)
+val AmoledSurfaceHigh = Color(0xFF18181E)
 
 // ── Borders and dividers ──────────────────────────────────────────────────────
 //

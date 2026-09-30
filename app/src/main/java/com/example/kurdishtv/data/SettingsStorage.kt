@@ -19,19 +19,20 @@ class SettingsStorage(context: Context) {
         return try {
             AppSettings(
                 accent = enumOrDefault(prefs.getString(KEY_ACCENT, null), AccentColor.SUN_GOLD),
-                themeMode = enumOrDefault(prefs.getString(KEY_THEME, null), ThemeMode.DARK),
+                themeMode = enumOrDefault(prefs.getString(KEY_THEME, null), ThemeMode.AMOLED),
                 deviceMode = enumOrDefault(prefs.getString(KEY_DEVICE_MODE, null), DeviceMode.AUTO),
                 startCategory = enumOrDefault(prefs.getString(KEY_START_CATEGORY, null), CategoryFilter.ALL),
                 autoplay = prefs.getBoolean(KEY_AUTOPLAY, true),
                 showLogos = prefs.getBoolean(KEY_SHOW_LOGOS, true),
                 autoHideControls = prefs.getBoolean(KEY_AUTO_HIDE, true),
-                dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
+                dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, false),
                 resizeMode = enumOrDefault(prefs.getString(KEY_RESIZE_MODE, null), ResizeMode.FILL),
                 videoColorFilter = enumOrDefault(
                     prefs.getString(KEY_VIDEO_FILTER, null),
                     VideoColorFilter.None
                 ),
-                adsEnabled = prefs.getBoolean(KEY_ADS_ENABLED, true)
+                adsEnabled = prefs.getBoolean(KEY_ADS_ENABLED, false),
+                adMenuUnlocked = prefs.getBoolean(KEY_AD_MENU_UNLOCKED, false)
             )
         } catch (_: Exception) {
             AppSettings()
@@ -52,6 +53,7 @@ class SettingsStorage(context: Context) {
                 .putString(KEY_RESIZE_MODE, settings.resizeMode.name)
                 .putString(KEY_VIDEO_FILTER, settings.videoColorFilter.name)
                 .putBoolean(KEY_ADS_ENABLED, settings.adsEnabled)
+                .putBoolean(KEY_AD_MENU_UNLOCKED, settings.adMenuUnlocked)
                 .apply()
         } catch (_: Exception) {}
     }
@@ -71,5 +73,6 @@ class SettingsStorage(context: Context) {
         private const val KEY_RESIZE_MODE = "player_resize_mode"
         private const val KEY_VIDEO_FILTER = "player_video_filter"
         private const val KEY_ADS_ENABLED = "ads_enabled"
+        private const val KEY_AD_MENU_UNLOCKED = "ad_menu_unlocked"
     }
 }

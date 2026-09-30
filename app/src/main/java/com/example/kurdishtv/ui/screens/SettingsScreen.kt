@@ -130,6 +130,7 @@ fun SettingsScreen(
     // here rather than passed down: it is the one place the raw answer is wanted.
     val detectedIsTv = LocalConfiguration.current.isTvMode()
     var pendingAction by remember { mutableStateOf<PendingAction?>(null) }
+    var showTermsDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         if (!message.isNullOrBlank()) {
@@ -378,11 +379,19 @@ fun SettingsScreen(
                         subtitle = "Delete every imported IPTV link",
                         onClick = { pendingAction = PendingAction.CLEAR_PLAYLISTS }
                     )
-                    SettingsActionRow(
+                    HoldToUnlockActionRow(
                         iconRes = KurdishTvIcons.Delete,
                         title = "Clear channel cache",
-                        subtitle = "Re-download the channel list next launch",
-                        onClick = { pendingAction = PendingAction.CLEAR_CACHE }
+                        subtitle = if (settings.adMenuUnlocked) {
+                            "Re-download the channel list next launch"
+                        } else {
+                            "Re-download channel list • Hold 10s to unlock Ads menu"
+                        },
+                        onClick = { pendingAction = PendingAction.CLEAR_CACHE },
+                        onHoldCompleted = {
+                            onUpdate { it.copy(adMenuUnlocked = true) }
+                            showTermsDialog = true
+                        }
                     )
                     SettingsActionRow(
                         iconRes = KurdishTvIcons.Refresh,
@@ -432,74 +441,76 @@ fun SettingsScreen(
 
             // ── Ads ───────────────────────────────────────────────────────────
             //
-            // The viewer's switch, and the only reason the app asks for anything at all.
-            // Switching it off stops the ad SDK being started, so nothing is requested,
-            // nothing is shown, and nothing already fetched is kept — the placements
-            // disappearing is the visible half of that, not the whole of it.
-            //
-            // It stays on screen when ads are off, and only the placements below it go.
-            // Hiding the whole section with them would hide the one control that turns
-            // ads back on, which is a setting nobody could undo.
-            //
-            // The full-page ad sits behind a button deliberately. An interstitial shown
-            // at a moment of the app's choosing is the thing viewers describe as "the app
-            // has ads now"; asked for by name, it is a favour they chose to do. It is also
-            // worth many times what the banner beside it is worth per impression — which
-            // on a television is nothing at all, because Start.io's display inventory does
-            // not serve there. That is why the section keeps a real action of its own
-            // rather than being a frame around an ad that is usually invisible.
-            item(key = "ads") {
-                // `LocalContext` is the activity here, but only an unwrap can prove it.
-                val activity = remember(context) { context.findActivity() }
-                SettingsSection(
-                    title = "Ads",
-                    subtitle = if (settings.adsEnabled) {
-                        "How the app pays for itself"
-                    } else {
-                        "Off"
-                    },
-                    iconRes = KurdishTvIcons.FavoriteOutline
-                ) {
-                    SettingsSwitchRow(
-                        iconRes = KurdishTvIcons.Globe,
-                        title = "Show ads",
-                        subtitle = adsConsentHint(settings.adsEnabled),
-                        checked = settings.adsEnabled,
-                        showDivider = settings.adsEnabled,
-                        onCheckedChange = { enabled ->
-                            onUpdate { it.copy(adsEnabled = enabled) }
-                        }
-                    )
-
-                    // Composed only while ads are on, so a viewer who has switched them
-                    // off pays nothing for them — no composable, no request, no timer.
-                    if (settings.adsEnabled) {
-                        SettingsActionRow(
-                            iconRes = KurdishTvIcons.PlayRes,
-                            title = "Watch an ad",
-                            subtitle = adActionSubtitle(
-                                StartIoAds.isReady,
-                                StartIoFullPage.state
-                            ),
-                            onClick = {
-                                val host = activity
-                                if (host == null) {
-                                    // Cannot happen here — the app has one activity and
-                                    // this is it — but a miss is worth a log line rather
-                                    // than a crash.
-                                    NetworkClient.logDebug(
-                                        "No activity to show a full-page ad in"
-                                    )
+            // Only displayed once unlocked by holding the cache reset row for 10s.
+            if (settings.adMenuUnlocked) {
+                item(key = "ads") {
+                    // `LocalContext` is the activity here, but only an unwrap can prove it.
+                    val activity = remember(context) { context.findActivity() }
+                    SettingsSection(
+                        title = "Ads",
+                        subtitle = if (settings.adsEnabled) {
+                            "How the app pays for itself"
+                        } else {
+                            "Off"
+                        },
+                        iconRes = KurdishTvIcons.FavoriteOutline
+                    ) {
+                        SettingsSwitchRow(
+                            iconRes = KurdishTvIcons.Globe,
+                            title = "Show ads",
+                            subtitle = adsConsentHint(settings.adsEnabled),
+                            checked = settings.adsEnabled,
+                            showDivider = settings.adsEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled && !settings.adsEnabled) {
+                                    showTermsDialog = true
                                 } else {
-                                    StartIoFullPage.show(host)
+                                    onUpdate { it.copy(adsEnabled = enabled) }
                                 }
                             }
                         )
-                        StartIoBanner()
+
+                        // Composed only while ads are on, so a viewer who has switched them
+                        // off pays nothing for them — no composable, no request, no timer.
+                        if (settings.adsEnabled) {
+                            SettingsActionRow(
+                                iconRes = KurdishTvIcons.PlayRes,
+                                title = "Watch an ad",
+                                subtitle = adActionSubtitle(
+                                    StartIoAds.isReady,
+                                    StartIoFullPage.state
+                                ),
+                                onClick = {
+                                    val host = activity
+                                    if (host == null) {
+                                        NetworkClient.logDebug(
+                                            "No activity to show a full-page ad in"
+                                        )
+                                    } else {
+                                        StartIoFullPage.show(host)
+                                    }
+                                }
+                            )
+                            StartIoBanner()
+                        }
                     }
                 }
             }
         }
+    }
+
+    if (showTermsDialog) {
+        AdConsentTermsDialog(
+            onAcceptAndEnable = {
+                onUpdate { it.copy(adsEnabled = true, adMenuUnlocked = true) }
+                showTermsDialog = false
+            },
+            onDecline = {
+                onUpdate { it.copy(adsEnabled = false, adMenuUnlocked = true) }
+                showTermsDialog = false
+            },
+            onDismiss = { showTermsDialog = false }
+        )
     }
 
     pendingAction?.let { action ->

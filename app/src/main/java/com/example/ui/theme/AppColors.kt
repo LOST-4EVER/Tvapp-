@@ -165,21 +165,11 @@ private fun contrastRatio(a: Color, b: Color): Float {
 fun appColorsFor(settings: AppSettings, dynamicScheme: ColorScheme? = null): AppColors {
     val tone = settings.accent.tone()
     val amoled = settings.isAmoled
-    val primary = dynamicScheme?.primary ?: tone.primary
+    val primary = if (settings.dynamicColor && dynamicScheme != null) dynamicScheme.primary else tone.primary
 
     val surface = if (amoled) AmoledSurface else DarkSurface
     val variant = if (amoled) AmoledSurfaceVariant else DarkSurfaceVariant
-    // Containers sit on the surface, not the variant, so a chip on a raised card
-    // still reads as "tinted" rather than as a second, competing surface.
-    //
-    // The on-colour is measured rather than lerped when the accent came from the
-    // wallpaper. `tonalPair` pulls the on-colour *towards white*, which is right
-    // for the five bundled accents because they are all hand-picked light tones.
-    // A Material You primary is not hand-picked: some wallpaper palettes land on a
-    // deep primary, and lerping that towards white produced a mid tone that the
-    // dark container could not separate from. `onColorFor` picks by measured
-    // contrast instead, which is the same rule the rest of the file already uses.
-    val (container, onContainer) = if (dynamicScheme != null) {
+    val (container, onContainer) = if (settings.dynamicColor && dynamicScheme != null) {
         val tinted = lerp(surface, primary, CONTAINER_TINT)
         tinted to onColorFor(tinted)
     } else {

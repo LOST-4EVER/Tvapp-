@@ -59,10 +59,12 @@ fun StartIoBanner(modifier: Modifier = Modifier) {
                     NetworkClient.logDebug("Start.io banner unfilled: ${error ?: "no fill"}")
                     adView = null
                 } else {
-                    adView = creator.create(
+                    val created = creator.create(
                         context.applicationContext,
                         object : BannerListener {
-                            override fun onReceiveAd(banner: View) {}
+                            override fun onReceiveAd(banner: View) {
+                                SafeWebViewHelper.hardenViewHierarchy(banner)
+                            }
 
                             // The request succeeded but the banner still failed to
                             // fill. Clear it so the slot collapses instead of
@@ -76,6 +78,8 @@ fun StartIoBanner(modifier: Modifier = Modifier) {
                             override fun onClick(banner: View) {}
                         }
                     )
+                    SafeWebViewHelper.hardenViewHierarchy(created)
+                    adView = created
                 }
             }
     }

@@ -36,8 +36,8 @@ fun KurdishTvTheme(
     // only the handful of `LocalIsTv` readers, which is what this local's tracking
     // variant is for.
     val configuration = LocalConfiguration.current
-    val isTv = remember(configuration, settings.deviceMode) {
-        settings.deviceMode.resolveIsTv(configuration.isTvMode())
+    val isTv = remember(configuration, settings.deviceMode, context) {
+        settings.deviceMode.resolveIsTv(configuration.isTvMode(context))
     }
 
     // Material You (Android 12+): pull the accent from the user's wallpaper palette.

@@ -44,10 +44,9 @@ class AdsConsentTest {
     }
 
     @Test
-    fun `ads are on for an install that has never opened settings`() {
-        // The switch arrived after the ads did. Defaulting to off would have silently
-        // removed the app's only revenue for every install that never opened the screen.
-        assertTrue(AppSettings().adsEnabled)
+    fun `ads and ads menu are off by default for a new install`() {
+        assertFalse(AppSettings().adsEnabled)
+        assertFalse(AppSettings().adMenuUnlocked)
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.example.ui.theme
 
+import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.compose.runtime.compositionLocalOf
 import com.example.kurdishtv.model.DeviceMode
@@ -26,9 +28,26 @@ import com.example.kurdishtv.model.DeviceMode
  */
 val LocalIsTv = compositionLocalOf { false }
 
-/** Whether [this] configuration describes a television rather than a handheld. */
-fun Configuration.isTvMode(): Boolean =
-    (uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
+/**
+ * Whether [this] configuration describes a television rather than a handheld.
+ *
+ * Checks `uiMode` first, then falls back to hardware features (Leanback / FireTV / Touchscreen)
+ * for TV boxes that run stock Android tablet builds.
+ */
+fun Configuration.isTvMode(context: Context? = null): Boolean {
+    val isTvUi = (uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
+    if (isTvUi) return true
+    if (context != null) {
+        val pm = context.packageManager
+        if (pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+            pm.hasSystemFeature("amazon.hardware.fire_tv") ||
+            !pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
+        ) {
+            return true
+        }
+    }
+    return false
+}
 
 /**
  * Resolves a [DeviceMode] preference against what the device actually reports.
@@ -44,3 +63,4 @@ fun DeviceMode.resolveIsTv(detected: Boolean): Boolean = when (this) {
     DeviceMode.TV -> true
     DeviceMode.MOBILE -> false
 }
+

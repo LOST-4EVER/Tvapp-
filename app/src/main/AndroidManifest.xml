@@ -52,6 +52,10 @@
           are declared by the SDK's own manifest and merged in, so they are
           deliberately not repeated here.
         -->
+        <provider
+            android:name="com.startapp.sdk.adsbase.StartAppInitProvider"
+            tools:node="remove" />
+
         <meta-data
             android:name="com.startapp.sdk.SPLASH_ENABLED"
             android:value="false" />

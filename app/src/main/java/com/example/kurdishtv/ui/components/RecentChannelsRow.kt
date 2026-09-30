@@ -95,7 +95,8 @@ fun RecentChannelsRow(
                 // watching a channel shifted every other entry's key, so the whole
                 // row was torn down and rebuilt on each watch instead of just
                 // moving one item. The id is already unique by construction.
-                key = { _, item -> item.id }
+                key = { _, item -> item.id },
+                contentType = { _, _ -> "recent_channel_chip" }
             ) { _, channel ->
                 RecentChannelChip(
                     channel = channel,
@@ -129,7 +130,7 @@ private fun RecentChannelChip(
     val chipShape = CornerScale.uniform(20.dp).toShape()
     val tileShape: Shape = remember { RoundedCornerShape(percent = 50) }
     // The click keeps the focus target; the ring observes it. See `expressiveFocusRing`.
-    val focusSource = remember { MutableInteractionSource() }
+    val focusSource = remember(channel.id) { MutableInteractionSource() }
 
     Surface(
         shape = chipShape,

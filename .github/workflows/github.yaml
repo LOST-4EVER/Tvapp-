@@ -100,7 +100,6 @@ jobs:
 
       - name: Resolve the release version
         id: version
-        if: github.event_name != 'pull_request'
         env:
           # Required by the `gh release view` probe below. Without a token that
           # call exits non-zero on auth, which made the probe report "tag is
@@ -117,20 +116,12 @@ jobs:
             TAG="${GITHUB_REF_NAME}"
           else
             # Advance the patch number past the newest published release.
-            #
-            # This used to be a fixed value in gradle.properties, so once a
-            # versionName shipped it stayed taken forever: every build resolved
-            # to the same tag and overwrote the same release and APK asset. The
-            # APK replaced itself in place, so a release that reported 1.0.22
-            # kept changing contents underneath anyone who had already
-            # downloaded it, and the release history stayed frozen at 1.0.22.
-            #
-            # Deriving it from the latest published tag means each green build
-            # gets its own version, its own tag and its own immutable asset.
             LATEST=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo '')
             LATEST_PATCH=$(echo "${LATEST:-}" | sed -E 's/^v?([0-9]+)\.([0-9]+)\.([0-9]+).*$/\3/')
+            LATEST_PATCH=${LATEST_PATCH:-0}
             if echo "${LATEST:-}" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+'; then
               BASE_PATCH=$(echo "$VERSION_NAME" | cut -d. -f3)
+              BASE_PATCH=${BASE_PATCH:-0}
               NEXT_PATCH=$(( LATEST_PATCH > BASE_PATCH ? LATEST_PATCH : BASE_PATCH ))
               NEXT_PATCH=$(( NEXT_PATCH + 1 ))
               VERSION_NAME="1.0.${NEXT_PATCH}"
@@ -298,4 +289,5 @@ jobs:
           # --quiet: this runs on every main build, and a no-op commit must not
           # produce an empty commit that would loop the workflow.
           git commit --quiet -m "Update manifest for ${TAG}" || echo "Manifest already current."
-          git push --quiet || echo "Nothing to push."
+          git pull --rebase --quiet origin "${GITHUB_REF_NAME}" 2>/dev/null || true
+          git push --quiet origin "HEAD:${GITHUB_REF_NAME}" || echo "Nothing to push."

@@ -54,25 +54,9 @@ object NetworkClient {
     private var mediaClientInstance: OkHttpClient? = null
 
     /**
-     * Safe DNS lookup, shared by both clients.
-     *
-     * Hoisted out of [buildClient] so the media client can use it too. Held as a
-     * single immutable value rather than rebuilt per client: it is stateless, and
-     * two identical wrappers guarding two clients was one more thing that could
-     * be applied to one and forgotten on the other.
+     * Safe, high-performance cached DNS lookup shared by both playlist and media clients.
      */
-    private val safeDns: Dns = object : Dns {
-        override fun lookup(hostname: String): List<InetAddress> {
-            return try {
-                Dns.SYSTEM.lookup(hostname)
-            } catch (se: SecurityException) {
-                throw UnknownHostException("Permission denied during DNS lookup: ${se.message}")
-            } catch (t: Throwable) {
-                if (t is UnknownHostException) throw t
-                throw UnknownHostException("Unable to resolve host '$hostname': ${t.message}")
-            }
-        }
-    }
+    private val safeDns: Dns = FastCachingDns()
 
     fun getOkHttpClient(context: Context): OkHttpClient {
         return clientInstance ?: synchronized(this) {
@@ -114,7 +98,7 @@ object NetworkClient {
                         maxRequestsPerHost = 8
                     }
                 )
-                .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
+                .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(15, TimeUnit.SECONDS)
@@ -133,6 +117,12 @@ object NetworkClient {
     fun createMediaDataSourceFactory(context: Context): OkHttpDataSource.Factory {
         return OkHttpDataSource.Factory(getMediaClient(context))
             .setUserAgent(USER_AGENT)
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Accept" to "*/*",
+                    "Connection" to "keep-alive"
+                )
+            )
     }
 
     private fun buildClient(appContext: Context): OkHttpClient {

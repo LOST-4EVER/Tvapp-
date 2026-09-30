@@ -86,6 +86,10 @@ object StartIoAds {
      */
     fun init(context: Context) {
         if (!started.compareAndSet(false, true)) return
+        if (!AdEnvironment.isAdRenderingSupported()) {
+            NetworkClient.logDebug("Start.io ads disabled on emulator or unsupported rendering environment")
+            return
+        }
         try {
             StartAppSDK.setTestAdsEnabled(BuildConfig.DEBUG)
             StartAppSDK.initParams(context.applicationContext, APP_ID)

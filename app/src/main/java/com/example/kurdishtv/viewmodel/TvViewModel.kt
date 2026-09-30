@@ -4,19 +4,15 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.BuildConfig
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.model.ChannelFilterEngine
 import com.example.kurdishtv.model.KurdishChannelCatalog
 import com.example.kurdishtv.network.NetworkMonitor
 import com.example.kurdishtv.repository.TvRepository
-import com.example.kurdishtv.update.ApkInstaller
 import com.example.kurdishtv.update.AppUpdate
-import com.example.kurdishtv.update.DownloadState
 import com.example.kurdishtv.update.UpdateChecker
 import com.example.kurdishtv.update.UpdateState
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -26,7 +22,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 
 class TvViewModel(
     private val repository: TvRepository,
@@ -54,133 +49,46 @@ class TvViewModel(
      * and therefore every collector of it, which is the whole navigation graph — once
      * a second, whether or not the player was the visible screen.
      */
-    private val _sleepTimer = MutableStateFlow(SleepTimerState())
-    val sleepTimer: StateFlow<SleepTimerState> = _sleepTimer.asStateFlow()
+    private val sleepTimerManager = SleepTimerManager(viewModelScope) {
+        _uiState.update { it.copy(isPlaybackPaused = true) }
+    }
+    val sleepTimer: StateFlow<SleepTimerState> = sleepTimerManager.sleepTimer
 
-    private var sleepTimerJob: Job? = null
     private var searchJob: Job? = null
     private var loadJob: Job? = null
-    private var updateJob: Job? = null
 
-    // ── Channel numbers on the remote keypad ────────────────────────────────
-    //
-    // A television remote has a number pad, and this app ignored every key on it.
-    // The numbers are the fastest way to reach a channel on a screen with six
-    // hundred of them, and they are what a viewer who knows "NRT is 47" reaches
-    // for without thinking about it.
-    private val _channelJump = MutableStateFlow<ChannelJump?>(null)
-    val channelJump: StateFlow<ChannelJump?> = _channelJump.asStateFlow()
+    private val keypadController = ChannelKeypadController(
+        coroutineScope = viewModelScope,
+        getFilteredChannels = { _uiState.value.filteredChannels },
+        onChannelSelected = { channel -> onChannelSelected(channel) }
+    )
+    val channelJump: StateFlow<ChannelJump?> = keypadController.channelJump
 
-    private var jumpCommitJob: Job? = null
-
-    private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
-    val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
-
-    /** Downloaded APKs live in cache/updates, which the system may clear. */
-    private val updateDir: File?
-        get() = appContext?.let { File(it.cacheDir, "updates") }
+    private val updateController = UpdateController(viewModelScope, updateChecker, appContext)
+    val updateState: StateFlow<UpdateState> = updateController.updateState
+    val needsInstallPermission: StateFlow<Boolean> = updateController.needsInstallPermission
 
     private companion object {
         /** Long enough to coalesce a burst of keystrokes, short enough to feel live. */
         const val SEARCH_DEBOUNCE_MS = 220L
-
-        /**
-         * How long a typed number waits for another digit before it is acted on.
-         *
-         * A viewer typing "47" has to be given time to type the 7, and a viewer who
-         * stops at "4" has to be given time to notice that nothing happened. Just
-         * over a second is the usual compromise on a television, where the distance
-         * to the remote makes fine motor timing less reliable than it is on a
-         * keyboard.
-         */
-        const val JUMP_COMMIT_DELAY_MS = 1_400L
-
-        /**
-         * The most digits a channel number can have.
-         *
-         * Not cosmetic: a remote key that sticks, or a viewer holding a digit down
-         * through auto-repeat, would otherwise append forever and the number could
-         * never match anything again. Four digits is beyond any list this app holds.
-         */
-        const val MAX_JUMP_DIGITS = 4
     }
 
     // ── Channel numbers ─────────────────────────────────────────────────────
 
-    /**
-     * Adds a digit to the number being typed.
-     *
-     * `digit` is 0-9. Anything else is ignored rather than clamped, because a key
-     * that is not a number reaching here means the caller is wrong, and guessing
-     * would be worse than doing nothing.
-     */
     fun onNumericKey(digit: Int) {
-        if (digit !in 0..9) return
-        val current = _channelJump.value?.digits.orEmpty()
-        setJump((current + digit).takeLast(MAX_JUMP_DIGITS))
+        keypadController.onNumericKey(digit)
     }
 
-    /** Removes the last digit, or cancels the whole entry if it was the only one. */
     fun onNumericBackspace() {
-        val shorter = _channelJump.value?.digits?.dropLast(1) ?: return
-        if (shorter.isEmpty()) cancelChannelJump() else setJump(shorter)
+        keypadController.onNumericBackspace()
     }
 
-    /**
-     * Publishes a number and restarts the idle timer that acts on it.
-     *
-     * One place, because the target has to be recomputed and the timer restarted on
-     * every change to the digits — and doing the two separately is how the readout
-     * ends up describing a number the viewer has already edited past.
-     */
-    private fun setJump(digits: String) {
-        _channelJump.value = ChannelJump(digits = digits, target = jumpTargetFor(digits))
-        jumpCommitJob?.cancel()
-        jumpCommitJob = viewModelScope.launch {
-            delay(JUMP_COMMIT_DELAY_MS)
-            commitChannelJump()
-        }
-    }
-
-    /**
-     * Acts on the number being typed and clears the readout.
-     *
-     * Selects rather than plays. Typing a number is a way of *moving* through the
-     * list — the grid scrolls the channel into view and takes D-pad focus, and the
-     * preview pane follows — and the viewer presses OK for the channel they want,
-     * exactly as they would if they had arced to it. Jumping straight to fullscreen
-     * video from a number key makes every mistyped digit a stream the app then has
-     * to start, buffer and tear down.
-     */
     fun commitChannelJump() {
-        jumpCommitJob?.cancel()
-        val target = _channelJump.value?.target
-        _channelJump.value = null
-        if (target != null) onChannelSelected(target)
+        keypadController.commitChannelJump()
     }
 
-    /** Throws the number away without acting on it. */
     fun cancelChannelJump() {
-        jumpCommitJob?.cancel()
-        _channelJump.value = null
-    }
-
-    /**
-     * The channel a number names, in the list the viewer is actually looking at.
-     *
-     * The *filtered* list, not the whole catalogue: the numbers are the ones shown
-     * in the sidebar and implied by the grid, so a number that only resolved
-     * against channels the viewer has filtered out, searched away or never scrolled
-     * to would tune a channel they cannot see and cannot recognise.
-     *
-     * One-based, because that is how a television numbers its channels and how the
-     * sidebar labels them. Zero is not a channel number, so it never resolves —
-     * which is also what makes it a safe digit to *start* a number with.
-     */
-    private fun jumpTargetFor(digits: String): Channel? {
-        val number = digits.toIntOrNull() ?: return null
-        if (number < 1) return null
-        return _uiState.value.filteredChannels.getOrNull(number - 1)
+        keypadController.cancelChannelJump()
     }
 
     init {
@@ -372,7 +280,7 @@ class TvViewModel(
     fun onSearchQueryChanged(query: String) {
         // The numbers name positions in the current results, and the results are
         // changing underneath them.
-        if (_channelJump.value != null) cancelChannelJump()
+        if (channelJump.value != null) cancelChannelJump()
         // Store the query immediately so the text field stays responsive, but debounce the
         // actual filtering. Re-filtering every channel on every keystroke was the main cause
         // of jank while typing, since the merged remote playlists can hold thousands of
@@ -387,16 +295,6 @@ class TvViewModel(
                 ChannelFilterEngine.filter(state.channels, state.selectedCategory, query)
             }
             _uiState.update { current ->
-                // The query is not the only thing that can have moved. A merge
-                // landing during the filter replaces `channels` with a different
-                // list, and publishing a result derived from the *old* one would
-                // leave the grid showing channels that are no longer in the
-                // catalogue — the search would silently answer a question about
-                // a list that had already been replaced.
-                //
-                // Identity, not equality: a re-merge produces a new object even
-                // when it holds the same channels, and in that case the merge's
-                // own filter pass is what should be published, not this one.
                 if (current.searchQuery != query || current.channels !== state.channels) current
                 else current.copy(filteredChannels = filtered)
             }
@@ -406,7 +304,7 @@ class TvViewModel(
     fun onCategorySelected(category: CategoryFilter) {
         // Same reason as the search: a number typed into the previous category does
         // not name the same channel in the new one.
-        if (_channelJump.value != null) cancelChannelJump()
+        if (channelJump.value != null) cancelChannelJump()
         // A category switch supersedes any in-flight search debounce.
         searchJob?.cancel()
         // Already showing it, and the filtered list tracks it: nothing to compute.
@@ -459,7 +357,7 @@ class TvViewModel(
             // has to draw the grid it is drawing into.
             val snapshot = _uiState.value
             val rebuilt = withContext(Dispatchers.Default) {
-                rebuildForFavorite(snapshot, channelId, isFav)
+                FavoriteRebuilder.rebuildForFavorite(snapshot, channelId, isFav)
             }
             _uiState.update { state ->
                 // A merge, a search or a second tap can land while the rebuild is
@@ -468,7 +366,7 @@ class TvViewModel(
                 // different object even when it holds the same channels, and
                 // recomputing for it is what keeps the two answers consistent.
                 if (state.channels !== snapshot.channels) {
-                    val fresh = rebuildForFavorite(state, channelId, isFav)
+                    val fresh = FavoriteRebuilder.rebuildForFavorite(state, channelId, isFav)
                     state.copy(
                         channels = fresh.channels,
                         filteredChannels = fresh.filteredChannels,
@@ -487,65 +385,10 @@ class TvViewModel(
         }
     }
 
-    /** The four lists a heart tap changes, derived together so they cannot disagree. */
-    private data class FavoriteUpdate(
-        val channels: List<Channel>,
-        val filteredChannels: List<Channel>,
-        val selectedChannel: Channel?,
-        val recentChannels: List<Channel>
-    )
-
-    /**
-     * Applies one favourite flag across every list that holds a copy of a channel.
-     *
-     * Only the Favourites tab actually changes membership when a heart is tapped.
-     * In the other eleven categories the channel is in the list before and after,
-     * and what changed about it is one boolean — so the same `Channel` instance
-     * with the flag flipped is substituted into the existing filtered list instead
-     * of re-deriving the list from several hundred channels.
-     *
-     * This is the action a viewer performs most often after watching something,
-     * so the difference between "replace one element" and "refilter everything" is
-     * the difference between instant and a visible stall on a large merged
-     * playlist.
-     */
-    private fun rebuildForFavorite(
-        state: TvUiState,
-        channelId: String,
-        isFav: Boolean
-    ): FavoriteUpdate {
-        val updatedChannels = state.channels.map {
-            if (it.id == channelId) it.copy(isFavorite = isFav) else it
-        }
-        val updatedSelected = if (state.selectedChannel?.id == channelId) {
-            state.selectedChannel.copy(isFavorite = isFav)
-        } else state.selectedChannel
-        val updatedRecents = state.recentChannels.map {
-            if (it.id == channelId) it.copy(isFavorite = isFav) else it
-        }
-        val filtered = if (state.selectedCategory == CategoryFilter.FAVORITES) {
-            ChannelFilterEngine.filter(
-                updatedChannels,
-                state.selectedCategory,
-                state.searchQuery
-            )
-        } else {
-            state.filteredChannels.map {
-                if (it.id == channelId) it.copy(isFavorite = isFav) else it
-            }
-        }
-        return FavoriteUpdate(
-            channels = updatedChannels,
-            filteredChannels = filtered,
-            selectedChannel = updatedSelected,
-            recentChannels = updatedRecents
-        )
-    }
-
     fun onChannelSelected(channel: Channel) {
         // Any number on screen is now describing a different selection, and leaving
         // the readout up would claim a channel the viewer has moved off.
-        if (_channelJump.value != null) cancelChannelJump()
+        if (channelJump.value != null) cancelChannelJump()
         // Selecting the channel should feel instant, so update the selection first and
         // refresh the "recently watched" row once the write has completed.
         _uiState.update { it.copy(selectedChannel = channel, isPlaybackPaused = false) }
@@ -681,39 +524,7 @@ class TvViewModel(
     }
 
     fun setSleepTimer(minutes: Int) {
-        sleepTimerJob?.cancel()
-        if (minutes <= 0) {
-            _sleepTimer.value = SleepTimerState()
-            return
-        }
-
-        val totalSeconds = minutes * 60
-        _sleepTimer.value = SleepTimerState(
-            minutes = minutes,
-            formattedText = formatRemainingTime(totalSeconds)
-        )
-
-        sleepTimerJob = viewModelScope.launch {
-            var remaining = totalSeconds
-            while (remaining > 0) {
-                delay(1000L)
-                remaining--
-                // Only the timer's own flow moves. See [sleepTimer].
-                _sleepTimer.value = SleepTimerState(
-                    minutes = minutes,
-                    formattedText = formatRemainingTime(remaining)
-                )
-            }
-            // Sleep timer finished: pause playback cleanly
-            _sleepTimer.value = SleepTimerState()
-            _uiState.update { it.copy(isPlaybackPaused = true) }
-        }
-    }
-
-    private fun formatRemainingTime(seconds: Int): String {
-        val mins = seconds / 60
-        val secs = seconds % 60
-        return String.format(Locale.US, "%02d:%02d", mins, secs)
+        sleepTimerManager.setSleepTimer(minutes)
     }
 
     fun toggleMute() {
@@ -747,176 +558,34 @@ class TvViewModel(
         }
     }
 
-    // ── In-app update ─────────────────────────────────────────────────────────
+    // ── In-app update (delegated to UpdateController) ─────────────────────────
 
-    /**
-     * Asks GitHub whether a newer build exists.
-     *
-     * @param silent when true, a failed check leaves the UI untouched so the
-     *   automatic background check never surfaces an error the user did not ask for.
-     */
     fun checkForUpdate(silent: Boolean = false) {
-        val checker = updateChecker ?: return
-        if (updateJob?.isActive == true) return
-
-        updateJob = viewModelScope.launch {
-            if (!silent) _updateState.value = UpdateState.Checking
-
-            val result = checker.checkForUpdate(BuildConfig.VERSION_CODE)
-            result
-                .onSuccess { update ->
-                    _updateState.value = when {
-                        update != null -> UpdateState.Available(update)
-                        silent -> UpdateState.Idle
-                        else -> UpdateState.UpToDate(BuildConfig.VERSION_NAME)
-                    }
-                }
-                .onFailure { error ->
-                    // A silent check must not show a failure the user did not request.
-                    if (!silent) {
-                        _updateState.value = UpdateState.Failed(
-                            error.message ?: "Could not reach the update server"
-                        )
-                    }
-                }
-        }
+        updateController.checkForUpdate(silent)
     }
 
-    /** Downloads an available update, reporting progress into [updateState]. */
     fun downloadUpdate(update: AppUpdate) {
-        val checker = updateChecker ?: return
-        val dir = updateDir ?: return
-        if (updateJob?.isActive == true) return
-
-        updateJob = viewModelScope.launch {
-            _updateState.value = UpdateState.Downloading(update, DownloadState.Idle)
-            checker.download(update, dir) { progress ->
-                _updateState.value = UpdateState.Downloading(update, progress)
-            }
-                .onSuccess { file ->
-                    _updateState.value = UpdateState.ReadyToInstall(update, file.absolutePath)
-                }
-                .onFailure { error ->
-                    _updateState.value = UpdateState.Failed(
-                        error.message ?: "Download failed"
-                    )
-                }
-        }
+        updateController.downloadUpdate(update)
     }
 
-    /**
-     * Opens the system installer for a downloaded APK.
-     *
-     * Suspends, because it is not a cheap call: comparing signing certificates
-     * parses the downloaded archive's manifest and certificate block, which on a
-     * multi-megabyte APK is real disk I/O and crypto. It used to run synchronously
-     * from the Install button's click handler, putting all of that on the main
-     * thread for exactly as long as it takes.
-     *
-     * Returns false when the install could not be started. Each failure gets its own
-     * message because the fix is different in every case: a missing file needs a
-     * re-download, an ungranted "allow from this source" needs the settings screen,
-     * and a changed signing key needs an uninstall.
-     */
     suspend fun installUpdate(update: AppUpdate, filePath: String): Boolean {
-        val context = appContext ?: return false
-        val file = File(filePath)
-        if (!file.exists()) {
-            _updateState.value = UpdateState.Failed("The downloaded update is missing, please retry")
-            return false
-        }
-        if (!ApkInstaller.canRequestPackageInstalls(context)) {
-            _needsInstallPermission.value = true
-            // Deliberately not a failure state: the download is still good, the
-            // button must survive, and the caller turns this into a trip to Settings.
-            // See [requestInstallUpdate].
-            return false
-        }
-        _needsInstallPermission.value = false
-        val sameSignature = withContext(Dispatchers.IO) {
-            ApkInstaller.isSignedBySameCertificate(context, file)
-        }
-        if (!sameSignature) {
-            // Android reports this only from inside its own installer, as
-            // "package conflicts with an existing package", which reads like a
-            // corrupt download. It is actually a different signing key, which
-            // only an uninstall can clear.
-            _updateState.value = UpdateState.Failed(
-                "This update is signed with a different key than the app already on this " +
-                    "device, so Android cannot upgrade over it. Uninstall Kurdish TV Live, " +
-                    "then install the update. Uninstalling clears your favourites and " +
-                    "watch history."
-            )
-            return false
-        }
-        val started = ApkInstaller.install(context, file)
-        if (!started) {
-            _updateState.value =
-                UpdateState.Failed("This device could not start the package installer")
-        }
-        return started
+        return updateController.installUpdate(update, filePath)
     }
 
-    /**
-     * Non-suspend entry point for the Install button.
-     *
-     * Only the "allow from this source" case can be fixed by sending the user to
-     * settings. Every other failure (missing file, changed signing key, no
-     * installer) is already reported in the update card, and bouncing the user
-     * into a settings screen that cannot help is worse than saying what went
-     * wrong.
-     *
-     * Critically, [installUpdate] must be left in [UpdateState.ReadyToInstall] when
-     * it stops for want of that permission. It used to overwrite the state with
-     * [UpdateState.Failed], and because the card renders its actions *from* the
-     * state, that removed the Install button and replaced it with "Retry / Dismiss" —
-     * which re-runs the update *check*, not the install. So the flow was: tap Install,
-     * get bounced to Settings, grant the permission, come back, and find that the
-     * multi-megabyte APK that had already been downloaded could no longer be
-     * installed from the app at all. The only way out was a second full download.
-     */
     fun requestInstallUpdate(update: AppUpdate, filePath: String) {
-        viewModelScope.launch {
-            if (!installUpdate(update, filePath) && needsInstallPermissionNow()) {
-                // Put the card back where it was before bouncing to Settings, so the
-                // Install button is still there on the way back in.
-                _updateState.value = UpdateState.ReadyToInstall(update, filePath)
-                openInstallPermissionSettings()
-            }
-        }
+        updateController.requestInstallUpdate(update, filePath)
     }
 
-    /**
-     * Whether Android is still refusing to let this app install packages.
-     *
-     * Exposed as state rather than as a function because the update card reads it
-     * during composition, and the underlying check goes to `PackageManager`. Reading
-     * it on every recomposition of the navigation graph meant a binder round trip
-     * per frame of whatever animation was running; the answer only ever changes when
-     * the user leaves and re-enters the system settings screen, so it is re-read
-     * when Settings is opened and when an install is attempted.
-     */
-    private val _needsInstallPermission = MutableStateFlow(false)
-    val needsInstallPermission: StateFlow<Boolean> = _needsInstallPermission.asStateFlow()
-
-    /** Re-reads the permission. Cheap, and only called at the two moments it can change. */
     fun refreshInstallPermission() {
-        val context = appContext ?: return
-        _needsInstallPermission.value = !ApkInstaller.canRequestPackageInstalls(context)
-    }
-
-    /** True when the app still needs permission to install packages. */
-    private fun needsInstallPermissionNow(): Boolean {
-        val context = appContext ?: return false
-        return !ApkInstaller.canRequestPackageInstalls(context)
+        updateController.refreshInstallPermission()
     }
 
     fun openInstallPermissionSettings() {
-        appContext?.let { ApkInstaller.openInstallPermissionSettings(it) }
+        updateController.openInstallPermissionSettings()
     }
 
     fun clearUpdateMessage() {
-        _updateState.value = UpdateState.Idle
+        updateController.clearUpdateMessage()
     }
 
     class Factory(

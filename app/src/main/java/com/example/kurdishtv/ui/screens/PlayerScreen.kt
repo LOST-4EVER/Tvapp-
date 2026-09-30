@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -129,6 +132,7 @@ fun PlayerScreen(
     var lastChannelStepAt by remember { mutableStateOf<Long?>(null) }
 
     val shouldPlay = isUserPlaying && !isPlaybackPaused
+    val playerFocusRequester = remember { FocusRequester() }
 
     DisposableEffect(isFullscreen, activity) {
         val window = activity?.window
@@ -171,6 +175,14 @@ fun PlayerScreen(
         }
     }
 
+    // When transport controls fade out, transfer focus to the player Box so remote hardware
+    // keys (digits, channel stepping, play/pause) continue to be intercepted reliably.
+    LaunchedEffect(isControlsVisible) {
+        if (!isControlsVisible) {
+            runCatching { playerFocusRequester.requestFocus() }
+        }
+    }
+
     if (showSleepDialog) {
         SleepTimerDialog(
             currentMinutes = sleepTimerMinutes,
@@ -183,6 +195,8 @@ fun PlayerScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
+            .focusRequester(playerFocusRequester)
+            .focusable()
             // The remote was dead while the controls were hidden.
             //
             // Auto-hide takes the transport bar out of the composition, and the bar is
@@ -275,11 +289,42 @@ fun PlayerScreen(
                     // Only while one is up, so OK still reaches whatever control has
                     // focus, and only on the first press, so leaning on OK does not
                     // commit a number that is still being typed.
-                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter ->
+                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
                         if (channelJump != null) {
                             if (!isRepeat) onNumericCommit()
                             true
+                        } else {
+                            if (!isControlsVisible) {
+                                isControlsVisible = true
+                                true
+                            } else {
+                                if (!isRepeat) isUserPlaying = !isUserPlaying
+                                true
+                            }
+                        }
+                    }
+
+                    Key.DirectionUp -> {
+                        if (!isControlsVisible) {
+                            stepChannel(1)
                         } else false
+                    }
+                    Key.DirectionDown -> {
+                        if (!isControlsVisible) {
+                            stepChannel(-1)
+                        } else false
+                    }
+                    Key.DirectionLeft -> {
+                        if (!isControlsVisible) {
+                            stepChannel(-1)
+                        } else false
+                    }
+                    Key.DirectionRight -> {
+                        if (!isControlsVisible) {
+                            stepChannel(1)
+                        } else false
+                    }
+
                     // One press, one digit. A held backspace used to clear the lot.
                     Key.Backspace ->
                         if (channelJump != null) {
@@ -307,6 +352,7 @@ fun PlayerScreen(
             colorFilter = colorFilter,
             areControlsVisible = isControlsVisible,
             reloadKey = retryToken,
+            isMuted = isMuted,
             modifier = Modifier.fillMaxSize()
         )
 

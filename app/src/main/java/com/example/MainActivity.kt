@@ -5,8 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import com.example.kurdishtv.ads.StartIoAdsHost
 import com.example.kurdishtv.data.ChannelCacheStorage
 import com.example.kurdishtv.data.CustomPlaylistStorage
@@ -64,6 +68,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
         enableEdgeToEdge()
 
         setContent {
@@ -85,19 +90,15 @@ class MainActivity : ComponentActivity() {
             StartIoAdsHost(enabled = settingsLoaded && settings.adsEnabled)
 
             KurdishTvTheme(settings = settings) {
-                // No frame loops here any more.
-                //
-                // This used to stand up two of them for the whole life of the
-                // process: a shared `withFrameNanos` loop breathing every LIVE badge
-                // on screen, and another slowly turning every focus ring. Both were
-                // correctly demand-driven — they stopped when nothing was reading
-                // them and when the app left the foreground — and both were still
-                // there, which is the point: the demand was never the problem, the
-                // animation was.
-                KurdishTvNavGraph(
-                    viewModel = viewModel,
-                    settingsViewModel = settingsViewModel
-                )
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    KurdishTvNavGraph(
+                        viewModel = viewModel,
+                        settingsViewModel = settingsViewModel
+                    )
+                }
             }
         }
     }

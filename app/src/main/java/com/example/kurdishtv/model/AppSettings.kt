@@ -56,7 +56,7 @@ enum class DeviceMode(val displayName: String) {
  */
 data class AppSettings(
     val accent: AccentColor = AccentColor.SUN_GOLD,
-    val themeMode: ThemeMode = ThemeMode.DARK,
+    val themeMode: ThemeMode = ThemeMode.AMOLED,
     /**
      * Which layout family to present. [DeviceMode.AUTO] follows the device; the other
      * two override it. Resolved into `LocalIsTv` by the theme layer, which is the only
@@ -72,7 +72,7 @@ data class AppSettings(
      * Material You: derive accent colors from the device wallpaper palette.
      * Requires Android 12+ (API 31); ignored on older releases.
      */
-    val dynamicColor: Boolean = true,
+    val dynamicColor: Boolean = false,
     /**
      * How the video fills the screen: the FIT/FILL/ZOOM toggle in the player.
      *
@@ -86,18 +86,15 @@ data class AppSettings(
     /** The video colour correction last chosen in the player, for the same reason. */
     val videoColorFilter: VideoColorFilter = VideoColorFilter.None,
     /**
-     * Whether the viewer has agreed to ads.
-     *
-     * On for an install that has never opened Settings, because the ads shipped before
-     * this switch existed and defaulting to off would have switched them off for
-     * everybody in an update while nobody was looking.
-     *
-     * Off is a hard opt-out, not a preference about personalisation: nothing is
-     * requested at all. The ad SDK is not even started while it is off, which is what
-     * makes that true rather than merely what the screen looks like — see
-     * [com.example.kurdishtv.ads.adsMayBeRequested].
+     * Whether the viewer has explicitly agreed to and enabled ads.
+     * Off by default.
      */
-    val adsEnabled: Boolean = true
+    val adsEnabled: Boolean = false,
+    /**
+     * Whether the Ads section in Settings has been unlocked by holding the
+     * full cache reset button for 10 seconds.
+     */
+    val adMenuUnlocked: Boolean = false
 ) {
     val isAmoled: Boolean get() = themeMode == ThemeMode.AMOLED
 }
