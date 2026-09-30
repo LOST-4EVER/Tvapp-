@@ -210,20 +210,25 @@ dependencies {
   // implementation(libs.logging.interceptor)
   // implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  // Start.io (formerly StartApp) in-app ads. Carries its own consumer ProGuard rules
-  // (proguard.txt in the AAR), so no hand-written keeps are needed here.
+  // Start.io (formerly StartApp) in-app ads, pinned to 5.3.1 rather than the newest
+  // 5.3.2, and both reasons are hard build failures rather than warnings.
   //
-  // Its transitive `kotlin-stdlib` is excluded. The SDK is built against Kotlin 2.4.0
-  // and declares that as a plain compile dependency rather than a range, so it outvoted
-  // the stdlib this project's compiler ships: "Class 'kotlin.Lazy' was compiled with an
-  // incompatible version of Kotlin ... the compiler version 2.2.0 can read versions up
-  // to 2.3.0", and then an unresolved `lazy`, `javaClass` and property-delegate error
-  // in every Kotlin file in the app, the SDK's own included. Excluding it leaves the
-  // stdlib the Kotlin plugin adds at the compiler's own version, which is the only one
-  // this build can read; nothing else here asks for a newer one.
-  implementation(libs.startapp.inapp.sdk) {
-    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
-  }
+  // 5.3.2's AAR metadata requires compileSdk 37, which this project does not use and
+  // AGP refuses to build against rather than warning about. It is the only release in
+  // the catalogue that constrains it; every version below it asks for nothing.
+  //
+  // 5.3.2 also declares kotlin-stdlib 2.4.0 as a plain compile dependency rather than
+  // a range, so it outvotes the 2.2.10 stdlib this project's compiler ships. A
+  // compiler that can read metadata only up to 2.3.0 does not degrade gracefully:
+  // "Class 'kotlin.Lazy' was compiled with an incompatible version of Kotlin", and
+  // then an unresolved `lazy`, `javaClass` and property-delegate error in every Kotlin
+  // file in the app, the SDK's own included. 5.3.1 declares 2.0.0, older than this
+  // project's, so the stdlib resolves to the compiler's own version and nothing has to
+  // be excluded. Re-check both of these before moving the pin.
+  //
+  // The SDK carries its own consumer ProGuard rules (proguard.txt in the AAR), so no
+  // hand-written keeps are needed here either.
+  implementation(libs.startapp.inapp.sdk)
   // implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
