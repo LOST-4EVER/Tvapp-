@@ -30,7 +30,8 @@ class SettingsStorage(context: Context) {
                 videoColorFilter = enumOrDefault(
                     prefs.getString(KEY_VIDEO_FILTER, null),
                     VideoColorFilter.None
-                )
+                ),
+                adsEnabled = prefs.getBoolean(KEY_ADS_ENABLED, true)
             )
         } catch (_: Exception) {
             AppSettings()
@@ -50,6 +51,7 @@ class SettingsStorage(context: Context) {
                 .putBoolean(KEY_DYNAMIC_COLOR, settings.dynamicColor)
                 .putString(KEY_RESIZE_MODE, settings.resizeMode.name)
                 .putString(KEY_VIDEO_FILTER, settings.videoColorFilter.name)
+                .putBoolean(KEY_ADS_ENABLED, settings.adsEnabled)
                 .apply()
         } catch (_: Exception) {}
     }
@@ -68,5 +70,6 @@ class SettingsStorage(context: Context) {
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
         private const val KEY_RESIZE_MODE = "player_resize_mode"
         private const val KEY_VIDEO_FILTER = "player_video_filter"
+        private const val KEY_ADS_ENABLED = "ads_enabled"
     }
 }

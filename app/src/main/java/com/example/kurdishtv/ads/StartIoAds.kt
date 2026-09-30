@@ -46,6 +46,38 @@ object StartIoAds {
         private set
 
     /**
+     * Whether the viewer has agreed to ads.
+     *
+     * False until the stored preference has actually been read, which is the point: the
+     * default is "on", so treating the default as an answer would start the SDK for
+     * somebody who had switched ads off.
+     */
+    var isAllowed by mutableStateOf(false)
+        private set
+
+    /**
+     * True only when an ad may be requested: agreed to, and the SDK is up.
+     *
+     * The one question every request site asks. See [adsMayBeRequested] for why the two
+     * halves are not interchangeable.
+     */
+    val canRequestAds: Boolean get() = adsMayBeRequested(isAllowed, isReady)
+
+    /**
+     * Records the viewer's decision.
+     *
+     * Deliberately does not start or stop anything. The SDK cannot be un-initialised, so
+     * "off" is enforced at the request sites rather than here, and
+     * [com.example.kurdishtv.ads.StartIoAdsHost] is what reacts to the change.
+     *
+     * Not called `setAllowed`, which is the JVM signature of [isAllowed]'s own setter and
+     * clashes with it at compile time.
+     */
+    fun recordConsent(allowed: Boolean) {
+        isAllowed = allowed
+    }
+
+    /**
      * Initialises the SDK at most once per process.
      *
      * Idempotent so it can be called from every activity `onCreate` — the activity

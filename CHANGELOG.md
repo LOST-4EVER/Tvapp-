@@ -369,6 +369,66 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Initialisation is idempotent, and it cannot take the app down: a device without
     Play services, a missing native library or a rejected app id all degrade to
     "no ads" rather than to a crash on launch.
+- **A full-page ad is now available behind a button in Settings, and the ad setup is
+  built to earn rather than merely to exist.** A banner is the least valuable format
+  there is, and on a television this one does not serve at all — so the screen that
+  carried it could not earn anything on the device the app is built for. A full-page
+  (interstitial) ad is worth many times a banner impression, and asking for it with a
+  button makes it something the viewer chose rather than something done to them.
+  - **It is preloaded, not loaded on the tap.** A load takes a second or more, and for
+    the whole of it the viewer is stood watching a button do nothing. The ad is fetched
+    as soon as the SDK reports ready — from `MainActivity`, not from the Settings screen
+    — so by the time anyone reaches the button there is already an ad in memory and the
+    tap is instant.
+  - **A tap is never discarded.** Pressing while a request is still out marks the ad to
+    show the moment it lands. Without that, the first tap on a cold screen is silently
+    dropped, which costs the impression *and* teaches the viewer that the button does
+    nothing.
+  - **A tap is never a dead end, and the line under the button says which of the three
+    states it is in** — service still coming up, ad being fetched, or no ad available.
+    One "no ad" message covering all three would make the button look broken for the
+    second or two it is merely working. That line is a pure function with a test, since
+    it is exactly the kind of three-branch text that gets collapsed back into one.
+  - **The next ad is fetched as the current one closes,** so a second tap does not pay
+    the load latency again. An ad loaded against an activity that has since been
+    recreated is dropped rather than shown, because the SDK resolves its display target
+    through that activity.
+  - **The banner and the button now share one "Support" section** at the foot of the
+    screen. That also fixes what the banner was when it drew nothing: an invisible item
+    of its own. It is now part of a section that has real content whether or not an ad
+    arrives.
+  - The banner's `AndroidView` is keyed on the ad view itself, so a re-request that
+    lands while a banner is already on screen replaces it instead of being ignored —
+    `AndroidView` calls its factory once per node and never again.
+- **Ads are now the viewer's own choice, in Settings, and declining them hides them
+  completely rather than merely not drawing them.** This is the consent the app never
+  had. It is on for an install that has never opened the screen, because the ads shipped
+  first and defaulting the other way would have switched them off for everybody in an
+  update while nobody was looking.
+  - **Off means the ad SDK is not started at all.** Not started and then ignored — the
+    initialiser is not called, so a viewer who declined is not paying for a
+    remote-config fetch, its handlers and its threads on every launch. That work used to
+    happen unconditionally in `onCreate`, before anything could know whether it was
+    wanted.
+  - **Off means nothing is requested, and that is enforced where the requests are made.**
+    Every request site asks one question — `adsMayBeRequested(agreed, sdkReady)` — which
+    lives on its own with a test. Written as just `sdkReady` it still draws no ads on the
+    screen that hides them, so the failure is invisible, while the app starts fetching
+    for every viewer who declined.
+  - **Off means an ad already fetched is let go of.** A loaded full-page ad is one
+    reference away from being put on screen, so switching off releases it rather than
+    parking it, and the last check is made at the moment the button is pressed.
+  - **The switch does not hide itself.** Only the placements below it go. Hiding the
+    whole section would hide the one control that turns ads back on, which is a setting
+    nobody could undo.
+  - **The line under the switch says what it actually does.** "Off" is not a choice about
+    which ads: it stops the app asking for any and stops the service being started, which
+    is more than a viewer would guess from a toggle going grey. It is a pure function
+    with a test, like the line under the button.
+  - **The app no longer recomposes itself when the SDK reports in.** The readiness flag
+    was read as a `LaunchedEffect` key at the root of `setContent`, so the SDK arriving
+    invalidated the whole app once on every launch. It is now waited on from inside the
+    effect, by a composable that draws nothing and has no children to invalidate.
 
 ### Changed
 - **R8 was keeping the whole of media3, which is the largest dependency in the app.**
