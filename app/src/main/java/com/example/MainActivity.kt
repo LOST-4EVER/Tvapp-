@@ -5,9 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.kurdishtv.ads.StartIoAds
+import com.example.kurdishtv.ads.StartIoFullPage
 import com.example.kurdishtv.data.ChannelCacheStorage
 import com.example.kurdishtv.data.CustomPlaylistStorage
 import com.example.kurdishtv.data.FavoriteStorage
@@ -74,6 +76,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val settings by settingsViewModel.settings.collectAsState()
+
+            // The full-page ad behind the Settings button is fetched here rather than
+            // when that screen opens. The button is a tap away from the moment the app
+            // starts, and preloading it app-wide means the tap lands on an ad that is
+            // already in memory rather than one that has to be asked for and waited out.
+            // Keyed on readiness because the SDK is still initialising on a cold start,
+            // so the first pass here is a no-op.
+            LaunchedEffect(StartIoAds.isReady) {
+                if (StartIoAds.isReady) StartIoFullPage.preload(this@MainActivity)
+            }
 
             KurdishTvTheme(settings = settings) {
                 // No frame loops here any more.

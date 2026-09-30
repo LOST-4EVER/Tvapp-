@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -74,9 +75,16 @@ fun StartIoBanner(modifier: Modifier = Modifier) {
 
     val view = adView
     if (view != null) {
-        AndroidView(
-            modifier = modifier.fillMaxWidth(),
-            factory = { view }
-        )
+        // Keyed on the view itself. `AndroidView` calls its factory once per node and
+        // never again, so a re-request that lands while a banner is already on screen
+        // would hand it a different `View` and leave the node showing the one it was
+        // built with. The key ties the node's identity to the view, so the second one
+        // replaces the first instead of being ignored.
+        key(view) {
+            AndroidView(
+                modifier = modifier.fillMaxWidth(),
+                factory = { view }
+            )
+        }
     }
 }

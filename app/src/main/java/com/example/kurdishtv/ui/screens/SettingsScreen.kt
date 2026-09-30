@@ -22,15 +22,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.os.Build
 import com.example.BuildConfig
+import com.example.kurdishtv.ads.FullPageAdState
+import com.example.kurdishtv.ads.StartIoAds
 import com.example.kurdishtv.ads.StartIoBanner
+import com.example.kurdishtv.ads.StartIoFullPage
+import com.example.kurdishtv.ads.findActivity
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.DeviceMode
 import com.example.kurdishtv.model.ThemeMode
+import com.example.kurdishtv.network.NetworkClient
 import com.example.kurdishtv.ui.components.KurdishTvIcons
 import com.example.kurdishtv.ui.components.UpdateCard
 import com.example.kurdishtv.update.AppUpdate
@@ -60,6 +66,24 @@ internal fun deviceModeHint(mode: DeviceMode, detectedIsTv: Boolean): String = w
         "Phone — the compact touch layout is forced, whatever the device reports."
 }
 
+/**
+ * The line under the "Watch an ad" button.
+ *
+ * Pure so it can be unit-tested, and kept next to the button it describes rather than
+ * inline in the composable.
+ *
+ * The two ways of not being able to show an ad read differently on purpose. A request
+ * that is still out resolves itself in a second; one that came back empty does not
+ * until the viewer asks again. One "no ad" line for both would make the button look
+ * broken for the whole of the second or two it is merely working.
+ */
+internal fun adActionSubtitle(sdkReady: Boolean, adState: FullPageAdState): String = when {
+    !sdkReady -> "Getting the ad service ready…"
+    adState == FullPageAdState.Ready -> "Plays a short video ad, and keeps the app free"
+    adState == FullPageAdState.Loading -> "Preparing an ad…"
+    else -> "No ad right now — tap to try again"
+}
+
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
@@ -82,6 +106,7 @@ fun SettingsScreen(
 ) {
     val colors = LocalAppColors.current
     val isTv = LocalIsTv.current
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val supportsDynamicColor = remember { Build.VERSION.SDK_INT >= Build.VERSION_CODES.S }
     // What the *device* says, as opposed to what the preference resolved to. Shown
@@ -389,17 +414,44 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Advertisement ─────────────────────────────────────────────────
+            // ── Support ───────────────────────────────────────────────────────
             //
-            // A single banner at the very foot of the screen, below About, where it
-            // cannot sit between the viewer and anything they came here to change.
+            // The only two places the app asks the viewer for anything, kept together at
+            // the very foot of the screen, below About, where neither can sit between the
+            // viewer and something they came here to change.
             //
-            // It draws nothing at all when there is no fill, which on a television is
-            // the normal case — Start.io's display inventory is mobile — so it is
-            // expected to be invisible on the primary target device and is here for
-            // phones and tablets for now.
-            item(key = "ad") {
-                StartIoBanner(modifier = Modifier.readableColumn(isTv))
+            // The full-page ad sits behind a button deliberately. An interstitial shown
+            // at a moment of the app's choosing is the thing viewers describe as "the app
+            // has ads now"; asked for by name, it is a favour they chose to do. It is also
+            // worth many times what the banner beside it is worth per impression — which
+            // on a television is nothing at all, because Start.io's display inventory does
+            // not serve there. That is why the section carries a real action of its own
+            // rather than being a frame around an ad that is usually invisible.
+            item(key = "support") {
+                // `LocalContext` is the activity here, but only an unwrap can prove it.
+                val activity = remember(context) { context.findActivity() }
+                SettingsSection(
+                    title = "Support",
+                    subtitle = "Ads are what keep the app free",
+                    iconRes = KurdishTvIcons.FavoriteOutline
+                ) {
+                    SettingsActionRow(
+                        iconRes = KurdishTvIcons.PlayRes,
+                        title = "Watch an ad",
+                        subtitle = adActionSubtitle(StartIoAds.isReady, StartIoFullPage.state),
+                        onClick = {
+                            val host = activity
+                            if (host == null) {
+                                // Cannot happen here — the app has one activity and this is
+                                // it — but a miss is worth a log line rather than a crash.
+                                NetworkClient.logDebug("No activity to show a full-page ad in")
+                            } else {
+                                StartIoFullPage.show(host)
+                            }
+                        }
+                    )
+                    StartIoBanner()
+                }
             }
         }
     }

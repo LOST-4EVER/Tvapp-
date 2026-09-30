@@ -369,6 +369,37 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Initialisation is idempotent, and it cannot take the app down: a device without
     Play services, a missing native library or a rejected app id all degrade to
     "no ads" rather than to a crash on launch.
+- **A full-page ad is now available behind a button in Settings, and the ad setup is
+  built to earn rather than merely to exist.** A banner is the least valuable format
+  there is, and on a television this one does not serve at all — so the screen that
+  carried it could not earn anything on the device the app is built for. A full-page
+  (interstitial) ad is worth many times a banner impression, and asking for it with a
+  button makes it something the viewer chose rather than something done to them.
+  - **It is preloaded, not loaded on the tap.** A load takes a second or more, and for
+    the whole of it the viewer is stood watching a button do nothing. The ad is fetched
+    as soon as the SDK reports ready — from `MainActivity`, not from the Settings screen
+    — so by the time anyone reaches the button there is already an ad in memory and the
+    tap is instant.
+  - **A tap is never discarded.** Pressing while a request is still out marks the ad to
+    show the moment it lands. Without that, the first tap on a cold screen is silently
+    dropped, which costs the impression *and* teaches the viewer that the button does
+    nothing.
+  - **A tap is never a dead end, and the line under the button says which of the three
+    states it is in** — service still coming up, ad being fetched, or no ad available.
+    One "no ad" message covering all three would make the button look broken for the
+    second or two it is merely working. That line is a pure function with a test, since
+    it is exactly the kind of three-branch text that gets collapsed back into one.
+  - **The next ad is fetched as the current one closes,** so a second tap does not pay
+    the load latency again. An ad loaded against an activity that has since been
+    recreated is dropped rather than shown, because the SDK resolves its display target
+    through that activity.
+  - **The banner and the button now share one "Support" section** at the foot of the
+    screen. That also fixes what the banner was when it drew nothing: an invisible item
+    of its own. It is now part of a section that has real content whether or not an ad
+    arrives.
+  - The banner's `AndroidView` is keyed on the ad view itself, so a re-request that
+    lands while a banner is already on screen replaces it instead of being ignored —
+    `AndroidView` calls its factory once per node and never again.
 
 ### Changed
 - **R8 was keeping the whole of media3, which is the largest dependency in the app.**

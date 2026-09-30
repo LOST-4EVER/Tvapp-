@@ -96,10 +96,13 @@ for a D-pad and a ten-foot viewing distance first, and adapts to touch second.
 - Material You dynamic colour on Android 12+, plus five bundled accent palettes
 
 **Monetisation**
-- A single Start.io banner at the foot of Settings, below About
+- A **Support** section at the foot of Settings, below About: a "Watch an ad" button
+  that plays a Start.io full-page (interstitial) ad, and a banner beside it
+- The full-page ad is preloaded as soon as the SDK reports ready, so the button is
+  instant, and a tap made while a request is still out is honoured rather than dropped
 - Real ads in release, test ads in debug, and an unfilled slot that draws nothing
-  rather than an empty box. Start.io's display inventory is mobile, so the banner is
-  expected to stay invisible on a television and is there for phones and tablets
+  rather than an empty box. Start.io's display inventory is mobile, so neither format
+  fills on a television — the placements are there for phones and tablets
 
 ## Architecture
 
@@ -159,7 +162,8 @@ app/src/main/java/com/example/
 ├── kurdishtv/
 │   ├── ads/                     Start.io ad SDK wiring
 │   │   ├── StartIoAds.kt        one-time SDK init and readiness state
-│   │   └── StartIoBanner.kt     Compose banner that draws nothing when unfilled
+│   │   ├── StartIoBanner.kt     Compose banner that draws nothing when unfilled
+│   │   └── StartIoFullPage.kt   preloaded full-page ad behind the Support button
 │   ├── data/                    SharedPreferences + JSON cache
 │   │   ├── ChannelCacheStorage    atomic channel-list cache
 │   │   ├── CustomPlaylistStorage  user playlist links, validated
