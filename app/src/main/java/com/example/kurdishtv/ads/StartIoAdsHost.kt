@@ -29,7 +29,7 @@ fun StartIoAdsHost(enabled: Boolean) {
     val context = LocalContext.current
 
     LaunchedEffect(enabled) {
-        StartIoAds.setAllowed(enabled)
+        StartIoAds.recordConsent(enabled)
 
         if (!enabled) {
             StartIoFullPage.release()

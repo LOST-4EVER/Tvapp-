@@ -69,8 +69,11 @@ object StartIoAds {
      * Deliberately does not start or stop anything. The SDK cannot be un-initialised, so
      * "off" is enforced at the request sites rather than here, and
      * [com.example.kurdishtv.ads.StartIoAdsHost] is what reacts to the change.
+     *
+     * Not called `setAllowed`, which is the JVM signature of [isAllowed]'s own setter and
+     * clashes with it at compile time.
      */
-    fun setAllowed(allowed: Boolean) {
+    fun recordConsent(allowed: Boolean) {
         isAllowed = allowed
     }
 
