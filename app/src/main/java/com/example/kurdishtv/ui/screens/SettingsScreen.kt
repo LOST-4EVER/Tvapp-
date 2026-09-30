@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.os.Build
 import com.example.BuildConfig
+import com.example.kurdishtv.ads.StartIoBanner
 import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.DeviceMode
@@ -386,6 +387,19 @@ fun SettingsScreen(
                         lineHeight = 15.sp
                     )
                 }
+            }
+
+            // ── Advertisement ─────────────────────────────────────────────────
+            //
+            // A single banner at the very foot of the screen, below About, where it
+            // cannot sit between the viewer and anything they came here to change.
+            //
+            // It draws nothing at all when there is no fill, which on a television is
+            // the normal case — Start.io's display inventory is mobile — so it is
+            // expected to be invisible on the primary target device and is here for
+            // phones and tablets for now.
+            item(key = "ad") {
+                StartIoBanner(modifier = Modifier.readableColumn(isTv))
             }
         }
     }

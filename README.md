@@ -95,6 +95,12 @@ for a D-pad and a ten-foot viewing distance first, and adapts to touch second.
   app has left is a spinner replacing itself
 - Material You dynamic colour on Android 12+, plus five bundled accent palettes
 
+**Monetisation**
+- A single Start.io banner at the foot of Settings, below About
+- Real ads in release, test ads in debug, and an unfilled slot that draws nothing
+  rather than an empty box. Start.io's display inventory is mobile, so the banner is
+  expected to stay invisible on a television and is there for phones and tablets
+
 ## Architecture
 
 Standard MVVM with a unidirectional data flow. No DI framework, no database —
@@ -151,6 +157,9 @@ would invalidate every collector of the shared state:
 app/src/main/java/com/example/
 ├── MainActivity.kt              Entry point, dependency wiring
 ├── kurdishtv/
+│   ├── ads/                     Start.io ad SDK wiring
+│   │   ├── StartIoAds.kt        one-time SDK init and readiness state
+│   │   └── StartIoBanner.kt     Compose banner that draws nothing when unfilled
 │   ├── data/                    SharedPreferences + JSON cache
 │   │   ├── ChannelCacheStorage    atomic channel-list cache
 │   │   ├── CustomPlaylistStorage  user playlist links, validated
@@ -476,6 +485,7 @@ that:
 | `kurdishTvVersionName` | human-facing version shown in Settings → About |
 | `-PversionCode=` | CI override, set to the GitHub run number |
 | `KEYSTORE_PATH` | path to an upload keystore, for CI |
+| Start.io app id | `208672276`, compiled into `StartIoAds.kt`; deliberately not an environment variable |
 | `STORE_PASSWORD` / `KEY_PASSWORD` / `KEY_ALIAS` | keystore credentials |
 
 The release key itself is **not** an environment variable. It is committed as
@@ -485,6 +495,13 @@ the build instead of silently producing an uninstallable APK.
 Permissions requested: `INTERNET`, `ACCESS_NETWORK_STATE`, `WAKE_LOCK`,
 `MODIFY_AUDIO_SETTINGS`, and `REQUEST_INSTALL_PACKAGES` for in-app updates.
 `usesCleartextTraffic` is enabled because a number of the streams are plain HTTP.
+
+The installed app requests more than that list. The Start.io ad SDK declares
+`ACCESS_WIFI_STATE`, `RECEIVE_BOOT_COMPLETED`,
+`com.google.android.gms.permission.AD_ID`, `ACCESS_ADSERVICES_TOPICS` and the Play
+install-referrer permission in its own manifest, and those merge into the APK. They
+are left to the SDK rather than copied here so there is only one place for them to
+drift.
 
 ## Troubleshooting
 

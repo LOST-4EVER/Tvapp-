@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.example.kurdishtv.ads.StartIoAds
 import com.example.kurdishtv.data.ChannelCacheStorage
 import com.example.kurdishtv.data.CustomPlaylistStorage
 import com.example.kurdishtv.data.FavoriteStorage
@@ -64,6 +65,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Start.io has to be initialised before any ad is requested, and its callback
+        // is the only reliable "ready" signal. Initialising here rather than in a
+        // custom Application class keeps the dependency wiring in one place; `init`
+        // is idempotent, so an activity recreation does not re-run it.
+        StartIoAds.init(applicationContext)
 
         setContent {
             val settings by settingsViewModel.settings.collectAsState()

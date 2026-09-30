@@ -210,6 +210,9 @@ dependencies {
   // implementation(libs.logging.interceptor)
   // implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
+  // Start.io (formerly StartApp) in-app ads. Carries its own consumer ProGuard rules
+  // (proguard.txt in the AAR), so no hand-written keeps are needed here.
+  implementation(libs.startapp.inapp.sdk)
   // implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)

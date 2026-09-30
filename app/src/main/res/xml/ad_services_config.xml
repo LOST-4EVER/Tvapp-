@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Privacy Sandbox (Topics) configuration referenced by the
+  android.adservices.AD_SERVICES_CONFIG property in AndroidManifest.xml.
+
+  This is the shape the Start.io SDK's own sample ships. The app serves no ads
+  itself and reads no topics; the file exists only so the manifest property points
+  at something valid on Android 13+.
+-->
+<ad-services-config>
+    <topics allowAllToAccess="true" />
+</ad-services-config>
