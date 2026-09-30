@@ -225,11 +225,13 @@ class TvViewModel(
         return try {
             val instant = withContext(Dispatchers.IO) { repository.getInstantInitialChannels() }
             if (instant.channels.isEmpty()) return false
-            val byId = instant.channels.associateBy { it.id }
 
-            val customUrls = withContext(Dispatchers.IO) { repository.getCustomPlaylistUrls() }
-            val recentIds = withContext(Dispatchers.IO) { repository.getRecentChannelIds() }
-            val recents = recentIds.mapNotNull { id -> byId[id] }
+            // One hop to IO for both preference reads rather than two: each
+            // `withContext` is a dispatch and a suspension, and on a cold start this
+            // is the path that decides how soon the grid has real channels in it.
+            val (customUrls, recentIds) = withContext(Dispatchers.IO) {
+                repository.getCustomPlaylistUrls() to repository.getRecentChannelIds()
+            }
 
             // Filtered on a background dispatcher, like every other whole-catalogue
             // pass. `update` is a compare-and-set loop and is safe to run from any
@@ -238,6 +240,12 @@ class TvViewModel(
             // that step's several hundred string comparisons landing on the main
             // thread during a cold start.
             withContext(Dispatchers.Default) {
+                // The history lookup is a hash build over the whole list, so it runs
+                // on a worker beside the filter rather than on the main thread this
+                // view model is launched on. A merged list can hold well over a
+                // thousand channels once the remote playlists land.
+                val byId = instant.channels.associateBy { it.id }
+                val recents = recentIds.mapNotNull { id -> byId[id] }
                 _uiState.update { state ->
                     val filtered = ChannelFilterEngine.filter(
                         channels = instant.channels,
@@ -309,22 +317,26 @@ class TvViewModel(
                     return@launch
                 }
 
-                val customUrls = withContext(Dispatchers.IO) { repository.getCustomPlaylistUrls() }
-                val recentIds = withContext(Dispatchers.IO) { repository.getRecentChannelIds() }
-                val byId = list.associateBy { it.id }
-                val recents = recentIds.mapNotNull { id -> byId[id] }
-                // Built here rather than inside the `update` below, which is a
-                // compare-and-set loop that can run more than once: the membership
-                // test was a linear `list.any { it.id == ... }` over the whole merged
-                // catalogue, and paying for that on every retry of a contended
-                // compare-and-set is a scan of a thousand channels to answer one
-                // yes/no question.
-                val ids = byId.keys
+                val (customUrls, recentIds) = withContext(Dispatchers.IO) {
+                    repository.getCustomPlaylistUrls() to repository.getRecentChannelIds()
+                }
 
                 // Same reasoning as in [loadInstantState]: the merge can hold well over
                 // a thousand channels once the remote playlists land, and this pass and
                 // the state swap that publishes it are one atomic step.
                 withContext(Dispatchers.Default) {
+                    // Built on a worker rather than on the main thread the view model
+                    // is launched on: `associateBy` is a hash build over the whole
+                    // merged list, and its only consumer needs an id set, not the map.
+                    //
+                    // The set exists because the membership test runs inside the
+                    // compare-and-set `update` below, which can run more than once —
+                    // the old linear `list.any { it.id == ... }` was a scan of a
+                    // thousand channels to answer one yes/no question, repeated on
+                    // every retry.
+                    val byId = list.associateBy { it.id }
+                    val recents = recentIds.mapNotNull { id -> byId[id] }
+                    val ids = byId.keys
                     _uiState.update { state ->
                         val filtered = ChannelFilterEngine.filter(
                             channels = list,

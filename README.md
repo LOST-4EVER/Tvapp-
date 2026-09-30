@@ -18,7 +18,7 @@ television, a TV box, a tablet or a phone.
 | **Language** | Kotlin 2.2.10, Jetpack Compose (BOM 2024.09.00) |
 | **Build** | AGP 9.1.1, Gradle 9.3.1, JDK 21 |
 | **Repository** | <https://github.com/LOST-4EVER/Tvapp-> |
-| **Catalogue** | 98 channels, all verified end to end |
+| **Catalogue** | 95 channels, all verified end to end |
 
 ---
 

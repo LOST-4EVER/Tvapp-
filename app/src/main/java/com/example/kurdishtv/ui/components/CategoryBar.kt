@@ -99,11 +99,18 @@ fun CategoryBar(
     val visible = remember(counts, selectedCategory) {
         when {
             counts == null -> CategoryFilter.entries
-            selectedCategory.let { sel -> counts[sel] ?: 0 } > 0 ->
-                // Keep the selected tab even if it is empty, so the selection is
-                // never silently changed out from under the user.
-                CategoryFilter.entries.filter { counts[it] != 0 || it == selectedCategory }
-            else -> CategoryFilter.entries.filter { counts[it] != 0 }
+            // Keep the selected tab even when the current list has nothing behind
+            // it, so the selection is never silently dropped out from under the
+            // viewer: the chip and the matching rail item stay visible and
+            // highlighted, and the grid explains the empty category rather than
+            // the navigation forgetting which one is open.
+            //
+            // This used to branch on whether the selected category had a non-zero
+            // count, and the branch that ran when it did not dropped the tab — so
+            // the `|| it == selectedCategory` below could only ever run in the one
+            // case where it could not matter, and the empty-selected case it was
+            // written for was exactly the one it skipped.
+            else -> CategoryFilter.entries.filter { counts[it] != 0 || it == selectedCategory }
         }
     }
 

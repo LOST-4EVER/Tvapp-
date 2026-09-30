@@ -369,7 +369,7 @@ object KurdishChannelCatalog {
         ),
     )
 
-    // Iraq & Kurdistan expansion — 24 channels
+    // Iraq & Kurdistan expansion — 23 channels
     private fun sectionIraqKurdistanExpansion(): List<Channel> = listOf(
 
         // The previous "Iraqia Sports" entry was removed: every sports path on
@@ -463,15 +463,13 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         ),
-        Channel(
-            id = "al_sharqiya_news",
-            name = "Al Sharqiya News",
-            streamUrl = "https://5d94523502c2d.streamlock.net/alsharqiyalive/mystream/playlist.m3u8",
-            logoUrl = "https://i.imgur.com/PeAcXB9.png",
-            category = "News",
-            quality = "HLS / 1080p",
-            isHd = true
-        ),
+        // "Al Sharqiya News" was removed here. Its host's TLS certificate has
+        // expired (leaf not valid after 2026-09-29), so every request is rejected
+        // before a byte of the playlist is read. The community gist that also
+        // carries this channel points at the same dead origin, and no public index
+        // lists an alternative, so the entry is dropped rather than left holding a
+        // News slot that can only fail. Re-add it once the broadcaster renews the
+        // certificate.
         Channel(
             id = "al_aimma_tv",
             name = "Al-Aimma TV",
@@ -685,7 +683,7 @@ object KurdishChannelCatalog {
         )
     )
 
-    // Harvested channels — 22 channels
+    // Harvested channels — 20 channels
     private fun sectionHarvestedChannels(): List<Channel> = listOf(
         // ── Harvested channels ────────────────────────────────────────────────────
         // Every entry below was found in the app's own live sources plus public
@@ -700,14 +698,11 @@ object KurdishChannelCatalog {
         // playlist advertises no RESOLUTION attribute it reads "HLS / Auto"
         // rather than guessing, and the card shows that verbatim.
 
-        Channel(
-            id = "iraqia_sports",
-            name = "Iraqya Sports",
-            streamUrl = "https://imn-live.esite-lab.com/hls/iraqia-sports-1.m3u8",
-            category = "Sport",
-            quality = "HLS / Auto",
-            isHd = false
-        ),
+        // "Iraqya Sports" was removed here. Its master and variant playlists answer
+        // 200 while every media segment returns 404 — the exact failure the audit
+        // exists to catch, since a URL-level check would pass it. It was the only
+        // curated Sports entry that could not play; MMN Sport still supplies the
+        // Sports tab, and the category repopulates from the remote playlists.
         Channel(
             id = "mmn_sport",
             name = "MMN Sport",
@@ -883,15 +878,10 @@ object KurdishChannelCatalog {
             quality = "HLS / 1080p",
             isHd = true
         ),
-        Channel(
-            id = "kurd7",
-            name = "Kurd 7",
-            streamUrl = "http://avrstream.com:1935/live/Kurd7HD/playlist.m3u8",
-            logoUrl = "https://i.imgur.com/xy7W0wD.png",
-            category = "Kurdish",
-            quality = "HLS / 1080p",
-            isHd = true
-        ),
+        // "Kurd 7" was removed here. Its origin returns 404 for the playlist path
+        // on every attempt, and the community gist carries the identical URL, so
+        // there is nothing to fall back to. Dropped rather than left in the Kurdish
+        // list as a channel that can only fail once the viewer commits to it.
         Channel(
             id = "bask_plus",
             name = "Bask Plus",
