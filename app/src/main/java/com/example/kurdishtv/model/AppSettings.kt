@@ -84,7 +84,20 @@ data class AppSettings(
      */
     val resizeMode: ResizeMode = ResizeMode.FILL,
     /** The video colour correction last chosen in the player, for the same reason. */
-    val videoColorFilter: VideoColorFilter = VideoColorFilter.None
+    val videoColorFilter: VideoColorFilter = VideoColorFilter.None,
+    /**
+     * Whether the viewer has agreed to ads.
+     *
+     * On for an install that has never opened Settings, because the ads shipped before
+     * this switch existed and defaulting to off would have switched them off for
+     * everybody in an update while nobody was looking.
+     *
+     * Off is a hard opt-out, not a preference about personalisation: nothing is
+     * requested at all. The ad SDK is not even started while it is off, which is what
+     * makes that true rather than merely what the screen looks like — see
+     * [com.example.kurdishtv.ads.adsMayBeRequested].
+     */
+    val adsEnabled: Boolean = true
 ) {
     val isAmoled: Boolean get() = themeMode == ThemeMode.AMOLED
 }

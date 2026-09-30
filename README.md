@@ -96,8 +96,12 @@ for a D-pad and a ten-foot viewing distance first, and adapts to touch second.
 - Material You dynamic colour on Android 12+, plus five bundled accent palettes
 
 **Monetisation**
-- A **Support** section at the foot of Settings, below About: a "Watch an ad" button
-  that plays a Start.io full-page (interstitial) ad, and a banner beside it
+- An **Ads** section at the foot of Settings, below About, with a switch that is the
+  viewer's own consent: a "Watch an ad" button that plays a Start.io full-page
+  (interstitial) ad, and a banner, both shown only while it is on
+- Switching ads off is a hard opt-out — the SDK is not started, nothing is requested,
+  and an ad already fetched is released. The switch stays visible either way, so it can
+  always be turned back on
 - The full-page ad is preloaded as soon as the SDK reports ready, so the button is
   instant, and a tap made while a request is still out is honoured rather than dropped
 - Real ads in release, test ads in debug, and an unfilled slot that draws nothing
@@ -161,9 +165,11 @@ app/src/main/java/com/example/
 ├── MainActivity.kt              Entry point, dependency wiring
 ├── kurdishtv/
 │   ├── ads/                     Start.io ad SDK wiring
-│   │   ├── StartIoAds.kt        one-time SDK init and readiness state
+│   │   ├── AdsPolicy.kt         the one gate every request goes through
+│   │   ├── StartIoAds.kt        one-time SDK init, readiness and consent state
+│   │   ├── StartIoAdsHost.kt    drives the SDK lifecycle from the preference
 │   │   ├── StartIoBanner.kt     Compose banner that draws nothing when unfilled
-│   │   └── StartIoFullPage.kt   preloaded full-page ad behind the Support button
+│   │   └── StartIoFullPage.kt   preloaded full-page ad behind the button
 │   ├── data/                    SharedPreferences + JSON cache
 │   │   ├── ChannelCacheStorage    atomic channel-list cache
 │   │   ├── CustomPlaylistStorage  user playlist links, validated

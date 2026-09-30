@@ -5,11 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import com.example.kurdishtv.ads.StartIoAds
-import com.example.kurdishtv.ads.StartIoFullPage
+import com.example.kurdishtv.ads.StartIoAdsHost
 import com.example.kurdishtv.data.ChannelCacheStorage
 import com.example.kurdishtv.data.CustomPlaylistStorage
 import com.example.kurdishtv.data.FavoriteStorage
@@ -68,24 +66,23 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Start.io has to be initialised before any ad is requested, and its callback
-        // is the only reliable "ready" signal. Initialising here rather than in a
-        // custom Application class keeps the dependency wiring in one place; `init`
-        // is idempotent, so an activity recreation does not re-run it.
-        StartIoAds.init(applicationContext)
-
         setContent {
             val settings by settingsViewModel.settings.collectAsState()
+            val settingsLoaded by settingsViewModel.loaded.collectAsState()
 
-            // The full-page ad behind the Settings button is fetched here rather than
-            // when that screen opens. The button is a tap away from the moment the app
-            // starts, and preloading it app-wide means the tap lands on an ad that is
-            // already in memory rather than one that has to be asked for and waited out.
-            // Keyed on readiness because the SDK is still initialising on a cold start,
-            // so the first pass here is a no-op.
-            LaunchedEffect(StartIoAds.isReady) {
-                if (StartIoAds.isReady) StartIoFullPage.preload(this@MainActivity)
-            }
+            // Ads are driven from the viewer's own preference, and only once that
+            // preference has actually been read. `settingsLoaded` is half the condition
+            // because the default is "on" and the read is asynchronous: acting on the
+            // default would start the ad SDK for a viewer who had switched ads off.
+            // The pair is safe to read together, and that rests on the view model
+            // assigning the stored preferences *before* it raises the flag — so a
+            // composition can only see a raised flag beside stale settings if the flag
+            // is still false, which reads as "no ads" either way.
+            //
+            // This used to initialise the SDK inline here and preload on the readiness
+            // flag, which made the SDK reporting in read as part of this scope's
+            // composition — and so recompose the whole app once on every launch.
+            StartIoAdsHost(enabled = settingsLoaded && settings.adsEnabled)
 
             KurdishTvTheme(settings = settings) {
                 // No frame loops here any more.

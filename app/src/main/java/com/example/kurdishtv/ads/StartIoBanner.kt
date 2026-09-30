@@ -42,8 +42,15 @@ fun StartIoBanner(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var adView by remember { mutableStateOf<View?>(null) }
 
-    LaunchedEffect(StartIoAds.isReady) {
-        if (!StartIoAds.isReady) return@LaunchedEffect
+    LaunchedEffect(StartIoAds.canRequestAds) {
+        // Keyed on the gate rather than on the SDK's readiness, so that switching ads off
+        // while this screen is open runs the effect again and takes the banner down. A
+        // request site that only asked "is the SDK up?" would leave the last ad it drew
+        // on screen after the viewer had said no.
+        if (!StartIoAds.canRequestAds) {
+            adView = null
+            return@LaunchedEffect
+        }
 
         BannerRequest(context.applicationContext)
             .setAdFormat(BannerFormat.BANNER)

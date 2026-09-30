@@ -84,6 +84,22 @@ internal fun adActionSubtitle(sdkReady: Boolean, adState: FullPageAdState): Stri
     else -> "No ad right now — tap to try again"
 }
 
+/**
+ * The line under the ads switch.
+ *
+ * Pure so it can be unit-tested, and kept next to the switch it describes.
+ *
+ * It says what the switch actually does rather than repeating its label. "Show ads" off
+ * is not a preference about which ads — it stops the app requesting any, and stops the
+ * ad service being started at all, which is more than a viewer would guess from a
+ * toggle going grey.
+ */
+internal fun adsConsentHint(adsEnabled: Boolean): String = if (adsEnabled) {
+    "Ads are what keep the app free. Watching one is always your choice."
+} else {
+    "Off — no ads are requested, and the ad service is not started."
+}
+
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
@@ -414,43 +430,73 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Support ───────────────────────────────────────────────────────
+            // ── Ads ───────────────────────────────────────────────────────────
             //
-            // The only two places the app asks the viewer for anything, kept together at
-            // the very foot of the screen, below About, where neither can sit between the
-            // viewer and something they came here to change.
+            // The viewer's switch, and the only reason the app asks for anything at all.
+            // Switching it off stops the ad SDK being started, so nothing is requested,
+            // nothing is shown, and nothing already fetched is kept — the placements
+            // disappearing is the visible half of that, not the whole of it.
+            //
+            // It stays on screen when ads are off, and only the placements below it go.
+            // Hiding the whole section with them would hide the one control that turns
+            // ads back on, which is a setting nobody could undo.
             //
             // The full-page ad sits behind a button deliberately. An interstitial shown
             // at a moment of the app's choosing is the thing viewers describe as "the app
             // has ads now"; asked for by name, it is a favour they chose to do. It is also
             // worth many times what the banner beside it is worth per impression — which
             // on a television is nothing at all, because Start.io's display inventory does
-            // not serve there. That is why the section carries a real action of its own
+            // not serve there. That is why the section keeps a real action of its own
             // rather than being a frame around an ad that is usually invisible.
-            item(key = "support") {
+            item(key = "ads") {
                 // `LocalContext` is the activity here, but only an unwrap can prove it.
                 val activity = remember(context) { context.findActivity() }
                 SettingsSection(
-                    title = "Support",
-                    subtitle = "Ads are what keep the app free",
+                    title = "Ads",
+                    subtitle = if (settings.adsEnabled) {
+                        "How the app pays for itself"
+                    } else {
+                        "Off"
+                    },
                     iconRes = KurdishTvIcons.FavoriteOutline
                 ) {
-                    SettingsActionRow(
-                        iconRes = KurdishTvIcons.PlayRes,
-                        title = "Watch an ad",
-                        subtitle = adActionSubtitle(StartIoAds.isReady, StartIoFullPage.state),
-                        onClick = {
-                            val host = activity
-                            if (host == null) {
-                                // Cannot happen here — the app has one activity and this is
-                                // it — but a miss is worth a log line rather than a crash.
-                                NetworkClient.logDebug("No activity to show a full-page ad in")
-                            } else {
-                                StartIoFullPage.show(host)
-                            }
+                    SettingsSwitchRow(
+                        iconRes = KurdishTvIcons.Globe,
+                        title = "Show ads",
+                        subtitle = adsConsentHint(settings.adsEnabled),
+                        checked = settings.adsEnabled,
+                        showDivider = settings.adsEnabled,
+                        onCheckedChange = { enabled ->
+                            onUpdate { it.copy(adsEnabled = enabled) }
                         }
                     )
-                    StartIoBanner()
+
+                    // Composed only while ads are on, so a viewer who has switched them
+                    // off pays nothing for them — no composable, no request, no timer.
+                    if (settings.adsEnabled) {
+                        SettingsActionRow(
+                            iconRes = KurdishTvIcons.PlayRes,
+                            title = "Watch an ad",
+                            subtitle = adActionSubtitle(
+                                StartIoAds.isReady,
+                                StartIoFullPage.state
+                            ),
+                            onClick = {
+                                val host = activity
+                                if (host == null) {
+                                    // Cannot happen here — the app has one activity and
+                                    // this is it — but a miss is worth a log line rather
+                                    // than a crash.
+                                    NetworkClient.logDebug(
+                                        "No activity to show a full-page ad in"
+                                    )
+                                } else {
+                                    StartIoFullPage.show(host)
+                                }
+                            }
+                        )
+                        StartIoBanner()
+                    }
                 }
             }
         }

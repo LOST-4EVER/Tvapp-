@@ -400,6 +400,35 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - The banner's `AndroidView` is keyed on the ad view itself, so a re-request that
     lands while a banner is already on screen replaces it instead of being ignored —
     `AndroidView` calls its factory once per node and never again.
+- **Ads are now the viewer's own choice, in Settings, and declining them hides them
+  completely rather than merely not drawing them.** This is the consent the app never
+  had. It is on for an install that has never opened the screen, because the ads shipped
+  first and defaulting the other way would have switched them off for everybody in an
+  update while nobody was looking.
+  - **Off means the ad SDK is not started at all.** Not started and then ignored — the
+    initialiser is not called, so a viewer who declined is not paying for a
+    remote-config fetch, its handlers and its threads on every launch. That work used to
+    happen unconditionally in `onCreate`, before anything could know whether it was
+    wanted.
+  - **Off means nothing is requested, and that is enforced where the requests are made.**
+    Every request site asks one question — `adsMayBeRequested(agreed, sdkReady)` — which
+    lives on its own with a test. Written as just `sdkReady` it still draws no ads on the
+    screen that hides them, so the failure is invisible, while the app starts fetching
+    for every viewer who declined.
+  - **Off means an ad already fetched is let go of.** A loaded full-page ad is one
+    reference away from being put on screen, so switching off releases it rather than
+    parking it, and the last check is made at the moment the button is pressed.
+  - **The switch does not hide itself.** Only the placements below it go. Hiding the
+    whole section would hide the one control that turns ads back on, which is a setting
+    nobody could undo.
+  - **The line under the switch says what it actually does.** "Off" is not a choice about
+    which ads: it stops the app asking for any and stops the service being started, which
+    is more than a viewer would guess from a toggle going grey. It is a pure function
+    with a test, like the line under the button.
+  - **The app no longer recomposes itself when the SDK reports in.** The readiness flag
+    was read as a `LaunchedEffect` key at the root of `setContent`, so the SDK arriving
+    invalidated the whole app once on every launch. It is now waited on from inside the
+    effect, by a composable that draws nothing and has no children to invalidate.
 
 ### Changed
 - **R8 was keeping the whole of media3, which is the largest dependency in the app.**

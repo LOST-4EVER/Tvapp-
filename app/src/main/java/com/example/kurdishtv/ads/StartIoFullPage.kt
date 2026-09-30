@@ -69,9 +69,10 @@ object StartIoFullPage {
      * still initialising and once more when it reports in.
      */
     fun preload(activity: Activity) {
-        // Nothing can be requested before the SDK is up: the request is dropped with no
-        // callback and no error, and the screen would sit on "loading" for ever.
-        if (!StartIoAds.isReady) return
+        // Nothing can be requested before the SDK is up — the request is dropped with no
+        // callback and no error, and the screen would sit on "loading" for ever — and
+        // nothing may be requested for a viewer who has switched ads off.
+        if (!StartIoAds.canRequestAds) return
 
         // A finishing activity is not something to load an ad against — the callback
         // would land after the screen it belongs to is gone.
@@ -97,6 +98,13 @@ object StartIoFullPage {
      * tell a viewer whose tap did nothing.
      */
     fun show(activity: Activity): Boolean {
+        // The switch can be turned off between this button being drawn and being pressed,
+        // and this is the last moment the promise can be kept.
+        if (!StartIoAds.canRequestAds) {
+            release()
+            return false
+        }
+
         val loaded = ad
         if (loaded == null) {
             showWhenReady = true
@@ -125,6 +133,19 @@ object StartIoFullPage {
             NetworkClient.logDebug("Start.io full-page show failed: ${t.javaClass.simpleName}")
             false
         }
+    }
+
+    /**
+     * Drops the loaded ad without showing it.
+     *
+     * Called when ads are switched off. A loaded full-page ad is one reference away
+     * from being put on screen, so switching off has to let go of it rather than park
+     * it, and this is the only thing standing between "off" and the next stray `show`.
+     */
+    fun release() {
+        ad = null
+        showWhenReady = false
+        state = FullPageAdState.Unavailable
     }
 
     private fun load(activity: Activity) {
