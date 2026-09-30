@@ -321,6 +321,54 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tuned for a screen held at arm's length and silently applied to a television.
   `LocalIsTv` now carries the answer, and the grid gets a 220dp ten-foot cell instead
   of falling through to the two-column *phone* grid it was being handed.
+- **The app now carries Start.io banner ads, starting with one at the foot of
+  Settings.** The Android app id (`208672276`) is the only thing tying an installed
+  build to the account that gets paid, so it lives in the source beside the
+  initialisation it belongs to rather than in a resource or an environment variable —
+  repointing the revenue means editing and re-signing an APK, which is the right
+  amount of friction for a value that has to be identical in every build.
+  - **Test ads are on in debug and off in release.** Serving real inventory while
+    developing counts against the account and can get it flagged, which is the
+    documented reason the SDK ships the switch. It is wired to `BuildConfig.DEBUG`,
+    so a debug build cannot bill and a release build cannot forget to.
+  - **The banner is the last item on the Settings screen, below About.** Nothing
+    there is ad-funded, so the ad goes where it cannot sit between the viewer and
+    something they came to the screen to change.
+  - **Nothing is requested until the SDK reports that it is ready.** This is the
+    SDK's sharpest edge: a banner requested before initialisation completes is
+    dropped with no callback and no error, so a request made at composition time is
+    blank on exactly one launch — the cold start, where the screen is guaranteed not
+    to be ready yet. The request is keyed on the readiness flag, which is Compose
+    state so the screen gets its second chance the moment the callback fires.
+  - **No fill draws nothing at all.** The slot is composed only once a banner view
+    exists, and a failed impression clears it again. A bordered empty box reads as a
+    broken ad and is worse than no ad — and on a television, where Start.io's display
+    inventory does not extend, that is the normal outcome rather than an error, so it
+    reports through the debug log and nowhere the viewer would see it. The ads are
+    expected to be invisible on the primary TV target and to serve phones and tablets
+    for now.
+  - **The SDK's return ad and splash are disabled**, in the initialiser and in the
+    manifest. A return ad is a full-screen surface shown on exit; the app has its own
+    navigation and its own update flow, and a second uncontrolled one on the way out
+    is not something this product wants.
+  - **Permissions and ProGuard rules come from the SDK, not from here.** The AAR's
+    manifest already declares `AD_ID`, `ACCESS_ADSERVICES_TOPICS` and the rest, and
+    its bundled `proguard.txt` keeps `com.startapp.**` for the release build's R8
+    pass, so the app declares neither — repeating them would only create a second
+    place to drift.
+  - **The SDK is pinned to 5.3.1, not the newest 5.3.2, and both reasons are hard
+    build failures rather than warnings.** 5.3.2's AAR metadata requires `compileSdk`
+    37, which this project does not use and AGP refuses to build against; it is the
+    only release in the catalogue that constrains it. 5.3.2 also declares
+    `kotlin-stdlib` 2.4.0 as a plain dependency rather than a range, which outvoted the
+    2.2.10 stdlib this project compiles with, and a compiler that reads metadata only
+    up to 2.3.0 does not degrade gracefully: it failed every Kotlin file in the app,
+    the SDK's own included, behind one "incompatible version of Kotlin" line. 5.3.1
+    declares 2.0.0, so the stdlib resolves to the compiler's own version and nothing
+    has to be excluded. Re-check both before moving the pin.
+  - Initialisation is idempotent, and it cannot take the app down: a device without
+    Play services, a missing native library or a rejected app id all degrade to
+    "no ads" rather than to a crash on launch.
 
 ### Changed
 - **R8 was keeping the whole of media3, which is the largest dependency in the app.**

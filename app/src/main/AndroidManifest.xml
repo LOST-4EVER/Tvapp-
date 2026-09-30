@@ -39,6 +39,32 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">
+        <!--
+          Start.io (StartApp) ad SDK.
+
+          SPLASH_ENABLED=false disables the SDK's full-screen "return ad" on launch.
+          The app has its own navigation and its own update flow, and a second,
+          uncontrolled full-screen surface on the way in is not something this
+          product wants; the initialiser also passes setReturnAdsEnabled(false).
+
+          The remaining permissions the SDK needs (INTERNET, ACCESS_NETWORK_STATE,
+          ACCESS_WIFI_STATE, RECEIVE_BOOT_COMPLETED, AD_ID and ACCESS_ADSERVICES_TOPICS)
+          are declared by the SDK's own manifest and merged in, so they are
+          deliberately not repeated here.
+        -->
+        <meta-data
+            android:name="com.startapp.sdk.SPLASH_ENABLED"
+            android:value="false" />
+
+        <!--
+          The Privacy Sandbox Topics configuration the SDK expects on Android 13+.
+          The element is ignored below API 31, hence the tools:targetApi annotation.
+        -->
+        <property
+            android:name="android.adservices.AD_SERVICES_CONFIG"
+            android:resource="@xml/ad_services_config"
+            tools:targetApi="s" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
