@@ -55,7 +55,11 @@ class SearchFoldingTest {
         // The channel as a playlist stores it: with the small-v reh, the lam with
         // small v, and Arabic-Indic digits.
         val stored = listOf(
-            Channel(id = "k1", name = "کوردستان ڕستی ١٢", category = "General")
+            Channel(
+                id = "k1",
+                name = "کوردستان ڕستی ١٢",
+                streamUrl = "https://example.test/stream.m3u8"
+            )
         )
         // Typed with plain Arabic letters and ASCII digits, as a viewer holding a
         // stock Android keyboard would.
