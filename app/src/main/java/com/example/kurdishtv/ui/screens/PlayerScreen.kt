@@ -57,6 +57,7 @@ import com.example.kurdishtv.ui.components.SvgIcon
 import com.example.kurdishtv.ui.keys.RemoteKeyPolicy.acceptsChannelStep
 import com.example.kurdishtv.ui.keys.RemoteKeyPolicy.isAutoRepeat
 import com.example.kurdishtv.ui.motion.tapOnly
+import com.example.kurdishtv.ui.player.DEFAULT_VIDEO_ASPECT
 import com.example.kurdishtv.ui.player.PlayerControlsOverlay
 import com.example.kurdishtv.ui.player.ResizeMode
 import com.example.kurdishtv.ui.player.VideoColorFilter
@@ -123,6 +124,18 @@ fun PlayerScreen(
     // back to the default rather than throwing.
     val resizeMode = settings.resizeMode
     val colorFilter = settings.videoColorFilter
+
+    // Where the picture actually sits inside this screen. The player letterboxes
+    // inside a full-bleed black container, so on a phone held upright the window is
+    // mostly black bars with a 16:9 band across the middle, and the transport overlay
+    // has to be laid out against that band rather than against the window. The player
+    // reports the decoded aspect as it becomes known; until then this is the 16:9
+    // that essentially every stream in the catalogue is encoded as.
+    //
+    // Keyed on the channel so switching channel cannot leave the previous channel's
+    // ratio — and therefore its letterbox — in place while the new one loads.
+    var videoAspect by remember(channel.id) { mutableStateOf(DEFAULT_VIDEO_ASPECT) }
+
     var errorMessage by remember(channel.id) { mutableStateOf<String?>(null) }
     var showSleepDialog by remember { mutableStateOf(false) }
 
@@ -358,6 +371,7 @@ fun PlayerScreen(
             areControlsVisible = isControlsVisible,
             reloadKey = retryToken,
             isMuted = isMuted,
+            onVideoAspectChanged = { videoAspect = it },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -402,6 +416,8 @@ fun PlayerScreen(
             onToggleMute = onToggleMute,
             colorFilter = colorFilter,
             onCycleColorFilter = { onColorFilterChange(colorFilter.next()) },
+            videoAspect = videoAspect,
+            showLogos = settings.showLogos,
             modifier = Modifier.fillMaxSize()
         )
 
