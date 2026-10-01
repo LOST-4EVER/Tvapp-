@@ -223,7 +223,15 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          # Taken from the event payload rather than looked up.
+          #
+          # On a `pull_request` event `github.sha` is the *merge* commit that CI
+          # built — refs/pull/N/merge — not the head commit on the branch. An
+          # earlier version searched the open PRs for one whose `head.sha` equalled
+          # `github.sha`, found nothing, and skipped the comment while still
+          # reporting success. The number is right there in the payload.
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # A pull request builds a real, signed release APK and then throws it
           # away, because the two steps that publish it are guarded by
@@ -295,16 +303,6 @@ jobs:
           the update manifest is untouched until this is merged into \`main\`.
           EOF
           )
-
-          # `gh pr comment` on a PR whose number is not known here would guess,
-          # so it is passed explicitly from the event payload.
-          PR_NUMBER=$(gh api "repos/${REPO}/pulls" --paginate \
-            --jq ".[] | select(.head.sha == \"${SHA}\") | .number" | head -1)
-
-          if [ -z "$PR_NUMBER" ]; then
-            echo "::warning::Could not resolve a PR number for ${SHA}; skipping the comment."
-            exit 0
-          fi
 
           EXISTING=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
             --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" | head -1)
