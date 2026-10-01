@@ -20,6 +20,9 @@ on:
 
 permissions:
   contents: write
+  # Only for the "tell reviewers where the APK is" comment below. Scoped to
+  # pull-requests so it cannot be used to touch issues or reviews.
+  pull-requests: write
 
 jobs:
   build-and-release:
@@ -211,6 +214,116 @@ jobs:
         with:
           name: kurdish-tv-apks
           path: release-artifacts/*.apk
+
+      - name: Tell reviewers where the APK is
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          # A pull request builds a real, signed release APK and then throws it
+          # away, because the two steps that publish it are guarded by
+          # `github.event_name != 'pull_request'` — correctly, since a PR must
+          # never mint a release or push to the update manifest.
+          #
+          # The consequence was that the APK existed but was unfindable: a
+          # reviewer had to know to open the Actions tab, find the right run,
+          # expand "Artifacts" and download a zip. So the APK is linked on the
+          # PR itself, and the release steps stay exactly as guarded as they
+          # were.
+          #
+          # Two things this step deliberately does *not* do:
+          #
+          #  - It does not fail the run. A comment is a courtesy; if the token
+          #    cannot write one the build is still a good build, and turning a
+          #    permissions quirk into a red X on an otherwise-green PR would
+          #    train people to ignore this workflow's failures.
+          #  - It does not post once per push. Every new commit re-runs the
+          #    workflow, and a PR that has been through six pushes would
+          #    otherwise carry six identical comments. The existing one is
+          #    found by marker and edited in place.
+          #
+          # Fork pull requests get a read-only GITHUB_TOKEN by design, so the
+          # write is skipped there rather than attempted and failed. The APK is
+          # still in the run's artifacts either way.
+          if [ "${HEAD_REPO}" != "${BASE_REPO}" ]; then
+            echo "::notice::Fork pull request: GITHUB_TOKEN is read-only, so the APK"
+            echo "::notice::link cannot be posted. The artifact is still uploaded to"
+            echo "::notice::this run under 'kurdish-tv-apks'."
+            exit 0
+          fi
+
+          # Resolve the artifact id so the link goes straight to the APK rather
+          # than to the run's artifact list, which is where a reviewer would
+          # otherwise have to start. The download itself still goes through
+          # GitHub's artifact UI - that is a deliberate constraint of the
+          # artifact store, not something a link can bypass.
+          ARTIFACT_ID=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/artifacts" \
+            --jq '.artifacts[] | select(.name == "kurdish-tv-apks") | .id' | head -1)
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "::warning::kurdish-tv-apks artifact not found; skipping the PR comment."
+            exit 0
+          fi
+
+          ARTIFACT_URL="https://github.com/${REPO}/actions/runs/${RUN_ID}/artifacts/${ARTIFACT_ID}"
+          MARKER="<!-- kurdish-tv-apk -->"
+          VERSION=$(grep '^kurdishTvVersionName=' gradle.properties | cut -d= -f2 | tr -d ' \r')
+          VERSION=${VERSION:-unknown}
+
+          BODY=$(cat <<EOF
+          ${MARKER}
+          ### 📦 APK for this pull request
+
+          This build is green, so the release APK it produced is ready to try:
+
+          **[⬇ Download kurdish-tv-universal.apk](${ARTIFACT_URL})**
+
+          One universal build — it runs on phones, tablets and TVs, so there is
+          nothing to choose between. It is signed with the **same key as every
+          published release**, so it installs straight over an existing copy of
+          Kurdish TV Live without an uninstall first.
+
+          *Version \`${VERSION}\`, built from \`${SHA:0:8}\` on run \`${RUN_ID}\`.
+          Artifacts are kept by GitHub for 90 days.*
+
+          This is a build of the branch, not a release. Nothing is published and
+          the update manifest is untouched until this is merged into \`main\`.
+          EOF
+          )
+
+          # `gh pr comment` on a PR whose number is not known here would guess,
+          # so it is passed explicitly from the event payload.
+          PR_NUMBER=$(gh api "repos/${REPO}/pulls" --paginate \
+            --jq ".[] | select(.head.sha == \"${SHA}\") | .number" | head -1)
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::warning::Could not resolve a PR number for ${SHA}; skipping the comment."
+            exit 0
+          fi
+
+          EXISTING=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" | head -1)
+
+          if [ -n "$EXISTING" ]; then
+            if gh api -X PATCH "repos/${REPO}/issues/comments/${EXISTING}" \
+                 -f body="$BODY" > /dev/null; then
+              echo "Updated the APK comment on #${PR_NUMBER}."
+            else
+              echo "::warning::Could not update the APK comment on #${PR_NUMBER}."
+            fi
+          else
+            if gh api -X POST "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+                 -f body="$BODY" > /dev/null; then
+              echo "Posted the APK comment on #${PR_NUMBER}."
+            else
+              echo "::warning::Could not post the APK comment on #${PR_NUMBER}."
+            fi
+          fi
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
