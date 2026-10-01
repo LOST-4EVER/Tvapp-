@@ -416,7 +416,9 @@ fun MainTvScreen(
                                 },
                                 onVisibleCategories = { visibleCategories = it },
                                 onSearchFocusChanged = { searchFieldFocused = it }
-                            )if (filtered.isEmpty()) {
+                            )
+
+                            if (filtered.isEmpty()) {
                                 EmptyChannelState(
                                     searchQuery = uiState.searchQuery,
                                     onReset = {
