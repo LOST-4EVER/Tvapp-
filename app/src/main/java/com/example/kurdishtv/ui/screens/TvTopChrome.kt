@@ -14,7 +14,6 @@ import com.example.kurdishtv.model.AppSettings
 import com.example.kurdishtv.model.CategoryFilter
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.ui.components.CategoryBar
-import com.example.kurdishtv.ui.components.ChannelSkeletonGrid
 import com.example.kurdishtv.ui.components.EmptyChannelState
 import com.example.kurdishtv.ui.components.OfflineBanner
 import com.example.kurdishtv.ui.components.SearchBarM3
@@ -124,21 +123,13 @@ internal fun LandscapeCompactLayout(
                 .padding(paddingValues)
         ) {
             if (filtered.isEmpty()) {
-                if (uiState.isLoading) {
-                    ChannelSkeletonGrid(
-                        minCellSize = gridMinCellSize,
-                        showHero = isBrowsingHome,
-                        compact = true
-                    )
-                } else {
-                    EmptyChannelState(
-                        searchQuery = uiState.searchQuery,
-                        onReset = {
-                            onSearchQueryChanged("")
-                            onCategorySelected(CategoryFilter.ALL)
-                        }
-                    )
-                }
+                EmptyChannelState(
+                    searchQuery = uiState.searchQuery,
+                    onReset = {
+                        onSearchQueryChanged("")
+                        onCategorySelected(CategoryFilter.ALL)
+                    }
+                )
             } else {
                 ChannelGrid(
                     filtered = filtered,

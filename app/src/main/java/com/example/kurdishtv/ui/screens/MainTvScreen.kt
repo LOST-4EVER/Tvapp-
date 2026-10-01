@@ -46,7 +46,6 @@ import com.example.kurdishtv.ui.components.CategoryBar
 import com.example.kurdishtv.ui.components.ChannelCard
 import com.example.kurdishtv.ui.components.ChannelNumberOverlay
 import com.example.kurdishtv.ui.components.ChannelSidebar
-import com.example.kurdishtv.ui.components.ChannelSkeletonGrid
 import com.example.kurdishtv.ui.components.EmptyChannelState
 import com.example.kurdishtv.ui.components.FeaturedHeroCard
 import com.example.kurdishtv.ui.components.ImportPlaylistDialog
@@ -420,20 +419,13 @@ fun MainTvScreen(
                             )
 
                             if (filtered.isEmpty()) {
-                                if (uiState.isLoading) {
-                                    ChannelSkeletonGrid(
-                                        minCellSize = gridMinCellSize,
-                                        showHero = isBrowsingHome
-                                    )
-                                } else {
-                                    EmptyChannelState(
-                                        searchQuery = uiState.searchQuery,
-                                        onReset = {
-                                            onSearchQueryChanged("")
-                                            onCategorySelected(CategoryFilter.ALL)
-                                        }
-                                    )
-                                }
+                                EmptyChannelState(
+                                    searchQuery = uiState.searchQuery,
+                                    onReset = {
+                                        onSearchQueryChanged("")
+                                        onCategorySelected(CategoryFilter.ALL)
+                                    }
+                                )
                             } else {
                                 ChannelGrid(
                                     filtered = filtered,
@@ -508,20 +500,13 @@ fun MainTvScreen(
                                 .padding(paddingValues)
                         ) {
                             if (filtered.isEmpty()) {
-                                if (uiState.isLoading) {
-                                    ChannelSkeletonGrid(
-                                        minCellSize = 160.dp,
-                                        showHero = isBrowsingHome
-                                    )
-                                } else {
-                                    EmptyChannelState(
-                                        searchQuery = uiState.searchQuery,
-                                        onReset = {
-                                            onSearchQueryChanged("")
-                                            onCategorySelected(CategoryFilter.ALL)
-                                        }
-                                    )
-                                }
+                                EmptyChannelState(
+                                    searchQuery = uiState.searchQuery,
+                                    onReset = {
+                                        onSearchQueryChanged("")
+                                        onCategorySelected(CategoryFilter.ALL)
+                                    }
+                                )
                             } else {
                                 ChannelGrid(
                                     filtered = filtered,
@@ -568,20 +553,13 @@ fun MainTvScreen(
                             .padding(paddingValues)
                     ) {
                         if (filtered.isEmpty()) {
-                            if (uiState.isLoading) {
-                                ChannelSkeletonGrid(
-                                    minCellSize = gridMinCellSize,
-                                    showHero = isBrowsingHome
-                                )
-                            } else {
-                                EmptyChannelState(
-                                    searchQuery = uiState.searchQuery,
-                                    onReset = {
-                                        onSearchQueryChanged("")
-                                        onCategorySelected(CategoryFilter.ALL)
-                                    }
-                                )
-                            }
+                            EmptyChannelState(
+                                searchQuery = uiState.searchQuery,
+                                onReset = {
+                                    onSearchQueryChanged("")
+                                    onCategorySelected(CategoryFilter.ALL)
+                                }
+                            )
                         } else {
                             ChannelGrid(
                                 filtered = filtered,

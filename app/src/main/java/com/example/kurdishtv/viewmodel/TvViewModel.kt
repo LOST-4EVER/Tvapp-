@@ -148,12 +148,10 @@ class TvViewModel(
             // that step's several hundred string comparisons landing on the main
             // thread during a cold start.
             withContext(Dispatchers.Default) {
-                // The history lookup is a hash build over the whole list, so it runs
-                // on a worker beside the filter rather than on the main thread this
-                // view model is launched on. A merged list can hold well over a
-                // thousand channels once the remote playlists land.
-                val byId = instant.channels.associateBy { it.id }
-                val recents = recentIds.mapNotNull { id -> byId[id] }
+                // One pass over the catalogue for the handful of channels the history
+                // names, rather than a hash entry per channel to look them up.
+                // See [channelsForIds] for why the map was the wrong shape here.
+                val recents = channelsForIds(instant.channels, recentIds)
                 _uiState.update { state ->
                     val filtered = ChannelFilterEngine.filter(
                         channels = instant.channels,
@@ -233,33 +231,49 @@ class TvViewModel(
                 // a thousand channels once the remote playlists land, and this pass and
                 // the state swap that publishes it are one atomic step.
                 withContext(Dispatchers.Default) {
-                    // Built on a worker rather than on the main thread the view model
-                    // is launched on: `associateBy` is a hash build over the whole
-                    // merged list, and its only consumer needs an id set, not the map.
+                    // Resolved against the ids actually being asked about, rather
+                    // than against a map of the whole catalogue.
                     //
-                    // The set exists because the membership test runs inside the
-                    // compare-and-set `update` below, which can run more than once —
-                    // the old linear `list.any { it.id == ... }` was a scan of a
-                    // thousand channels to answer one yes/no question, repeated on
-                    // every retry.
-                    val byId = list.associateBy { it.id }
-                    val recents = recentIds.mapNotNull { id -> byId[id] }
-                    val ids = byId.keys
+                    // It used to be `list.associateBy { it.id }`, a hash entry for
+                    // every channel in the merged list, well over a thousand of them
+                    // once the remote playlists land. Its only two uses were looking
+                    // up a handful of recent ids and testing one selected id, so
+                    // almost every entry built was never read: roughly a thousand
+                    // `Channel` keys, a thousand map insertions and a thousand hash
+                    // computations to answer about a dozen questions.
+                    //
+                    // [channelsForIds] reads the list once and keeps only the dozen
+                    // channels asked for, so the allocation is proportional to the
+                    // question rather than to the catalogue. It is called from all
+                    // three places that were building this map.
+                    val recents = channelsForIds(list, recentIds)
+
+                    // Whether the previously selected channel survived the refresh.
+                    //
+                    // A source going down, or a playlist being edited, can remove a
+                    // channel between refreshes. Keeping the old reference would leave
+                    // the side player and the transport controls pointing at something
+                    // no longer in the list, and `selectNextChannel` would jump to the
+                    // first entry instead of continuing from where the user was.
+                    //
+                    // Asked against the channel the `update` below actually finds, not
+                    // against one captured beforehand — `update` is a compare-and-set
+                    // and may merge against a state published since, and a membership
+                    // test for one channel answered about a *different* channel is
+                    // worse than no test at all.
+                    //
+                    // One sequential scan of references, comparing a hoisted string.
+                    // That is cheap enough to sit inside the block even if the loop
+                    // retries, and it is still enormously cheaper than the
+                    // thousand-entry map this replaced.
                     _uiState.update { state ->
                         val filtered = ChannelFilterEngine.filter(
                             channels = list,
                             category = state.selectedCategory,
                             query = state.searchQuery
                         )
-                        // The previously selected channel can vanish between
-                        // refreshes — a source going down, or a playlist being edited.
-                        // Keeping the old reference would leave the side player and
-                        // the transport controls pointing at something that is no
-                        // longer in the list, and `selectNextChannel` would jump to
-                        // the first entry instead of continuing from where the user
-                        // was.
                         val selected = state.selectedChannel
-                            ?.takeIf { current -> ids.contains(current.id) }
+                            ?.takeIf { current -> list.any { it.id == current.id } }
                             ?: list.firstOrNull()
                         state.copy(
                             isLoading = false,
@@ -411,8 +425,7 @@ class TvViewModel(
             // from. The recents row is the only thing this coroutine owns.
             val channels = _uiState.value.channels
             val mappedRecents = withContext(Dispatchers.Default) {
-                val byId = channels.associateBy { it.id }
-                recents.mapNotNull { id -> byId[id] }
+                channelsForIds(channels, recents)
             }
             _uiState.update { state ->
                 state.copy(recentChannels = mappedRecents)
@@ -451,38 +464,55 @@ class TvViewModel(
 
     fun clearActionMessage() {
         _uiState.update { it.copy(actionMessage = null) }
-    }
+    }fun clearFavorites() {
+            viewModelScope.launch {
+                // The write decides the message. Reporting "Favorites cleared" after a
+                // failed write was the worst version of this: the hearts vanished from
+                // the grid, the confirmation appeared, and the favourites were still
+                // there after a restart.
+                val cleared = withContext(Dispatchers.IO) {
+                    runCatching { repository.clearFavorites() }.getOrDefault(false)
+                }
+                if (!cleared) {
+                    _uiState.update { it.copy(actionMessage = "Could not clear favourites") }
+                    return@launch
+                }
 
-    fun clearFavorites() {
-        viewModelScope.launch {
-            // The write decides the message. Reporting "Favorites cleared" after a
-            // failed write was the worst version of this: the hearts vanished from
-            // the grid, the confirmation appeared, and the favourites were still
-            // there after a restart.
-            val cleared = withContext(Dispatchers.IO) {
-                runCatching { repository.clearFavorites() }.getOrDefault(false)
-            }
-            if (!cleared) {
-                _uiState.update { it.copy(actionMessage = "Could not clear favourites") }
-                return@launch
-            }
-            _uiState.update { state ->
-                val updatedChannels = state.channels.map { it.copy(isFavorite = false) }
-                val filtered = ChannelFilterEngine.filter(
-                    updatedChannels,
-                    state.selectedCategory,
-                    state.searchQuery
-                )
-                state.copy(
-                    channels = updatedChannels,
-                    filteredChannels = filtered,
-                    selectedChannel = state.selectedChannel?.copy(isFavorite = false),
-                    recentChannels = state.recentChannels.map { it.copy(isFavorite = false) },
-                    actionMessage = "Favorites cleared"
-                )
+                // The rebuild runs on a worker, like every other whole-catalogue pass
+                // in this file.
+                //
+                // It used to run inside the `update` block below, and `update` is a
+                // compare-and-set on the main thread — so clearing favourites walked
+                // every channel in the catalogue *and* re-filtered the whole list on
+                // the thread that has to draw the grid it is drawing into. That is the
+                // same work [onFavoriteToggled] deliberately moved off it.
+                //
+                // `update` may also re-run its block, which would mean doing the pass
+                // more than once for one tap.
+                val snapshot = _uiState.value
+                val rebuilt = withContext(Dispatchers.Default) {
+                    stateWithFavoritesCleared(snapshot)
+                }
+                _uiState.update { state ->
+                    // A merge can land while the rebuild is in flight, in which case
+                    // the answer describes a list that is no longer on screen. Identity,
+                    // not equality — a re-merged catalogue is a different object even
+                    // when it holds the same channels.
+                    val fresh = if (state.channels !== snapshot.channels) {
+                        stateWithFavoritesCleared(state)
+                    } else {
+                        rebuilt
+                    }
+                    state.copy(
+                        channels = fresh.channels,
+                        filteredChannels = fresh.filteredChannels,
+                        selectedChannel = fresh.selectedChannel,
+                        recentChannels = fresh.recentChannels,
+                        actionMessage = "Favorites cleared"
+                    )
+                }
             }
         }
-    }
 
     fun clearRecents() {
         viewModelScope.launch {

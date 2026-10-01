@@ -181,15 +181,32 @@ fun ChannelCard(
             ),
         shape = cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = if (isFocused) colors.surfaceHigh else colors.surface
+            // `Color.Transparent`, not the surface colour.
+            //
+            // The `Card` was given `containerColor = surface` *and* the `Box` inside
+            // it painted `background(surface, cardShape)` — the same colour, over the
+            // same shape, on top of it. So every card in the grid filled the identical
+            // rounded rectangle twice: once by `Card` and once again by its own first
+            // child, which is a second full-card draw per item for a pixel-for-pixel
+            // identical result.
+            //
+            // In a grid of several hundred that is several hundred redundant draws of
+            // the largest surface on the card, on the thread that has to keep up with
+            // scrolling — and it is pure overdraw, the specific thing the previous pass
+            // removed when it deleted the per-card vertical gradient and the shadow for
+            // being invisible-but-not-free. Transparent hands the fill to exactly one
+            // layer; the `Box` below still clips to the card shape through the `Card`'s
+            // own shape, so the rounded corners are unchanged.
+            containerColor = Color.Transparent
         ),
         // No shadow. A Material shadow on a near-black surface is invisible, and it
         // still costs a render pass per item in a grid of several hundred cards. The
         // card's separation comes from the hairline below and the ring above it.
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        // A flat fill with a hairline of light along the top edge, which is what
-        // keeps a near-black card from reading as a hole cut in the page.
+        // The one and only fill of the card's surface: a flat colour plus a hairline of
+        // light along the top edge, which is what keeps a near-black card from reading
+        // as a hole cut in the page.
         Box(
             modifier = Modifier.background(
                 color = if (isFocused) colors.surfaceHigh else colors.surface,

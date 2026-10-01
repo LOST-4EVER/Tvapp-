@@ -57,4 +57,45 @@ internal object FavoriteRebuilder {
             recentChannels = updatedRecents
         )
     }
+
+    /**
+     * The same four lists with the favourite flag cleared everywhere.
+     *
+     * Lived as an inline block inside `clearFavorites`, where it was rebuilding the
+     * whole catalogue *and* re-filtering the whole list on the main thread — the one
+     * pass in this file that had not been moved off it. It is here now for the reason
+     * [rebuildForFavorite] is: it touches four lists at once, and the only way they
+     * cannot disagree is to derive them together.
+     *
+     * Unlike the single-channel case, clearing favourites always re-filters rather
+     * than substituting into the existing list. Membership of the Favourites tab
+     * changes for *every* channel at once, and on any other tab the category is not
+     * the Favourites tab so the list is not derived from the flag — so the filter is
+     * asked, once, rather than reasoned about per category.
+     *
+     * Callers must run this off the main thread: it is a whole-catalogue pass.
+     */
+    fun clearAllFavorites(state: TvUiState): FavoriteUpdate {
+        val updatedChannels = state.channels.map { it.copy(isFavorite = false) }
+        return FavoriteUpdate(
+            channels = updatedChannels,
+            filteredChannels = ChannelFilterEngine.filter(
+                updatedChannels,
+                state.selectedCategory,
+                state.searchQuery
+            ),
+            selectedChannel = state.selectedChannel?.copy(isFavorite = false),
+            recentChannels = state.recentChannels.map { it.copy(isFavorite = false) }
+        )
+    }
 }
+
+/**
+ * [FavoriteRebuilder.clearAllFavorites], named for the call site.
+ *
+ * Exists so [TvViewModel.clearFavorites] reads as a sequence of steps rather than as
+ * a block of list rebuilding, and so the whole-catalogue work is unmistakably
+ * something to be scheduled rather than something to be done inline.
+ */
+internal fun stateWithFavoritesCleared(state: TvUiState): FavoriteUpdate =
+    FavoriteRebuilder.clearAllFavorites(state)
