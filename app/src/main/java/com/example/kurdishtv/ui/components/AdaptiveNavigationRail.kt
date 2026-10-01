@@ -173,7 +173,8 @@ fun AdaptiveNavigationRail(
                 // This is a plain `Column`, not a lazy list, so Compose matches the
                 // items in it *by position*. `RailCategoryItem` remembers an
                 // `interactionSource`, and `remember` inside a position-matched slot
-                // means it belongs to the slot rather than to the category. So the moment the visible
+                // means it belongs to the slot rather than to the category. So the
+                // moment the visible
                 // set changed shape — which it does as soon as the first catalogue
                 // arrives and `CategoryBar` stops offering twelve tabs and starts
                 // offering eight — every item below the first removal inherited the
@@ -231,17 +232,11 @@ private fun RailCategoryItem(
     // The indicator is a fixed 60x34dp box, so its longest safe radius is 17dp --
     // half the short side. A 20dp "active" radius made the four corners overlap and
     // the selection pill render as a lopsided blob. Sized off the box instead.
-    // Built once rather than per composition. Both `rest` and `active` are the same
-    // value here, so the shape never actually changes with selection — only whether
-    // it is drawn at all — and there is no reason to re-derive it when the item
-    // recomposes for any other reason.
-    val indicatorShape: Shape = remember {
-        staticCornerShape(
-            rest = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.40f)),
-            active = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.40f)),
-            isActive = false
-        )
-    }
+    val indicatorShape: Shape = staticCornerShape(
+        rest = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.40f)),
+        active = CornerScale.uniform(ShapeMorph.cornerRadius(34.dp, 0.40f)),
+        isActive = isSelected
+    )
     // No `clip` on this Column. It used to clip to a 26dp rounded square, which cut
     // the focus ring in half: the ring is drawn *outset* from the element, and a clip
     // applied before it in the chain removes everything outside the element's own

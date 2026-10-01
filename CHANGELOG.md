@@ -287,9 +287,6 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   there. A stale source still reports the focus state it was left in, so the tap
   target and the highlight could disagree - the one failure a D-pad interface cannot
   have. Each item is now `key`ed by category.
-- **The rail re-derived its selection pill shape on every recomposition** for a shape
-  whose `rest` and `active` outlines are the same value, so it never actually changed
-  with selection.
 - **Arrowing the sidebar and the rail recomposed rows that were already correct.**
   Both mirrored the focus ring's state into a `mutableStateOf` that nothing read - the
   row's plate and the rail's pill are driven by *selection* - so each keypress
