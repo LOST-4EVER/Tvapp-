@@ -396,9 +396,8 @@ object KurdishTvParser {
      * The comparison used to be on the raw string, so it only caught an *exact*
      * repeat. Real playlists do not repeat exactly:
      *
-     *  - `http://` and `https://` for one stream, which is common when two
-     *    community playlists both carry the same channel;
      *  - a trailing slash, which some CDNs treat as a distinct object;
+     *  - host case, and a default port spelled out rather than implied;
      *  - a fragment, which is never sent to the server at all.
      *
      * Each of those is one channel shown twice in the grid, each with its own id, its
@@ -407,6 +406,12 @@ object KurdishTvParser {
      * channel's own [Channel.streamUrl] is left exactly as the playlist published it,
      * because that is the URL that has to be handed to the player and rewriting it
      * would be a change of behaviour rather than a de-duplication.
+     *
+     * `http` against `https` is the obvious next thing to fold, and it is deliberately
+     * *not* folded: those are two different origins and a server may serve different
+     * content from each, or require a token on one and not the other. Merging them
+     * would silently drop a channel that only plays on one of the two, which is worse
+     * than the duplicate row it was meant to remove.
      *
      * First occurrence wins, so the order of the merged list is preserved and the
      * result is deterministic.
@@ -430,10 +435,17 @@ object KurdishTvParser {
  * same stream produce the same string.
  *
  * Only the parts that genuinely cannot change which object is fetched are folded:
- * the scheme, the host's case, a default port, the fragment and a trailing slash.
- * The path and the query are left alone — case-sensitive, and two paths that differ
- * only by case are two different objects on most servers, so folding them would merge
- * channels that are not the same.
+ * the host's case, a default port, the fragment and a trailing slash. The path and
+ * the query are left alone — case-sensitive, and two paths that differ only by case
+ * are two different objects on most servers, so folding them would merge channels
+ * that are not the same.
+ *
+ * **The scheme is case-folded but not equated.** `http` and `https` are two different
+ * origins: a server is entitled to serve different content from each, and one of them
+ * may require a token or a subscription the other does not. Collapsing them would drop
+ * a channel that only plays on one of the two, which is a worse failure than the
+ * duplicate row this exists to remove — and a duplicate row is visible and a missing
+ * channel is not.
  *
  * Free and pure so it can be pinned by a test; see `ParserUrlTest`.
  */

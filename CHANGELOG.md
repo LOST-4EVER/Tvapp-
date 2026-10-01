@@ -226,14 +226,20 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the life of the process. Capped, with expired entries dropped first.
 - **The same channel was listed twice whenever two playlists spelled its URL
   differently.** De-duplication compared raw URL strings, so it only ever caught an
-  *exact* repeat - and real playlists do not repeat exactly. `http://` against
-  `https://`, or one entry with a trailing slash and one without, produced two cards
-  for one stream, each with its own id, its own logo request and its own heart, so
-  favouriting one did nothing to the other. The comparison key now folds the parts
-  that cannot change which object is fetched: scheme, host case, a default port, the
-  fragment and a trailing slash. The path and query are left alone, because most CDNs
-  treat paths as case-sensitive and folding them would merge channels that are not
-  the same.
+  *exact* repeat - and real playlists do not repeat exactly. One entry with a trailing
+  slash and one without, or one naming the host in a different case or spelling out
+  its default port, produced two cards for one stream, each with its own id, its own
+  logo request and its own heart, so favouriting one did nothing to the other. The
+  comparison key now folds the parts that cannot change which object is fetched: host
+  case, a default port, the fragment and a trailing slash.
+  - The path and query are left alone, because most CDNs treat paths as case-sensitive
+    and folding them would merge channels that are not the same.
+  - **`http` against `https` is deliberately *not* folded**, which is the one judgement
+    call here and the reason the function is not simply "make the URLs equal". Those
+    are two different origins: a server may serve different content from each, and one
+    may require a token or a subscription the other does not. Merging them would drop
+    a channel that only plays on one of the two - a worse failure than the duplicate
+    row this removes, because a duplicate row is visible and a missing channel is not.
   - Normalisation is a comparison key only. The channel's stored URL is still exactly
     what the playlist published, because that is the string handed to the player.
 - **A channel named in Kurdish script was filed under General.** Every needle in the

@@ -50,10 +50,22 @@ class ParserUrlTest {
     }
 
     @Test
-    fun `the scheme is folded`() {
-        // One stream, two spellings. This is the common case between two community
-        // playlists carrying the same channel.
+    fun `scheme case is folded but http and https stay different`() {
         assertEquals(
+            normalizeStreamUrl("https://cdn.example.com/live.m3u8"),
+            normalizeStreamUrl("HTTPS://cdn.example.com/live.m3u8")
+        )
+        // Deliberately *not* equal, and this is the one judgement call in the whole
+        // function. The same path on http and on https is two different origins and a
+        // server is entitled to serve different content from each — and, more to the
+        // point, one of the two may require a token or a subscription the other does
+        // not. Merging them would silently drop a channel that only plays on one of
+        // the two, which is worse than showing a row twice.
+        //
+        // A scheme difference is also the one difference a playlist is *most* likely
+        // to get wrong in a way the viewer pays for, so it is left visible rather
+        // than guessed away.
+        assertNotEquals(
             normalizeStreamUrl("https://cdn.example.com/live.m3u8"),
             normalizeStreamUrl("http://cdn.example.com/live.m3u8")
         )
@@ -157,8 +169,10 @@ class ParserUrlTest {
         val merged = KurdishTvParser.deduplicate(
             listOf(
                 channel("First", "https://cdn.example.com/live.m3u8"),
-                channel("Duplicate", "http://cdn.example.com/live.m3u8"),
-                channel("Slash", "https://cdn.example.com/live.m3u8/"),
+                channel("Trailing Slash", "https://cdn.example.com/live.m3u8/"),
+                channel("Host Case", "https://CDN.Example.com/live.m3u8"),
+                channel("Fragment", "https://cdn.example.com/live.m3u8#t=90"),
+                channel("Default Port", "https://cdn.example.com:443/live.m3u8"),
                 channel("Genuinely Different", "https://cdn.example.com/other.m3u8")
             )
         )
@@ -175,7 +189,7 @@ class ParserUrlTest {
             listOf(
                 channel("Alpha", "https://cdn.example.com/live.m3u8"),
                 channel("Beta", "https://cdn.example.com/other.m3u8"),
-                channel("Gamma", "http://cdn.example.com/live.m3u8")
+                channel("Gamma", "https://cdn.example.com/live.m3u8/")
             )
         )
         assertEquals(listOf("Alpha", "Beta"), merged.map { it.name })
@@ -185,11 +199,11 @@ class ParserUrlTest {
     fun `the surviving channel keeps the url the playlist published`() {
         // Normalisation is a comparison key only. Rewriting the stored URL would be a
         // change of behaviour handed to the player, not a de-duplication.
-        val published = "http://cdn.example.com/live.m3u8"
+        val published = "https://cdn.example.com/live.m3u8"
         val merged = KurdishTvParser.deduplicate(
             listOf(
                 channel("First", published),
-                channel("Second", "https://cdn.example.com/live.m3u8")
+                channel("Second", "https://cdn.example.com/live.m3u8/")
             )
         )
         assertEquals(1, merged.size)
