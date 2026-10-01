@@ -184,18 +184,30 @@ fun ChannelLogo(
         // Derived from the channel name, so the same channel keeps the same colour
         // across refreshes, reorderings and devices.
         val accent = remember(channelName) { monogramAccent(channelName) }
+        // The gradient and the initials are both derived from [channelName] and both
+        // were rebuilt on every recomposition of the cell.
+        //
+        // `initialsOf` splits the name on three delimiters and filters the result — a
+        // list plus a filtered copy plus two substrings — and the `Brush` is a fresh
+        // object with two more `Color` copies. Neither changes unless the channel's
+        // name does. A grid of several hundred logo-less cards therefore re-derived
+        // both on every recomposition of every card, which is the whole cost of a
+        // scroll.
+        val gradient = remember(channelName) {
+            val base = monogramAccent(channelName)
+            Brush.linearGradient(
+                listOf(base.copy(alpha = 0.26f), base.copy(alpha = 0.07f))
+            )
+        }
+        val initials = remember(channelName) { initialsOf(channelName) }
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        listOf(accent.copy(alpha = 0.26f), accent.copy(alpha = 0.07f))
-                    )
-                ),
+                .background(gradient),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = initialsOf(channelName),
+                text = initials,
                 color = accent,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -350,8 +362,12 @@ internal fun monogramAccent(seed: String): Color {
     return MonogramAccents[index]
 }
 
-/** Up to two initials, e.g. "Kurdistan 24" -> "K2". */
-private fun initialsOf(name: String): String {
+/**
+ * Up to two initials, e.g. "Kurdistan 24" -> "K2".
+ *
+ * Internal and pure so it can be pinned by a test; see `ChannelLogoTest`.
+ */
+internal fun initialsOf(name: String): String {
     val words = name.trim().split(' ', '-', '_').filter { it.isNotBlank() }
     return when {
         words.isEmpty() -> "?"

@@ -203,6 +203,110 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
       fall back to the icon-only form `LabelPillButton` already supports.
 
 ### Fixed
+- **A clock moved backwards pinned the whole DNS cache as fresh.** `FastCachingDns`
+  stamped entries with `System.currentTimeMillis()`, so a wall clock that moves - which
+  NITZ does on a TV box and a viewer does from the system settings - made every cached
+  address compute a *negative* age. A negative age passes any `age < ttl` test, so the
+  entire cache declared itself fresh until the clock caught back up, which on a box
+  whose time arrives after boot is most of a session. It now stamps with
+  `System.nanoTime`, which is monotonic and that nothing can move.
+  - **A record claiming to be from the future is stale, not fresh.** Kept as an
+    explicit test rather than as an assumption about the clock, because it is the one
+    behaviour that has to hold if the stamp is ever wrong. `DnsEntryTest` pins it,
+    along with the ttl boundaries.
+- **Concurrent lookups for the same host all did the work.** OkHttp calls `Dns` from
+  every dispatcher thread, and a grid of channel logos from one CDN - or five HLS
+  connections opening at once - miss a cold cache together and each performed its own
+  full system lookup. The stampede is precisely the case a DNS cache exists to
+  prevent. Misses on the same host now queue behind one another, with the cache
+  re-checked once the lock is held, while misses on *different* hosts stay parallel -
+  which is what a merge fetching five sources at once actually wants.
+- **The DNS cache was unbounded.** Hostnames come from playlists, and a viewer can
+  import as many as they like, so every host any playlist named stayed resident for
+  the life of the process. Capped, with expired entries dropped first.
+- **The same channel was listed twice whenever two playlists spelled its URL
+  differently.** De-duplication compared raw URL strings, so it only ever caught an
+  *exact* repeat - and real playlists do not repeat exactly. `http://` against
+  `https://`, or one entry with a trailing slash and one without, produced two cards
+  for one stream, each with its own id, its own logo request and its own heart, so
+  favouriting one did nothing to the other. The comparison key now folds the parts
+  that cannot change which object is fetched: scheme, host case, a default port, the
+  fragment and a trailing slash. The path and query are left alone, because most CDNs
+  treat paths as case-sensitive and folding them would merge channels that are not
+  the same.
+  - Normalisation is a comparison key only. The channel's stored URL is still exactly
+    what the playlist published, because that is the string handed to the player.
+- **A channel named in Kurdish script was filed under General.** Every needle in the
+  categoriser is Latin, and `lowercase` does nothing to Arabic script, so such a
+  channel matched none of them and fell through to the catch-all. Those are exactly
+  the channels that belong in the Kurdish tab, so the tab they were missing from was
+  the one guaranteed to be full of everything else. The category words now also exist
+  in Kurdish script, folded by the same function search uses so `کوردی` and `کوردي`
+  are one word here exactly as they are there.
+- **A Kurdish-script channel's id had nothing readable in it.** The id's name
+  component is stripped to `[a-z0-9]`, which removes every letter of an Arabic-script
+  name, so the id came out as `krd__2847193`. It was still unique - the URL hash
+  carries that - but nothing in it said which channel it was, which is what makes a
+  duplicate-id bug in the merge invisible in a log. That name part now falls back to
+  a stable hash of the folded name. Ids stay ASCII, because they are also `LazyGrid`
+  keys, `testTag` fragments and preference values, and a Latin channel's id is
+  bit-for-bit what it was - which is what keeps existing favourites and recents
+  resolving.
+- **The recently-watched row's edge fade never drew, and clipped its chips instead.**
+  `rememberLazyListState()` produced a state that was handed to `Modifier.edgeFade` but
+  never given to the `LazyRow` itself, so it was attached to nothing: no layout info,
+  `canScrollForward` and `canScrollBackward` permanently false, and both fades
+  permanently skipped. The state was pure overhead and the row was hard-clipping its
+  first and last chips - the exact artefact the modifier exists to prevent.
+- **Arrowing down the channel sidebar scrolled the list on every press.** The row
+  highlight and the list scroll were both being positioned on each selection change,
+  and `scrollToItem` puts its target at the *leading* edge - so one arrow press down
+  scrolled the list one row, and the next press scrolled another. The highlight walked
+  down a list that walked with it, and it was fighting the `LazyColumn`'s own D-pad
+  scrolling, which already brings a focused row into view. It now only scrolls when
+  the row is genuinely off screen, which on a tablet where the whole list fits is never.
+- **The sidebar compared two lists of several hundred channels, field by field, to
+  compute one index.** `remember(channels, selectedChannelId)` looks like the obvious
+  way to memoise the selected row, but `remember` compares its keys with `equals` -
+  so every recomposition of permanent chrome compared several hundred nine-field
+  `Channel` data classes before running the `indexOfFirst` that would have answered
+  the question in the same pass anyway. Not memoised now: one forward scan with an
+  early exit, no allocation, and nothing that can go stale.
+  - `remember { derivedStateOf { ... } }` was *not* the fix, and the reasoning is
+    worth recording: `derivedStateOf` only re-runs for reads of snapshot state, and
+  these are plain function parameters, so an unkeyed `remember` would have captured
+    the first composition's values and quietly gone stale - the same
+  highlight-the-wrong-row bug in a harder-to-spot form.
+- **A destination could be drawn focused that had never been focused.** The rail's
+  categories are a plain `Column` inside a `verticalScroll`, not a lazy list, so
+  Compose matches its children *by position* - and `RailCategoryItem` remembered an
+  `interactionSource` that therefore belonged to the slot rather than to the category.
+  The visible set changes shape as soon as the first catalogue arrives and the chips
+  stop offering twelve tabs and start offering eight, so from that moment every item
+  below the first removal inherited the interaction source of whatever used to be
+  there. A stale source still reports the focus state it was left in, so the tap
+  target and the highlight could disagree - the one failure a D-pad interface cannot
+  have. Each item is now `key`ed by category.
+- **The rail re-derived its selection pill shape on every recomposition** for a shape
+  whose `rest` and `active` outlines are the same value, so it never actually changed
+  with selection.
+- **Arrowing the sidebar and the rail recomposed rows that were already correct.**
+  Both mirrored the focus ring's state into a `mutableStateOf` that nothing read - the
+  row's plate and the rail's pill are driven by *selection* - so each keypress
+  invalidated two rows' compositions to produce a picture identical to the one on
+  screen. On a list of several hundred, arrowing is the interaction, so this was two
+  wasted recompositions per press for a whole traversal. Only the focus *gain* is
+  still reported, which is what the sidebar actually acts on.
+- **Every logo-less card rebuilt its monogram on every recomposition.** The accent
+  colour was remembered but the initials and the background brush were not, so a grid
+  of several hundred cards re-split each channel name and rebuilt each gradient on
+  every recomposition of every card - which is the whole cost of a scroll. Both are
+  derived from the channel name and both are now derived once.
+  - `initialsOf` is internal and has `ChannelLogoTest`, because a logo-less Kurdish
+    channel is exactly the case the fallback exists for and its awkward inputs -
+    empty names, punctuation-only names, Arabic script - are otherwise only reachable
+    by looking at a device.
+
 - **The player controls were crushed into a 230dp band in the middle of the screen.**
   A 16:9 stream on a phone held upright is a band about 230dp tall inside a window
   several times that, and the overlay was laid out *inside that band*: a 96dp header,

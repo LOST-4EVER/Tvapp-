@@ -21,10 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,17 +86,50 @@ fun ChannelSidebar(
     // else — the grid, or the remote's number pad. Without this the sidebar can
     // show row 3 highlighted while row 200 is the one being previewed, which is
     // worse than not showing a highlight at all.
-    val selectedIndex = remember(channels, selectedChannelId) {
-        val id = selectedChannelId
-        if (id == null) -1 else channels.indexOfFirst { it.id == id }
-    }
+    //
+    // Not memoised, and that is deliberate.
+    //
+    // `remember(channels, selectedChannelId)` is the obvious spelling and it cost more
+    // than the thing it was caching: `remember` compares its keys with `equals`, so
+    // every recomposition of this sidebar compared two Lists of several hundred
+    // nine-field `Channel` data classes field by field — before running the
+    // `indexOfFirst` that would have answered the question in the same pass anyway.
+    // This sidebar is permanent chrome on the wide layout, so that ran on every
+    // keystroke of the search field and on every selection change, to compute an
+    // index.
+    //
+    // `remember { derivedStateOf { ... } }` is not the fix. `derivedStateOf` only
+    // re-runs for reads of *snapshot state*, and `channels` and `selectedChannelId`
+    // are plain function parameters — an unkeyed `remember` would capture the values
+    // from the first composition and quietly go stale the moment either changed,
+    // which is the same highlight-the-wrong-row bug in a harder-to-spot form.
+    //
+    // So it is just computed. One `indexOfFirst` is a single forward scan with an
+    // early exit over a list of ids — a few hundred reference comparisons, no
+    // allocation, and nothing that can be stale. Wrapping it in a cache was the
+    // expensive part, not the scan.
+    val selectedIndex = if (selectedChannelId == null) -1
+        else channels.indexOfFirst { it.id == selectedChannelId }
     LaunchedEffect(selectedIndex) {
         if (selectedIndex >= 0) {
-            // `scrollToItem`, not `animateScrollToItem`. The row is highlighted the
-            // instant it is selected, and a glide that takes a third of a second
-            // lands the viewer looking at a list that has not caught up with the
-            // highlight they just watched appear.
-            runCatching { listState.scrollToItem(selectedIndex) }
+            // Only when the row is genuinely off screen.
+            //
+            // It used to `scrollToItem` on *every* selection change, and on this list
+            // that means every arrow press down the sidebar: `scrollToItem` puts its
+            // target at the leading edge, so arrowing one row down scrolled the list
+            // one row — then the next press scrolled another, forever. The viewer
+            // watching a highlight walk down a list watches the list walk with it, and
+            // the rows above the highlight are constantly being pushed out of view for
+            // no reason. It was also fighting the `LazyColumn`'s own D-pad scrolling,
+            // which already brings a focused row into view; two things positioning the
+            // list at once is how the highlight and the list end up disagreeing.
+            //
+            // A row already on screen needs nothing, and on a tablet where the whole
+            // list fits, that is every row there is.
+            val onScreen = listState.layoutInfo.visibleItemsInfo.any { it.index == selectedIndex }
+            if (!onScreen) {
+                runCatching { listState.scrollToItem(selectedIndex) }
+            }
         }
     }
 
@@ -173,7 +203,6 @@ private fun ChannelSidebarRow(
     onFavoriteToggle: () -> Unit
 ) {
     val colors = LocalAppColors.current
-    var isFocused by remember(channel.id) { mutableStateOf(false) }
 
     // One focus target for the row: the click's own. The ring observes it rather than
     // adding a second. See `expressiveFocusRing`.
@@ -221,7 +250,16 @@ private fun ChannelSidebarRow(
                 restShape = M3ExpressivePolygons.Square,
                 ringShape = ShapeMorph.focusRing,
                 onFocusChanged = { focused ->
-                    isFocused = focused
+                    // Only the *gain* is reported.
+                    //
+                    // This used to also mirror the flag into a `mutableStateOf` that
+                    // nothing read — the row's plate and type are driven by
+                    // `isSelected`, not by focus. So every arrow press down this list
+                    // wrote state on the row that was losing focus and the row gaining
+                    // it, invalidating both rows' compositions to produce a picture
+                    // identical to the one already on screen. On a list of several
+                    // hundred rows, arrowing is *the* interaction, so this was two
+                    // wasted recompositions per keypress for the whole traversal.
                     if (focused) onFocused()
                 }
             )

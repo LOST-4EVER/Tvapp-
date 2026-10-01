@@ -2,12 +2,24 @@ package com.example.kurdishtv.parser
 
 import com.example.kurdishtv.model.Channel
 import com.example.kurdishtv.model.KurdishChannelCatalog
+import com.example.kurdishtv.model.foldForSearch
 import org.json.JSONArray
 import java.util.Locale
 import kotlin.math.abs
 
 object KurdishTvParser {
 
+    /**
+     * Kept ASCII on purpose, and paired with the hash fallback in [cleanId].
+     *
+     * The obvious fix — allowing letters through `[^a-z0-9]` — was tried and is wrong
+     * for a different reason than it first appears: these ids become `LazyVerticalGrid`
+     * keys, `testTag` fragments and `SharedPreferences` values. Arabic-script names
+     * folded in fine, but a name written with a character that a shell, a log or an
+     * XML attribute mangles produced an id that did not survive the round trip, and
+     * the grid threw on the duplicate key. Keeping the id ASCII and carrying the
+     * distinguishing information in a stable hash avoids that entirely.
+     */
     private val nonAlphaNumericRegex = "[^a-z0-9]".toRegex()
     private val whitespaceRegex = "\\s+".toRegex()
     private val tvgLogoRegex = """tvg-logo="([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
@@ -196,40 +208,132 @@ object KurdishTvParser {
         )
     }
 
+    /**
+     * The same category words, written in Kurdish script.
+     *
+     * Every needle in [mapCategory] is Latin, and a channel whose `group-title` is
+     * absent or generic and whose *name* is in Kurdish script matched none of them and
+     * fell through to `else` — landing in **General**. That is not a rare fallback:
+     * the channels most likely to be named in Kurdish script are the ones that belong
+     * in the Kurdish tab, so the tab those channels were missing from was the one
+     * guaranteed to be full of everything else.
+     *
+     * Tested against [foldForSearch]'s output rather than the raw string, so that
+     * `کوردی` (Sorani yeh) and `کوردي` (Arabic yeh) are recognised as the same word
+     * here exactly as they are in search. Note that fold maps Kurdish *letter
+     * variants* — ڕ ڵ ۆ ێ ە گ چ پ ژ ڤ ھ ډ ڋ — onto their plain forms; it does not
+     * transliterate Arabic script into Latin, so these needles have to be written in
+     * the script they appear in. A single transliteration table would be the tidier
+     * design, but a wrong transliteration silently misfiles live channels, whereas an
+     * unrecognised word here only leaves a channel where it already was.
+     *
+     * Each entry is a whole word rather than a fragment, and the set is deliberately
+     * short: only words whose meaning is not in doubt in either dialect.
+     */
+    private val scriptNeedles: Map<String, String> = mapOf(
+        "Sports" to "وەرزش",
+        "Quran" to "قورئان",
+        "Religious" to "ئایینی",
+        "News" to "هەواڵ",
+        "Music" to "گۆرانی",
+        "Kids" to "منداڵان",
+        "Documentary" to "دۆکیومەنتاری",
+        "Kurdish" to "کورد"
+    )
+
+    /**
+     * [scriptNeedles] with every needle folded once, at class-init, by the same
+     * function [mapCategory] folds the haystack with.
+     *
+     * Folding here rather than at each call is the difference between one probe and
+     * eight folds per channel: this runs once per parsed entry across every source on
+     * every refresh, so several thousand times.
+     */
+    private val foldedNeedles: Map<String, String> =
+        scriptNeedles.mapValues { (_, needle) -> foldForSearch(needle) }
+
     private fun mapCategory(rawGroup: String, channelName: String): String {
         val combined = "$rawGroup $channelName".lowercase(Locale.ROOT)
+        // Folded, not lowercased: this is what collapses the two spellings of one
+        // Kurdish word onto each other and strips the separators, so a needle below
+        // matches the middle of a longer phrase.
+        val folded = foldForSearch(combined)
+
+        fun inScript(category: String): Boolean {
+            val needle = foldedNeedles[category] ?: return false
+            return folded.contains(needle)
+        }
+
         return when {
             // Sports is checked first: several sports channels carry "Kurdistan"
             // or a news-style group title, and the broad Kurdish/news tests below
             // would otherwise swallow them, leaving the Sports tab empty.
             combined.contains("sport") || combined.contains("football") ||
                 combined.contains("soccer") || combined.contains("tennis") ||
-                combined.contains("basket") -> "Sports"
+                combined.contains("basket") || inScript("Sports") -> "Sports"
             // Religious before Kids: several religious channels are grouped under
             // a kids/family group title in the community playlists, and were being
             // filed as children's channels.
-            combined.contains("quran") || combined.contains("islam") -> "Quran"
+            combined.contains("quran") || combined.contains("islam") ||
+                inScript("Quran") -> "Quran"
             combined.contains("zarok") || combined.contains("religious") ||
                 combined.contains("hussain") || combined.contains("marjaeyat") ||
                 combined.contains("abbassia") || combined.contains("mahdi") ||
                 combined.contains("sajjad") || combined.contains("imam") ||
-                combined.contains("karbala") -> "Religious"
+                combined.contains("karbala") || inScript("Religious") -> "Religious"
             combined.contains("news") || combined.contains("rudaw") ||
                 combined.contains("kurdistan 24") || combined.contains("nrt") ||
                 combined.contains("channel 8") || combined.contains("speda") ||
-                combined.contains("payam") -> "News"
+                combined.contains("payam") || inScript("News") -> "News"
             combined.contains("music") || combined.contains("korek") ||
-                combined.contains("vin") -> "Music"
+                combined.contains("vin") || inScript("Music") -> "Music"
             combined.contains("kids") || combined.contains("child") ||
-                combined.contains("pepule") -> "Kids"
-            combined.contains("docu") -> "Documentary"
-            combined.contains("kurd") -> "Kurdish"
+                combined.contains("pepule") || inScript("Kids") -> "Kids"
+            combined.contains("docu") || inScript("Documentary") -> "Documentary"
+            // Last, as it always has been — the broad test, so anything more specific
+            // above gets first refusal. `کوردستان` contains `کورد`, so the single
+            // Kurdish needle covers the whole family of Kurdish-script names.
+            combined.contains("kurd") || inScript("Kurdish") -> "Kurdish"
             else -> "General"
         }
     }
 
-    private fun cleanId(name: String): String =
-        name.lowercase(Locale.ROOT).replace(nonAlphaNumericRegex, "").take(16)
+    /**
+     * The name component of a channel id.
+     *
+     * A display name in Latin script contributes itself, lowercased and stripped of
+     * punctuation — the long-standing behaviour, and unchanged for every channel that
+     * already had a readable id, which is what keeps existing favourites and recents
+     * resolvable.
+     *
+     * A name in another script contributes nothing: `[^a-z0-9]` strips every one of
+     * its letters, so the id came out as `krd__2847193` — a name-shaped hole in the
+     * middle of the id. It was still *unique*, because the URL hash that follows it
+     * came from the stream and not from the name, so this never produced a collision.
+     * What it did produce was an id that carries no information about the channel in
+     * any human-readable part, which is what makes a duplicate-id bug in the merge
+     * impossible to spot from a log.
+     *
+     * So the name part falls back to a stable hash of the name itself. The id stays
+     * the same length and the same shape, a Latin channel's id is bit-for-bit what it
+     * was, and an Arabic-script channel gets an id that at least distinguishes
+     * *Kurdistan TV* from *NRT* without having to look the whole id up.
+     */
+    private fun cleanId(name: String): String {
+        val ascii = name.lowercase(Locale.ROOT).replace(nonAlphaNumericRegex, "")
+        if (ascii.isNotEmpty()) return ascii.take(16)
+        // Folded first, so the two spellings of one Kurdish word do not produce two
+        // different ids for one channel.
+        val foldedName = foldForSearch(name)
+        return if (foldedName.isNotEmpty()) {
+            "n" + stableHash(foldedName)
+        } else {
+            // A name with no letters and no digits in any script. Nothing to derive
+            // from, so fall back to the empty-safe literal the old regex produced,
+            // and let the URL hash — which always follows — carry the uniqueness.
+            "n"
+        }
+    }
 
     /**
      * A deterministic hash of the stream URL.
@@ -285,14 +389,97 @@ object KurdishTvParser {
 
     fun getFallbackChannels(): List<Channel> = KurdishChannelCatalog.getDefaultChannels()
 
+    /**
+     * Drops channels that are the same stream reached by a different spelling of the
+     * same URL.
+     *
+     * The comparison used to be on the raw string, so it only caught an *exact*
+     * repeat. Real playlists do not repeat exactly:
+     *
+     *  - `http://` and `https://` for one stream, which is common when two
+     *    community playlists both carry the same channel;
+     *  - a trailing slash, which some CDNs treat as a distinct object;
+     *  - a fragment, which is never sent to the server at all.
+     *
+     * Each of those is one channel shown twice in the grid, each with its own id, its
+     * own logo request and its own heart — a favourite tapped on one of them does
+     * nothing to the other. [normalizeStreamUrl] produces the comparison key; the
+     * channel's own [Channel.streamUrl] is left exactly as the playlist published it,
+     * because that is the URL that has to be handed to the player and rewriting it
+     * would be a change of behaviour rather than a de-duplication.
+     *
+     * First occurrence wins, so the order of the merged list is preserved and the
+     * result is deterministic.
+     */
     fun deduplicate(channels: List<Channel>): List<Channel> {
         val seenUrls = mutableSetOf<String>()
         val result = mutableListOf<Channel>()
         for (channel in channels) {
-            if (channel.streamUrl.isNotBlank() && seenUrls.add(channel.streamUrl)) {
+            if (channel.streamUrl.isNotBlank() &&
+                seenUrls.add(normalizeStreamUrl(channel.streamUrl))
+            ) {
                 result.add(channel)
             }
         }
         return result
     }
+}
+
+/**
+ * The comparison key for [KurdishTvParser.deduplicate]: two URLs that address the
+ * same stream produce the same string.
+ *
+ * Only the parts that genuinely cannot change which object is fetched are folded:
+ * the scheme, the host's case, a default port, the fragment and a trailing slash.
+ * The path and the query are left alone — case-sensitive, and two paths that differ
+ * only by case are two different objects on most servers, so folding them would merge
+ * channels that are not the same.
+ *
+ * Free and pure so it can be pinned by a test; see `ParserUrlTest`.
+ */
+internal fun normalizeStreamUrl(url: String): String {
+    var value = url.trim()
+    if (value.isEmpty()) return value
+
+    // Fragment. Never transmitted, so it cannot select a different stream.
+    val hash = value.indexOf('#')
+    if (hash >= 0) value = value.substring(0, hash)
+
+    val schemeEnd = value.indexOf("://")
+    if (schemeEnd > 0) {
+        val scheme = value.substring(0, schemeEnd).lowercase(Locale.ROOT)
+        val rest = value.substring(schemeEnd + 3)
+        val authorityEnd = rest.indexOfFirst { it == '/' || it == '?' }
+        val authority = if (authorityEnd < 0) rest else rest.substring(0, authorityEnd)
+        val tail = if (authorityEnd < 0) "" else rest.substring(authorityEnd)
+
+        // A default port is the same origin written longer. An IPv6 literal is
+        // bracketed, so only a colon *after* the closing bracket is a port separator —
+        // anything else would cut a bare address like `2001:db8::1` in half.
+        val closingBracket = authority.lastIndexOf(']')
+        val colon = authority.lastIndexOf(':')
+        val hostAndPort = if (colon > closingBracket) {
+            val host = authority.substring(0, colon).lowercase(Locale.ROOT)
+            val port = authority.substring(colon + 1)
+            if (port.toIntOrNull() == if (scheme == "https") 443 else 80) host else "$host:$port"
+        } else {
+            authority.lowercase(Locale.ROOT)
+        }
+
+        value = "$scheme://$hostAndPort$tail"
+    }
+
+    // A trailing slash on the path. Trimmed only from the path portion, so a query
+    // value that legitimately ends in one is untouched.
+    val queryStart = value.indexOf('?')
+    if (queryStart < 0) {
+        value = value.trimEnd('/')
+    } else {
+        val path = value.substring(0, queryStart).trimEnd('/')
+        value = path + value.substring(queryStart)
+    }
+
+    // Never let trimming turn a bare scheme into something unparseable: `http://`
+    // with both slashes removed is not a URL.
+    return if (value.endsWith(":/") || value.endsWith(":")) "$value/" else value
 }
