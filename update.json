@@ -1,9 +1,9 @@
 {
-  "version": "1.0.62",
-  "version_code": 164,
-  "release_url": "https://github.com/LOST-4EVER/Tvapp-/releases/tag/v1.0.62",
-  "download_url": "https://github.com/LOST-4EVER/Tvapp-/releases/download/v1.0.62/kurdish-tv-universal.apk",
+  "version": "1.0.63",
+  "version_code": 167,
+  "release_url": "https://github.com/LOST-4EVER/Tvapp-/releases/tag/v1.0.63",
+  "download_url": "https://github.com/LOST-4EVER/Tvapp-/releases/download/v1.0.63/kurdish-tv-universal.apk",
   "size_bytes": 3262548,
   "published_at": "",
-  "notes": "Build 164 from 597368a1."
+  "notes": "Build 167 from 8d70a880."
 }
