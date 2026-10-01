@@ -18,10 +18,8 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
@@ -170,12 +168,31 @@ fun AdaptiveNavigationRail(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // `key` around each item, which `forEach` without it does not give.
+                //
+                // This is a plain `Column`, not a lazy list, so Compose matches the
+                // items in it *by position*. `RailCategoryItem` remembers an
+                // `interactionSource`, and `remember` inside a position-matched slot
+                // means it belongs to the slot rather than to the category. So the
+                // moment the visible
+                // set changed shape — which it does as soon as the first catalogue
+                // arrives and `CategoryBar` stops offering twelve tabs and starts
+                // offering eight — every item below the first removal inherited the
+                // interaction source of whatever used to be there.
+                //
+                // A stale `MutableInteractionSource` still reports the focus state it
+                // was left in, so a destination that had never been focused could be
+                // drawn with a focus ring, and the ring could be reading the *wrong*
+                // source entirely: the tap target and the highlight disagreeing, which
+                // is the one failure a D-pad UI cannot have.
                 visibleCategories.forEach { category ->
-                    RailCategoryItem(
+                    key(category) {
+                        RailCategoryItem(
                         category = category,
-                        isSelected = selectedCategory == category,
-                        onClick = { onCategorySelected(category) }
-                    )
+                            isSelected = selectedCategory == category,
+                            onClick = { onCategorySelected(category) }
+                        )
+                    }
                 }
             }
 
@@ -203,9 +220,14 @@ private fun RailCategoryItem(
     onClick: () -> Unit
 ) {
     val colors = LocalAppColors.current
-    var isFocused by remember(category) { mutableStateOf(false) }
     // The click keeps the focus target; the ring observes it. See `expressiveFocusRing`.
-    val focusSource = remember { MutableInteractionSource() }
+    //
+    // Keyed on the category, and with no separate `isFocused` mirror of it: the item
+    // draws its state from `isSelected` alone, so a `mutableStateOf` fed by the
+    // ring's `onFocusChanged` and read by nothing invalidated this item's composition
+    // on every arrow press along the rail, to produce a picture identical to the one
+    // already on screen.
+    val focusSource = remember(category) { MutableInteractionSource() }
 
     // The indicator is a fixed 60x34dp box, so its longest safe radius is 17dp --
     // half the short side. A 20dp "active" radius made the four corners overlap and
@@ -235,8 +257,7 @@ private fun RailCategoryItem(
                 interactionSource = focusSource,
                 scrim = colors.focusScrim,
                 restShape = M3ExpressivePolygons.Square,
-                ringShape = M3ExpressivePolygons.Cookie6Sided,
-                onFocusChanged = { isFocused = it }
+                ringShape = M3ExpressivePolygons.Cookie6Sided
             )
             .semantics {
                 role = Role.Tab

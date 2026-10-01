@@ -85,6 +85,18 @@ fun RecentChannelsRow(
         }
 
         LazyRow(
+            // The state has to be *given* to the row, and it was not.
+            //
+            // `Modifier.edgeFade(listState)` reads `canScrollForward` and
+            // `canScrollBackward` off that object to decide which ends to paint. A
+            // `LazyListState` created by `rememberLazyListState` and then never handed
+            // to a list is never attached to anything: it has no layout info, so both
+            // flags are permanently false, so both fades were permanently skipped —
+            // and the state itself, plus the composition that built it, were pure
+            // overhead. The row was clipping its first and last chips with a hard edge,
+            // which is the exact artefact this modifier exists to prevent, and it had
+            // been doing that invisibly for as long as it was here.
+            state = listState,
             modifier = Modifier.edgeFade(listState),
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
