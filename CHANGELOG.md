@@ -149,6 +149,59 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     *connected* clusters, so on several Android releases that advance visibly opens
     the joins.
 
+- **The player's control bars were pinned to the screen instead of to the picture.**
+  The player draws a full-bleed black container and lets `PlayerView` letterbox the
+  video inside it, so the screen is not the picture: on a phone held upright a 16:9
+  stream is a band across the middle of a tall window, with black bars above and
+  below it. The header was laid out against the top of the *window* and the transport
+  bar against the bottom of it, which put the channel name in the top black bar and
+  the controls in the bottom one, with the video nowhere near any of them - the one
+  screen where the controls have to be obviously attached to what they control. The
+  overlay now resolves the video's frame first and lays itself out against that.
+    - `playerFrame()` is the whole of it, and it is a pure function of the container
+      size, the decoded aspect ratio and the resize mode - so it is pinned by
+      `PlayerFrameTest` rather than left to be checked by eye. FILL and ZOOM both
+      *cover* the window and crop the overflow, so both resolve to the full container;
+      only FIT produces a band.
+    - The aspect ratio is reported by the player from `onVideoSizeChanged`, so a 4:3
+      or 21:9 stream letterboxes against its own shape rather than against an assumed
+      16:9. 16:9 remains the value before the first frame is decoded, and for a
+      decoder that reports a zero dimension.
+
+- **The player dimmed the whole screen by 45% to show its controls.** A flat scrim
+  over the entire surface cost a fifth of the picture's brightness everywhere,
+  including across the middle where the transport sits, and bought nothing at all
+  over the black bars, which it could not darken any further. It is now two gradients
+  confined to the picture: opaque under the text, gone before they reach the middle,
+  so the part of the frame the viewer is actually watching is undimmed.
+    - The three transport buttons are now one rounded cluster rather than three
+      separate discs floating over a moving image, which is what they are: a single
+      control set with somewhere obvious for the D-pad to start.
+    - The scrim is still a `tapOnly` pointer target rather than a `clickable`. That is
+      not a style choice: as a clickable it is the largest and first focus target on
+      the player and sits above the controls, so the remote's first press goes to an
+      invisible surface instead of to Back or Play/Pause.
+
+- **The player header had no hierarchy and no logo.** It was a name over
+  `"Sports • HLS / 720p"`, in two lines of grey, with the mute, sleep and favourite
+  controls as three unlabelled glyphs beside it. A bullet-separated string is the
+  least legible arrangement available: the two halves are different *kinds* of fact -
+  what the channel is, and what the stream is - and the separator has to carry that
+  distinction by itself.
+    - The channel logo now appears, which is what a viewer recognises a channel by,
+      and the one screen with room to say so. It uses the same `ChannelLogo` the grid
+      does, so the monogram fallback and the viewer's "show logos" setting both
+      apply here as well.
+    - Category and quality are separate pills, and the category is the one thing in
+      the header carrying the accent, which is what makes it read as "this channel, of
+      this kind" rather than as two grey lines.
+    - The sleep timer moved out of the top bar and down beside the aspect and colour
+      options, which are labelled and which change the picture the same way. The
+      countdown itself stays on the left with the LIVE badge: that is a status
+      readout rather than a control, and it is the one thing in the bar that has to
+      stay legible on a narrow window, where the pills below it drop their labels and
+      fall back to the icon-only form `LabelPillButton` already supports.
+
 ### Fixed
 - **The selected category tab vanished when it had nothing behind it.** The chip
   row's "hide empty tabs" rule and its "keep the tab you are on" rule were written

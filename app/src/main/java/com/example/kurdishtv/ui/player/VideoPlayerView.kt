@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -94,10 +96,30 @@ fun VideoPlayerView(
     loadOnlyWhenPlaying: Boolean = false,
     /** Whether audio playback is muted. */
     isMuted: Boolean = false,
+    /**
+     * Reports the decoded picture's aspect ratio (width / height) as it becomes known.
+     *
+     * The player letterboxes the video inside a full-bleed black container, so the
+     * picture is not the screen and the overlay needs to know where the difference
+     * is: a 16:9 stream on a phone held upright occupies a band across the middle,
+     * and the transport controls have to be laid out against that band rather than
+     * against the window.
+     *
+     * Called with [DEFAULT_VIDEO_ASPECT] until the decoder reports a real size, and
+     * again if a channel change reports a different one. Defaults to doing nothing so
+     * that call sites which do not care — the side preview pane, which has no overlay
+     * — are unaffected.
+     */
+    onVideoAspectChanged: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var isBuffering by remember { mutableStateOf(true) }
+
+    // Read through the current state rather than captured directly, so the listener
+    // below — which is created once per player, not once per callback — never calls
+    // a stale lambda.
+    val currentAspectCallback by rememberUpdatedState(onVideoAspectChanged)
 
     // Applied with drawWithContent rather than graphicsLayer: in Compose 1.7
     // GraphicsLayerScope has no colorFilter property, so graphicsLayer cannot
@@ -214,6 +236,23 @@ fun VideoPlayerView(
 
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                val width = videoSize.width
+                val height = videoSize.height
+                // A decoder can report either dimension as zero while a stream is
+                // still being inspected, and `Player.Listener` is not called again
+                // until it settles. Falling back here means the overlay is laid out
+                // against a real ratio from the first callback rather than against
+                // whatever it was left holding.
+                currentAspectCallback(
+                    if (width > 0 && height > 0) {
+                        width.toFloat() / height.toFloat()
+                    } else {
+                        DEFAULT_VIDEO_ASPECT
+                    }
+                )
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 isBuffering = when (playbackState) {
                     Player.STATE_BUFFERING -> true
