@@ -8,13 +8,18 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -70,14 +75,19 @@ private fun PlayerMetaPill(
         Text(
             text = text,
             color = contentColor,
-            fontSize = 11.sp,
+            // 10sp rather than 11sp, and 7dp of padding rather than 8dp. Every
+            // character here is spent twice — once on the phone where the header has
+            // a logo, a back button and two more buttons in it, and once on a
+            // television from across the room — and the difference between "HLS /
+            // 1080p" fitting and "HLS / 7…" being ellipsized is four of them.
+            fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             // Only ever reached when the pill has been squeezed by a narrow window
             // (see the `weight` at the call site). A pill that ellipsizes is still a
             // legible badge; one that runs off the edge of the screen is not.
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
         )
     }
 }
@@ -85,23 +95,26 @@ private fun PlayerMetaPill(
 /**
  * The transport bar that floats over the video.
  *
- * Three changes from the arrangement it replaces, all of them about the picture rather
- * than about the controls:
+ * Three decisions, all of them about the picture rather than about the controls.
  *
- *  1. **The bars are laid out against the video's frame, not the window.** The player
- *     letterboxes inside a full-bleed black container, so on a phone held upright the
- *     window is mostly black bars with a 16:9 band across the middle. Pinning the
- *     header to the top of the *window* and the controls to the bottom of it stranded
- *     both in the letterbox, a long way from the thing they control. See
- *     [playerFrame].
+ *  1. **Only the transport is anchored to the picture; the chrome is anchored to the
+ *     window.** A phone held upright with a 16:9 stream is a ~230dp band across the
+ *     middle of an ~900dp window, and the rest is black. An earlier version packed
+ *     the header, the transport and the bottom bar into that band, which is what made
+ *     the controls look crushed: three rows of furniture competing for the same
+ *     230dp, the badges ellipsizing, the logo sitting on top of the channel name.
+ *     So the header goes to the top of the *screen* and the bottom bar to the bottom
+ *     of the *screen* — into dead space that costs the picture nothing, because it is
+ *     already black — and only the transport, the one thing that has to be over the
+ *     picture because it is the picture's control, sits on it. See [playerFrame].
  *
- *  2. **The dimming is two gradients over the picture instead of a flat wash over the
- *     screen.** A 45% black scrim on the whole surface cost the viewer a fifth of the
- *     picture's brightness everywhere — including across the middle, where the
- *     transport sits — and bought nothing at all over the black bars, which it could
- *     not darken further. A gradient that is opaque where the text is and gone before
- *     it reaches the middle leaves the part of the frame the viewer is watching
- *     untouched.
+ *  2. **The dimming is two gradients that start at the window's edges, not a flat
+ *     wash over the screen.** A 45% black scrim on the whole surface cost the viewer
+ *     a fifth of the picture's brightness everywhere — including across the middle,
+ *     where the transport sits — and bought nothing at all over the black bars, which
+ *     it could not darken further. Each gradient is tall enough to cover its letterbox
+ *     bar completely and fade out before it reaches the middle of the frame, so over
+ *     black it is invisible and over video it is exactly as strong as the text needs.
  *
  *  3. **The transport is one cluster rather than three floating discs.** Three
  *     separate circles over a moving image read as three unrelated buttons; a single
@@ -158,39 +171,42 @@ fun PlayerControlsOverlay(
         val frameWidth = with(density) { frame.width.toDp() }
         val frameHeight = with(density) { frame.height.toDp() }
 
-        // ── Adapting the control set to the height of the picture ──────────
+        // ── Two independent scales, because there are two different boxes now ────
         //
-        // This is the half of the frame-anchoring that is easy to get wrong. A 16:9
-        // stream fitted into a phone held upright is a band about 230dp tall in a
-        // window several times that, and the control set laid out at television sizes
-        // does not fit inside it: a 96dp header band, a 104dp transport cluster and
-        // an 88dp bottom band is 288dp, so the transport sat on top of the header and
-        // the bottom bar sat on top of the transport. Overlapping controls on a
-        // television are not merely untidy - there is no pointer to disambiguate them
-        // and the viewer cannot tell which one the D-pad is on.
+        // `chrome` sizes the header and the bottom bar, which live in the window and
+        // are therefore only ever limited by how big the window is. `picture` sizes
+        // the transport, which has to fit *inside* the frame: a 16:9 stream fitted
+        // into a phone held upright is a band about 230dp tall, and a 104dp transport
+        // cluster laid out at television size does not leave room for anything else
+        // in it. Driving both off one number is what produced the crushed header.
         //
-        // So the set scales with the picture. `1f` is the roomy case the sizes below
-        // were drawn for, and the floor keeps the controls at a size that is still
-        // pressable and still readable across a room when the picture is small.
         // `.value`, because `Dp / Float` is itself a `Dp` and this has to be a plain
         // ratio to be coerced against one.
-        val roomy = (frameHeight.value / 520f).coerceIn(0.6f, 1f)
+        val chrome = (maxHeight.value / 560f).coerceIn(0.72f, 1f)
+        val picture = (frameHeight.value / 460f).coerceIn(0.55f, 1f)
 
-        // Bands are a share of the picture, so they track the frame rather than the
-        // window, with bounds that scale alongside. The upper bound is what stops a
-        // tall frame from spending a third of its height on a gradient.
-        val topBand = (frameHeight * 0.36f).coerceIn(72.dp * roomy, 152.dp * roomy)
-        val bottomBand = (frameHeight * 0.26f).coerceIn(64.dp * roomy, 130.dp * roomy)
-
-        val playButtonSize = (76f * roomy).dp.coerceAtLeast(56.dp)
-        val stepButtonSize = (56f * roomy).dp.coerceAtLeast(44.dp)
-        val clusterPadding = (18f * roomy).dp.coerceAtLeast(10.dp)
-        val headerTopPadding = (20f * roomy).dp.coerceAtLeast(12.dp)
+        val headerTopPadding = (20f * chrome).dp.coerceAtLeast(12.dp)
+        val bottomPadding = (22f * chrome).dp.coerceAtLeast(14.dp)
         // Coerced as a `Float` and only then converted. `Sp` is declared
         // `Comparable<TextUnit>` rather than `Comparable<Sp>`, so it does not satisfy
         // the `T : Comparable<T>` bound that `coerceAtLeast` carries and cannot be
         // coerced directly - which is a compile error, not a subtle behaviour one.
-        val nameSize = (19f * roomy).coerceAtLeast(15f).sp
+        val nameSize = (20f * chrome).coerceAtLeast(16f).sp
+
+        val playButtonSize = (76f * picture).dp.coerceAtLeast(56.dp)
+        val stepButtonSize = (54f * picture).dp.coerceAtLeast(42.dp)
+        val clusterPadding = (16f * picture).dp.coerceAtLeast(9.dp)
+        val transportGap = (20f * picture).dp.coerceAtLeast(12.dp)
+
+        // Each scrim has to cover its letterbox bar in full — that is the whole
+        // reason the chrome can sit out there — and then fade out over the picture
+        // rather than ending at its edge, or the seam where the gradient stops would
+        // be visible as a hard line across the video. Capped at half the window so a
+        // frame that already fills the screen does not end up entirely blacked out.
+        val fade = (frameHeight * 0.26f).coerceAtLeast(48.dp)
+        val topScrimHeight = (frameTop + fade).coerceAtMost(maxHeight * 0.5f)
+        val bottomScrimHeight =
+            (maxHeight - frameTop - frameHeight + fade).coerceAtMost(maxHeight * 0.5f)
 
         // On a narrow window the four bottom controls — three labelled pills and the
         // fullscreen button — do not fit beside a LIVE badge without colliding, and a
@@ -205,147 +221,161 @@ fun PlayerControlsOverlay(
         // the auto-hide timer is what the viewer is actually waiting for, and a
         // half-faded scrim leaves the video at an unreadable brightness.
         if (isVisible) {
+            // ── Top scrim ─────────────────────────────────────────────────────
             Box(
                 modifier = Modifier
-                    // Offset rather than `align`: the frame is centred by definition,
-                    // so its left/top are the exact distance from the window's own
-                    // top-left corner, and stating it that way cannot be thrown off by
-                    // how the parent's alignment happens to resolve.
-                    .offset(x = frameLeft, y = frameTop)
-                    .size(width = frameWidth, height = frameHeight)
-            ) {
-                // ── Top scrim ────────────────────────────────────────────────
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .height(topBand)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.88f),
-                                    Color.Black.copy(alpha = 0.52f),
-                                    Color.Black.copy(alpha = 0.18f),
-                                    Color.Transparent
-                                )
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(topScrimHeight)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = 0.9f),
+                                Color.Black.copy(alpha = 0.82f),
+                                Color.Black.copy(alpha = 0.5f),
+                                Color.Transparent
                             )
                         )
+                    )
+            )
+
+            // ── Channel header, at the top of the window ──────────────────────
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth()
+                    // The header sits against the top edge of the screen, so in the
+                    // one case where the system bars are *not* hidden — the viewer
+                    // having toggled fullscreen off — it would otherwise be drawn
+                    // underneath the status bar, and the back button with it.
+                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
+                    .padding(start = 14.dp, end = 14.dp, top = headerTopPadding),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AppIconButton(
+                    iconRes = KurdishTvIcons.ChevronLeft,
+                    contentDescription = "Back",
+                    onClick = onBackClick,
+                    style = AppIconButtonStyle.Glass,
+                    size = 42.dp,
+                    iconSize = 23.dp
                 )
 
-                // ── Channel header ────────────────────────────────────────────
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = headerTopPadding),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AppIconButton(
-                        iconRes = KurdishTvIcons.ChevronLeft,
-                        contentDescription = "Back",
-                        onClick = onBackClick,
-                        style = AppIconButtonStyle.Glass,
-                        size = 44.dp,
-                        iconSize = 24.dp
-                    )
-
-                    Spacer(modifier = Modifier.width(2.dp))
-
-                    // The logo is what a viewer recognises a channel by, and this is
-                    // the one screen where there is room to say so at a glance. It
-                    // falls back to a monogram when the artwork is missing, which is
-                    // the same fallback the grid uses, and it honours the viewer's
-                    // "show logos" setting rather than ignoring it here.
-                    if (showLogos) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(M3ExpressiveShapes.MediumCard)
-                        ) {
-                            ChannelLogo(
-                                channelName = channel.name,
-                                logoUrl = channel.logoUrl,
-                                showLogos = showLogos,
-                                contentPadding = 5.dp,
-                                size = 44.dp
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(2.dp))
-                    }
-
-                    // Weighted, so the title takes the slack rather than its intrinsic
-                    // width. Unweighted it was the row's widest fixed child, and on a
-                    // narrow window the controls on the right pushed the whole bar past
-                    // the screen edge and took the channel name with it.
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = channel.name,
-                            color = Color.White,
-                            fontSize = nameSize,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                // The logo is what a viewer recognises a channel by, and this is
+                // the one screen where there is room to say so at a glance. It
+                // falls back to a monogram when the artwork is missing, which is
+                // the same fallback the grid uses, and it honours the viewer's
+                // "show logos" setting rather than ignoring it here.
+                //
+                // 40dp rather than 44dp: four dp is the difference between this row
+                // fitting four fixed children plus a name on a 360dp-wide phone and
+                // the quality badge losing its last two characters to an ellipsis.
+                if (showLogos) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(M3ExpressiveShapes.MediumCard)
+                    ) {
+                        ChannelLogo(
+                            channelName = channel.name,
+                            logoUrl = channel.logoUrl,
+                            showLogos = showLogos,
+                            contentPadding = 4.dp,
+                            size = 40.dp
                         )
-                        Spacer(modifier = Modifier.height(5.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // `fill = false` so each pill is drawn at its natural width
-                            // when there is room and is only *capped* at the space
-                            // left when there is not. A fixed-width pill row overflows a
-                            // narrow window silently — a `Row` does not wrap and does
-                            // not clip — which on a small phone put the quality badge
-                            // past the screen edge.
-                            PlayerMetaPill(
-                                text = channel.category,
-                                contentColor = colors.primary,
-                                containerColor = colors.glass,
-                                modifier = Modifier.weight(1f, fill = false),
-                                borderColor = colors.primary.copy(alpha = 0.45f)
-                            )
-                            PlayerMetaPill(
-                                text = channel.quality,
-                                contentColor = Color.White.copy(alpha = 0.78f),
-                                containerColor = colors.glass,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                        }
                     }
-
-                    AppIconButton(
-                        iconRes = if (isMuted) KurdishTvIcons.VolumeOff else KurdishTvIcons.VolumeUp,
-                        contentDescription = if (isMuted) "Unmute" else "Mute",
-                        onClick = onToggleMute,
-                        style = AppIconButtonStyle.Glass,
-                        active = isMuted
-                    )
-                    AppIconButton(
-                        iconRes = if (channel.isFavorite) {
-                            KurdishTvIcons.FavoriteFilledRes
-                        } else {
-                            KurdishTvIcons.FavoriteOutline
-                        },
-                        contentDescription = if (channel.isFavorite) {
-                            "Remove from favourites"
-                        } else {
-                            "Add to favourites"
-                        },
-                        onClick = onFavoriteToggle,
-                        style = AppIconButtonStyle.Glass,
-                        active = channel.isFavorite
-                    )
                 }
 
-                // ── Transport cluster ─────────────────────────────────────────
+                // Weighted, so the title takes the slack rather than its intrinsic
+                // width. Unweighted it was the row's widest fixed child, and on a
+                // narrow window the controls on the right pushed the whole bar past
+                // the screen edge and took the channel name with it.
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = channel.name,
+                        color = Color.White,
+                        fontSize = nameSize,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // The category takes the slack and the quality does not.
+                        //
+                        // Both were weighted equally, so on a narrow phone each was
+                        // capped at half the row and `"HLS / 1080p"` was ellipsized to
+                        // `"HLS / 7…"` — losing precisely the resolution number, which
+                        // is the only part of that string anybody reads. Weighted on one
+                        // side only, the category is the one that gives way, and the
+                        // quality keeps its natural width until the window is too
+                        // narrow for even that, which is the point at which losing the
+                        // digits is unavoidable.
+                        PlayerMetaPill(
+                            text = channel.category,
+                            contentColor = colors.primary,
+                            containerColor = colors.glass,
+                            modifier = Modifier.weight(1f, fill = false),
+                            borderColor = colors.primary.copy(alpha = 0.45f)
+                        )
+                        PlayerMetaPill(
+                            text = channel.quality,
+                            contentColor = Color.White.copy(alpha = 0.78f),
+                            containerColor = colors.glass
+                        )
+                    }
+                }
+
+                AppIconButton(
+                    iconRes = if (isMuted) KurdishTvIcons.VolumeOff else KurdishTvIcons.VolumeUp,
+                    contentDescription = if (isMuted) "Unmute" else "Mute",
+                    onClick = onToggleMute,
+                    style = AppIconButtonStyle.Glass,
+                    size = 42.dp,
+                    iconSize = 22.dp
+                )
+                AppIconButton(
+                    iconRes = if (channel.isFavorite) {
+                        KurdishTvIcons.FavoriteFilledRes
+                    } else {
+                        KurdishTvIcons.FavoriteOutline
+                    },
+                    contentDescription = if (channel.isFavorite) {
+                        "Remove from favourites"
+                    } else {
+                        "Add to favourites"
+                    },
+                    onClick = onFavoriteToggle,
+                    style = AppIconButtonStyle.Glass,
+                    size = 42.dp,
+                    iconSize = 22.dp,
+                    active = channel.isFavorite
+                )
+            }
+
+            // ── Transport cluster, on the picture ──────────────────────────────
+            // Its own box, offset to the frame: the one control set that has to be
+            // over the video, because it is the video's control. Offset rather than
+            // `align`, because the frame is centred by definition, so its left/top
+            // are the exact distance from the window's own top-left corner and
+            // stating it that way cannot be thrown off by how the parent's alignment
+            // happens to resolve.
+            Box(
+                modifier = Modifier
+                    .offset(x = frameLeft, y = frameTop)
+                    .size(width = frameWidth, height = frameHeight),
+                contentAlignment = Alignment.Center
+            ) {
                 // A plain `Box` with a background, deliberately not a `Surface` and not
                 // clickable: a surface here would either clip the circles inside it or
                 // add a focus target that competes with all three of them.
                 Box(
                     modifier = Modifier
-                        .align(Alignment.Center)
                         .background(colors.glass, M3ExpressiveShapes.LargeCard)
                         // A white hairline rather than `colors.border`, which is tuned
                         // against the app's own dark surfaces and is very nearly
@@ -355,7 +385,7 @@ fun PlayerControlsOverlay(
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(22.dp),
+                        horizontalArrangement = Arrangement.spacedBy(transportGap),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         AppIconButton(
@@ -386,113 +416,114 @@ fun PlayerControlsOverlay(
                         )
                     }
                 }
+            }
 
-                // ── Bottom scrim ──────────────────────────────────────────────
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(bottomBand)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.22f),
-                                    Color.Black.copy(alpha = 0.62f),
-                                    Color.Black.copy(alpha = 0.92f)
-                                )
+            // ── Bottom scrim ──────────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(bottomScrimHeight)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.5f),
+                                Color.Black.copy(alpha = 0.82f),
+                                Color.Black.copy(alpha = 0.92f)
                             )
                         )
-                )
+                    )
+            )
 
-                // ── Status and playback options ──────────────────────────────
+            // ── Status and playback options, at the bottom of the window ─────
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom))
+                    .padding(start = 18.dp, end = 18.dp, bottom = bottomPadding),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .padding(start = 20.dp, end = 20.dp, bottom = 18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    LiveBadge()
+                    if (!sleepTimerRemainingText.isNullOrEmpty()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        PlayerMetaPill(
+                            text = "Sleep $sleepTimerRemainingText",
+                            contentColor = colors.onPrimaryContainer,
+                            containerColor = colors.primaryContainer
+                        )
+                    }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        LiveBadge()
-                        if (!sleepTimerRemainingText.isNullOrEmpty()) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            PlayerMetaPill(
-                                text = "Sleep $sleepTimerRemainingText",
-                                contentColor = colors.onPrimaryContainer,
-                                containerColor = colors.primaryContainer
-                            )
-                        }
-                    }
+                    // The sleep timer moved down here from the top bar, where it
+                    // was a moon in a circle of four unlabelled glyphs. It now sits
+                    // beside the two other options that change the picture, and they
+                    // are all labelled. The *countdown* deliberately stays on the
+                    // left with the LIVE badge: that is a status readout rather than
+                    // a control, and it is the one thing in this bar that has to
+                    // stay legible on a narrow window, where these pills drop their
+                    // labels.
+                    LabelPillButton(
+                        iconRes = KurdishTvIcons.Bedtime,
+                        label = if (labelled) "Sleep" else "",
+                        onClick = onOpenSleepTimer,
+                        containerColor = colors.glass,
+                        active = !sleepTimerRemainingText.isNullOrEmpty()
+                    )
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // The sleep timer moved down here from the top bar, where it
-                        // was a moon in a circle of four unlabelled glyphs. It now sits
-                        // beside the two other options that change the picture, and
-                        // they are all labelled. The *countdown* deliberately stays on
-                        // the left with the LIVE badge: that is a status readout rather
-                        // than a control, and it is the one thing in this bar that has
-                        // to stay legible on a narrow window, where these pills drop
-                        // their labels.
-                        LabelPillButton(
-                            iconRes = KurdishTvIcons.Bedtime,
-                            label = if (labelled) "Sleep" else "",
-                            onClick = onOpenSleepTimer,
-                            containerColor = colors.glass,
-                            active = !sleepTimerRemainingText.isNullOrEmpty()
-                        )
+                    // The label names the mode that is *on*, not the one the next
+                    // tap selects, so the state is readable rather than being a
+                    // preview of an action nobody has taken yet.
+                    LabelPillButton(
+                        iconRes = KurdishTvIcons.AspectRatio,
+                        label = if (labelled) resizeMode.label else "",
+                        onClick = onResizeModeToggle,
+                        containerColor = colors.glass
+                    )
 
-                        // The label names the mode that is *on*, not the one the next
-                        // tap selects, so the state is readable rather than being a
-                        // preview of an action nobody has taken yet.
-                        LabelPillButton(
-                            iconRes = KurdishTvIcons.AspectRatio,
-                            label = if (labelled) resizeMode.label else "",
-                            onClick = onResizeModeToggle,
-                            containerColor = colors.glass
-                        )
+                    // Always named, and always naming the *current* state. It used to
+                    // be blank until a filter was switched on, which collapsed the
+                    // control to a bare accent-coloured disc in a bar where every
+                    // other control is a labelled pill.
+                    LabelPillButton(
+                        iconRes = KurdishTvIcons.Palette,
+                        label = if (labelled) {
+                            if (colorFilter.isActive) colorFilter.label else "Colour"
+                        } else {
+                            ""
+                        },
+                        onClick = onCycleColorFilter,
+                        containerColor = if (colorFilter.isActive) {
+                            colors.primary
+                        } else {
+                            colors.glass
+                        },
+                        contentColor = if (colorFilter.isActive) colors.onPrimary else Color.White,
+                        active = colorFilter.isActive
+                    )
 
-                        // Always named, and always naming the *current* state. It used
-                        // to be blank until a filter was switched on, which collapsed
-                        // the control to a bare accent-coloured disc in a bar where
-                        // every other control is a labelled pill.
-                        LabelPillButton(
-                            iconRes = KurdishTvIcons.Palette,
-                            label = if (labelled) {
-                                if (colorFilter.isActive) colorFilter.label else "Colour"
-                            } else {
-                                ""
-                            },
-                            onClick = onCycleColorFilter,
-                            containerColor = if (colorFilter.isActive) {
-                                colors.primary
-                            } else {
-                                colors.glass
-                            },
-                            contentColor = if (colorFilter.isActive) colors.onPrimary else Color.White,
-                            active = colorFilter.isActive
-                        )
-
-                        AppIconButton(
-                            iconRes = if (isFullscreen) {
-                                KurdishTvIcons.FullscreenExit
-                            } else {
-                                KurdishTvIcons.Fullscreen
-                            },
-                            contentDescription = "Fullscreen",
-                            onClick = onFullscreenToggle,
-                            style = AppIconButtonStyle.Glass,
-                            size = 40.dp,
-                            iconSize = 20.dp
-                        )
-                    }
+                    AppIconButton(
+                        iconRes = if (isFullscreen) {
+                            KurdishTvIcons.FullscreenExit
+                        } else {
+                            KurdishTvIcons.Fullscreen
+                        },
+                        contentDescription = "Fullscreen",
+                        onClick = onFullscreenToggle,
+                        style = AppIconButtonStyle.Glass,
+                        size = 40.dp,
+                        iconSize = 20.dp
+                    )
                 }
             }
         }

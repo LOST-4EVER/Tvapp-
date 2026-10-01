@@ -1,6 +1,7 @@
 package com.example.kurdishtv.model
 
 import java.lang.ref.WeakReference
+import java.text.Normalizer
 import java.util.Locale
 
 /**
@@ -256,28 +257,144 @@ object ChannelFilterEngine {
      *
      * The per-channel cost is one pass over a short string, and it replaces the
      * `ignoreCase` comparisons this used to do twice per channel, so it is not an
-     * addition to the hot path so much as a change of shape within it. Accent
-     * folding and script folding are deliberately *not* attempted: they are a larger
-     * claim than this test can honestly make, and a much larger cost per keystroke.
+     * addition to the hot path so much as a change of shape within it. What it does
+     * *not* fold is deliberate and is now the only thing it leaves out: Latin accents.
+     * A Kurdish playlist writes its Latin-script names without them, so `ç` and `c`
+     * are not two spellings of one channel here but two different channels, and
+     * folding them would make a real channel unfindable by its real name. See
+     * [foldForSearch] for the script folding that *is* done, and why.
      */
-    private fun normalizeQuery(text: String): String {
-        val lower = text.lowercase(Locale.ROOT)
-        // The overwhelming majority of names and categories are already free of
-        // separators, so scan first and only build a string when something has to
-        // come out. `filter` allocated unconditionally.
-        var needsRebuild = false
-        for (i in lower.indices) {
-            if (!lower[i].isLetterOrDigit()) {
-                needsRebuild = true
-                break
-            }
-        }
-        if (!needsRebuild) return lower
+    private fun normalizeQuery(text: String): String = foldForSearch(text)
+}
 
-        val out = StringBuilder(lower.length)
-        for (c in lower) {
-            if (c.isLetterOrDigit()) out.append(c)
+/**
+ * Puts a channel name, a category or a typed query into one canonical shape, so that
+ * the three can be compared as plain substrings.
+ *
+ * The previous version lowercased, then dropped every character that was not a letter
+ * or a digit. That is right for a Latin-script playlist and wrong in three specific
+ * ways for a *Kurdish* one, and all three fail the same visible way: an empty result
+ * grid for a channel that is plainly on screen, which from the sofa is
+ * indistinguishable from search being broken.
+ *
+ *  1. **The letters Kurmanji and Sorani add to Arabic were never folded.** `ڕ`, `ڵ`, `ۆ`,
+ *     `ێ` and `ە` are separate codepoints from the plain letters they are written
+ *     with, and a keyboard, a transcriber and a playlist author each pick a different
+ *     one. A viewer who types `کوردی` with a plain `ر` cannot find a channel stored as
+ *     `کوردی` with `ڕ`, even though they are the same word and the viewer would bet
+ *     money on which channel they meant. Folding each Kurdish letter onto its base
+ *     makes both spellings collapse to one key.
+ *  2. **Arabic-Indic digits were not digits at all, to this code.** `١٢` is what a
+ *     Kurdish playlist most often writes for a channel number, and `isLetterOrDigit`
+ *     said yes, so it survived — as `١٢`, which will never equal an ASCII `12`. The
+ *     Extended Arabic-Indic form `۱۲` has the same problem. Both now map onto ASCII, so
+ *     a remote's `12` finds a channel numbered `١٢` and vice versa.
+ *  3. **Presentation forms were silently deleted.** Arabic has a second set of shaped
+ *     letters for end-of-word positions (U+FE70 and onwards), which are combining
+ *     marks rather than letters. `isLetterOrDigit` said no to all of them, so a name
+ *     written in shaped form lost exactly the letters that made it distinguishable,
+ *     and matched nothing. They are folded to their base letters first.
+ *
+ * Also folded, because they are routine confusions in the same script and cost nothing
+ * to treat as one: the alef variants (أ إ آ → ا), ى → ی, ة → ه, and the two Arabic yeh
+ * codepoints onto one.
+ *
+ * The cost is one pass over a short string, plus an NFKC pass only for the rare names
+ * that actually contain presentation forms. The per-channel keys are built once and
+ * memoised by [searchKeysFor], so this is paid once per channel per list rather than
+ * per keystroke, and the query itself is a handful of characters.
+ *
+ * Internal, and free functions, so the folding can be pinned by a test rather than
+ * only checked by typing at it.
+ */
+internal fun foldForSearch(text: String): String {
+    val lower = text.lowercase(Locale.ROOT)
+
+    // The fast path, and it is the overwhelming majority of input: every category
+    // string, and most names, are ASCII letters and digits already. Nothing to fold
+    // and nothing to strip, so the original string is returned and no builder is
+    // allocated at all. This preserves the behaviour the existing code was careful to
+    // preserve, on the inputs it was careful about.
+    var plainAscii = true
+    for (i in lower.indices) {
+        val c = lower[i]
+        if (c !in 'a'..'z' && c !in '0'..'9') {
+            plainAscii = false
+            break
         }
-        return out.toString()
     }
+    if (plainAscii) return lower
+
+    // Only strings that really contain shaped letters are put through NFKC, so the
+    // common Arabic case is not paying for a compatibility decomposition it does not
+    // need, and cannot be altered by one.
+    val source = if (containsPresentationForm(lower)) {
+        Normalizer.normalize(lower, Normalizer.Form.NFKC)
+    } else {
+        lower
+    }
+
+    val out = StringBuilder(source.length)
+    for (raw in source) {
+        val c = foldSearchChar(raw)
+        // Folding produces one non-digit for every digit and a letter for every
+        // letter; everything else — separators, spaces, tatweel, harakat — is
+        // dropped, as it was before.
+        if (c.isLetterOrDigit()) out.append(c)
+    }
+    return out.toString()
+}
+
+private fun containsPresentationForm(text: String): Boolean {
+    for (c in text) {
+        // Presentation Forms-A (FB50-FDFF) and Arabic Presentation Forms-B
+        // (FE70-FEFF). Both are combining marks, not letters.
+        if (c.code in 0xFB50..0xFDFF || c.code in 0xFE70..0xFEFF) return true
+    }
+    return false
+}
+
+/**
+ * The single-character fold. Kept as a `when` rather than a lookup table because the
+ * digit ranges compile to an arithmetic case and the rest to a jump table, and a
+ * `Map<Char, Char>` probe per character is exactly the kind of cost the fast path in
+ * [foldForSearch] exists to avoid.
+ */
+private fun foldSearchChar(c: Char): Char = when (c) {
+    // Arabic-Indic digits U+0660-0669 and Extended Arabic-Indic U+06F0-06F9.
+    in '٠'..'٩' -> '0' + (c - '٠')
+    in '۰'..'۹' -> '0' + (c - '۰')
+
+    // The letters Kurdish adds to Arabic, folded onto the plain letter they are
+    // written with. This is the whole point of the function.
+    'ڕ' -> 'ر' // reh with small v
+    'ڵ' -> 'ل' // lam with small v
+    'ۆ' -> 'و' // oe
+    'ێ' -> 'ی' // yeh with small v
+    'ە' -> 'ه' // ae
+    'ژ' -> 'ز' // jeh
+    'پ' -> 'ب' // peh
+    'چ' -> 'ج' // tcheh
+    'ڤ' -> 'ف' // veh
+    'گ' -> 'ک' // gaf
+    'ھ' -> 'ه' // heh doachashmee
+    'ډ' -> 'د' // dal with small v
+    'ڋ' -> 'د' // dal with three dots below
+
+    // Alef variants, ya/tatweel-free yeh, and ta marbuta. Routine confusions in the
+    // same script: a viewer who types ا for أ is not looking for a different channel.
+    'أ', 'إ', 'آ', 'ٱ' -> 'ا'
+    'ى' -> 'ی' // alef maksura, used as yeh
+    'ة' -> 'ه'
+    'ؤ' -> 'و'
+    'ئ' -> 'ی'
+
+    // Zero-width and joiner characters that a playlist or a copy-paste can carry and
+    // that carry no sound. Written as escapes rather than as the characters themselves:
+    // an invisible literal in source is unreviewable, and a tool that rewrites the
+    // file can silently drop one. Each is mapped to a space, which the `isLetterOrDigit`
+    // test below then discards along with every other separator.
+    '\u00AD', '\u0640', '\u200B', '\u200C', '\u200D', '\uFEFF' -> ' '
+
+    else -> c
 }

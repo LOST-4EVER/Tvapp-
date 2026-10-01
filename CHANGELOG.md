@@ -203,6 +203,62 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
       fall back to the icon-only form `LabelPillButton` already supports.
 
 ### Fixed
+- **The player controls were crushed into a 230dp band in the middle of the screen.**
+  A 16:9 stream on a phone held upright is a band about 230dp tall inside a window
+  several times that, and the overlay was laid out *inside that band*: a 96dp header,
+  a 104dp transport cluster and an 88dp bottom bar competing for the same 230dp. The
+  result was the header's channel name sitting under the logo, the `HLS / 1080p`
+  badge ellipsized to `HLS / 7…` — losing precisely the resolution number, which is
+  the only part of that string anybody reads — and the bottom bar pressed right up
+  against the transport cluster. Only the transport is over the picture now, because
+  it is the picture's control; the channel header sits at the top of the *screen*
+  and the status and options bar at the bottom of the *screen*, in the letterbox bars
+  that were already black and so cost the picture nothing.
+  - The two gradients were re-derived to match: each one now starts at the window's
+    edge and is tall enough to cover its letterbox bar completely before fading out
+    over the video, so over black it is invisible and over video it is exactly as
+    strong as the text needs. Both used to be sized as a share of the *frame*, so on
+    a letterboxed phone they stopped well short of the bars they were meant to be
+    darkening.
+  - The header and the bottom bar now scale off the window and the transport off the
+    frame, rather than both off one number. That conflation is what forced the header
+    to be sized for a 230dp band it was no longer inside.
+  - Both bars respect the system-bar insets. With fullscreen toggled off, the header
+    was drawn underneath the status bar, taking the Back button with it.
+  - The two metadata badges no longer split the available width equally. The category
+    takes the slack and the quality keeps its natural width, so the resolution survives
+    on a narrow phone.
+- **Search could not find channels written in Arabic or Kurdish script.** This is the
+  one that reads, from a sofa, as *search is broken*: the channel is plainly on screen
+  with its name in Arabic script, the viewer types what they think it says, and the
+  grid comes back empty. Nothing errors and nothing looks wrong, and there is no way
+  for the viewer to tell that the two strings they were comparing are the same word
+  written with a different letter. Three separate causes:
+  - **The letters Kurmanji and Sorani add to Arabic were never folded.** `ڕ`, `ڵ`,
+    `ۆ`, `ێ`, `ە`, `پ`, `چ`, `ڤ`, `گ` and `ھ` are separate codepoints from the plain
+    letters they are written with, and a keyboard, a transcriber and a playlist author
+    each pick a different one. A viewer who types `کوردی` with a plain `ر` could not
+    find a channel stored as `کوردی` with `ڕ`. Each now folds onto its base letter, as
+    do the alef variants, `ى`, `ة`, `ؤ` and `ئ`.
+  - **Arabic-Indic digits were digits to the old code, but not ASCII ones.** `١٢` is
+    what a Kurdish playlist most often writes for a channel number and
+    `isLetterOrDigit` said yes to it, so it survived — as `١٢`, which never equals the
+    ASCII `12` a remote's number pad can produce. Arabic-Indic (U+0660) and Extended
+    Arabic-Indic (U+06F0) digits now map onto ASCII, in both directions.
+  - **Presentation forms were silently deleted.** Arabic has a second set of shaped
+    letters for end-of-word positions (U+FE70 onwards) which are combining marks, not
+    letters, so `isLetterOrDigit` rejected every one of them. A name written in shaped
+    form lost exactly the letters that made it distinguishable and matched nothing.
+    Those strings are now NFKC-normalised to their base letters first.
+  - Zero-width and joiner characters — ZWNJ, ZWJ, a soft hyphen, a BOM, tatweel — are
+    dropped rather than indexed, so a name pasted from a web page still has one key.
+  - **Latin accents are still deliberately *not* folded.** A Kurdish playlist writes
+    its Latin-script names without diacritics, so `ç` and `c` are two different
+    channels here rather than two spellings of one, and folding them would make a real
+    channel unfindable by its own name — the same silence, in the opposite direction.
+    The ASCII fast path is unchanged, so Latin search costs what it always did.
+  - `SearchFoldingTest` pins all of the above. The folding is an internal free function
+    specifically so that it can be tested rather than only checked by typing at it.
 - **The selected category tab vanished when it had nothing behind it.** The chip
   row's "hide empty tabs" rule and its "keep the tab you are on" rule were written
   as two branches on whether the selected category had a non-zero count, and the
@@ -711,7 +767,8 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the sofa an empty grid for a channel that is visibly on screen is indistinguishable
   from search being broken. Both the query and the names it is compared against are
   now put into one canonical form, so `nrt-1`, `nrt_1`, `nrt1` and `NRT 1` all find
-  the same channel. Accent and script folding are deliberately not attempted.
+  the  same channel. Script folding was added later and is described under **Fixed** above;
+  Latin accent folding is still deliberately not attempted.
 - **The keyboard's Search key did nothing.** The field had no IME action, so most
   keyboards showed a bare newline that did not submit and did not dismiss. It now
   takes a Search action that clears focus, which is what closes the keyboard, and the
