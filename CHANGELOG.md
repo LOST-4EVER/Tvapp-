@@ -203,6 +203,61 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
       fall back to the icon-only form `LabelPillButton` already supports.
 
 ### Fixed
+- **Every card in the grid painted its own surface twice.** The `Card` was given
+  `containerColor = surface` *and* the `Box` inside it painted
+  `background(surface, cardShape)` — the same colour, over the same shape, on top of
+  it. So each card filled the identical rounded rectangle twice: once by the `Card` and
+  again by its own first child. In a grid of several hundred that is several hundred
+  redundant draws of the largest surface on the card, on the thread that has to keep
+  up with scrolling — and it is pure overdraw, the exact thing the earlier pass deleted
+  the per-card gradient and the shadow for being invisible-but-not-free. The `Card` is
+  now transparent and the `Box` is the single fill; the rounded corners are unchanged,
+  because the `Card`'s own shape still clips them.
+- **Clearing favourites rebuilt the whole catalogue on the main thread.**
+  `clearFavorites` mapped every channel *and* re-filtered the whole list inside the
+  `update` block — and `update` is a compare-and-set on the main thread, so that is
+  the thread drawing the grid it was drawing into. It is the one whole-catalogue pass
+  in the view model that had not been moved off it; `onFavoriteToggled` had already
+  been. It now runs on `Dispatchers.Default`, like every other.
+  - It lives beside `rebuildForFavorite` for the same reason that one exists: it
+  touches four lists at once, and the only way they cannot disagree is to derive them
+  together.
+  - It also re-checks list identity before applying, so a merge landing mid-rebuild
+  cannot leave the hearts cleared against a list that is no longer on screen.
+- **Three separate id maps were built over the entire catalogue to answer about a
+  dozen questions.** The cold-start path, the merge path and every single channel
+  selection each did `channels.associateBy { it.id }` — a hash entry for *every*
+  channel, well over a thousand of them once the remote playlists land — and then
+  looked up a handful of recent ids from it. Almost every entry built was never read.
+  So a cold start, a refresh and every press of OK each paid a thousand insertions,
+  a thousand keys and a thousand string hashes to resolve at most twelve channels.
+  - One helper does it now, and it allocates in proportion to the *question* rather
+    than to the catalogue: a set of the ids being asked about, one pass over the list,
+    and only the channels that matched. No lookup per id either, which would have been
+    twelve full scans instead.
+  - Results come back in the id order given, because the history is stored
+    most-recent-first and the row is drawn in that order. Collecting during the scan
+    would have produced catalogue order, which looks plausible and is wrong.
+  - `ChannelLookupTest` pins the ordering, the skipping of ids a refresh removed, and
+    the duplicate cases — this is invisible in a screenshot, which is the problem.
+- **The channel grid's skeleton screen could never appear, and shimmered while it
+  could.** `ChannelSkeletonGrid` was guarded by `if (filtered.isEmpty())` **and**
+  `if (isLoading)`, and neither can be true at the same time: the bundled catalogue is
+  seeded into the state before anything loads and is re-seeded into every merge, so the
+  filtered list is never empty while a load is in flight. The guard was unreachable
+  from all four layouts.
+  - It was also the last thing in the app that animated. A shimmer is a per-frame
+    shader pass and a render node held open for the whole wait, which is what
+    `Skeleton.kt` says in its own header comment — and that the grid is
+    *deliberately* not given one, since the real catalogue is on screen throughout a
+    refresh and a hundred grey rectangles would throw away something the viewer can
+    already use.
+  - So it and its shimmer modifier are gone, and with them the app's last
+    `rememberInfiniteTransition` — the only one left anywhere in the source. Loading
+    feedback is unchanged: the header's indicator is what reports a refresh, and that
+    is still driven by `isLoading`.
+  - The logo tile's placeholder stays, because a logo tile genuinely is blank while it
+    loads — that is the one surface the skeleton was written for.
 - **A clock moved backwards pinned the whole DNS cache as fresh.** `FastCachingDns`
   stamped entries with `System.currentTimeMillis()`, so a wall clock that moves - which
   NITZ does on a TV box and a viewer does from the system settings - made every cached
