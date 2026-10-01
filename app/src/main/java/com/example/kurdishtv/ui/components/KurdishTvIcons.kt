@@ -25,6 +25,7 @@ object KurdishTvIcons {
     val VolumeUp: Int = R.drawable.ic_volume_up
     val VolumeOff: Int = R.drawable.ic_volume_off
     val Tune: Int = R.drawable.ic_tune
+    val Movie: Int = R.drawable.ic_movie
     val Palette: Int = R.drawable.ic_palette
     val AddLink: Int = R.drawable.ic_add_link
     val News: Int = R.drawable.ic_news

@@ -30,7 +30,8 @@ class ChannelKeypadController(
     fun onNumericKey(digit: Int) {
         if (digit !in 0..9) return
         val current = _channelJump.value?.digits.orEmpty()
-        setJump((current + digit).takeLast(MAX_JUMP_DIGITS))
+        if (current.length >= MAX_JUMP_DIGITS) return
+        setJump(current + digit)
     }
 
     fun onNumericBackspace() {

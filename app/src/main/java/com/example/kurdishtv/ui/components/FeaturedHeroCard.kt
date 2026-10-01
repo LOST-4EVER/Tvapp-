@@ -204,30 +204,36 @@ fun FeaturedHeroCard(
                         // phone you scrolled past it before reaching a single
                         // channel — the hero was eating the screen it was meant to
                         // introduce.
-                        Button(
-                            onClick = { onWatchClick(channel) },
+                        Surface(
                             shape = M3ExpressiveShapes.Pill,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = colors.primary,
-                                contentColor = colors.onPrimary
-                            ),
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-                            // No extra clickable here: the whole card is already a
-                            // click target, so a second one would fire it twice.
-                            modifier = Modifier.align(Alignment.Start)
+                            color = colors.primary,
+                            contentColor = colors.onPrimary,
+                            modifier = Modifier
+                                .align(Alignment.Start)
+                                .tvClickable(
+                                    focusable = false,
+                                    pressedFill = colors.onPrimary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                                    pressedShape = M3ExpressiveShapes.Pill,
+                                    onClick = { onWatchClick(channel) }
+                                )
                         ) {
-                            SvgIcon(
-                                resId = KurdishTvIcons.PlayRes,
-                                contentDescription = null,
-                                tint = colors.onPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(7.dp))
-                            Text(
-                                text = "Watch live now",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SvgIcon(
+                                    resId = KurdishTvIcons.PlayRes,
+                                    contentDescription = null,
+                                    tint = colors.onPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(7.dp))
+                                Text(
+                                    text = "Watch live now",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }

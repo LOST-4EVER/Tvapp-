@@ -409,9 +409,13 @@ class TvViewModel(
             // another channel in the meantime. Re-asserting the old value here used
             // to snap the selection back to the channel they had already moved on
             // from. The recents row is the only thing this coroutine owns.
-            val byId = _uiState.value.channels.associateBy { it.id }
+            val channels = _uiState.value.channels
+            val mappedRecents = withContext(Dispatchers.Default) {
+                val byId = channels.associateBy { it.id }
+                recents.mapNotNull { id -> byId[id] }
+            }
             _uiState.update { state ->
-                state.copy(recentChannels = recents.mapNotNull { id -> byId[id] })
+                state.copy(recentChannels = mappedRecents)
             }
         }
     }

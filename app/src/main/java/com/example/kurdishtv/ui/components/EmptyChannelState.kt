@@ -1,24 +1,31 @@
 package com.example.kurdishtv.ui.components
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kurdishtv.ui.motion.ExpressiveMotion
+import com.example.kurdishtv.ui.motion.ShapeMorph
+import com.example.kurdishtv.ui.motion.expressiveFocusRing
+import com.example.kurdishtv.ui.motion.tvClickable
+import com.example.kurdishtv.ui.theme.M3ExpressivePolygons
 import com.example.kurdishtv.ui.theme.M3ExpressiveShapes
 import com.example.ui.theme.LocalAppColors
 
@@ -29,6 +36,7 @@ fun EmptyChannelState(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalAppColors.current
+    val buttonSource = remember { MutableInteractionSource() }
 
     Column(
         modifier = modifier
@@ -73,22 +81,43 @@ fun EmptyChannelState(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Button(
-            onClick = onReset,
-            shape = M3ExpressiveShapes.Pill,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = colors.primary,
-                contentColor = colors.onPrimary
-            )
+        val pillShape = M3ExpressiveShapes.Pill
+        Surface(
+            shape = pillShape,
+            color = colors.primary,
+            contentColor = colors.onPrimary,
+            modifier = Modifier
+                .tvClickable(
+                    interactionSource = buttonSource,
+                    pressedFill = colors.onPrimary.copy(alpha = ExpressiveMotion.Press.heldAlpha),
+                    pressedShape = pillShape,
+                    onClick = onReset
+                )
+                .expressiveFocusRing(
+                    ringColor = colors.primary,
+                    interactionSource = buttonSource,
+                    scrim = colors.focusScrim,
+                    restShape = M3ExpressivePolygons.Square,
+                    ringShape = ShapeMorph.focusRing
+                )
         ) {
-            SvgIcon(
-                resId = KurdishTvIcons.Refresh,
-                contentDescription = null,
-                tint = colors.onPrimary,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Show all channels", fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SvgIcon(
+                    resId = KurdishTvIcons.Refresh,
+                    contentDescription = null,
+                    tint = colors.onPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Show all channels",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
         }
     }
 }

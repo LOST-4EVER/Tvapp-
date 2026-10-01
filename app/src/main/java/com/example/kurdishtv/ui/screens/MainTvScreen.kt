@@ -306,16 +306,13 @@ fun MainTvScreen(
                 }
             }
     ) {
-        val isTabletLandscape = maxWidth >= 900.dp
+        val isShortLandscape = maxHeight < 480.dp && !isTv
+        val isExpandedTvOrLandscape = isTv || (maxWidth >= 900.dp && !isShortLandscape)
         val isMediumScreen = maxWidth >= 600.dp
         // Phones in portrait are the tightest case. Shrinking the grid's minimum cell
         // there keeps two comfortable columns instead of squeezing one very wide one,
         // and keeps the header actions from colliding with the title on small screens.
         val isCompactWidth = maxWidth < 600.dp
-        // A phone in landscape is wide but short. Judging on width alone put it in
-        // the two-pane tablet layout, where the grid was squeezed into a narrow,
-        // very tall column. Height has to be part of the decision.
-        val isShortLandscape = maxHeight < 480.dp && !isTv
         // The channel sidebar costs 260dp of fixed width that the grid does not get
         // back. On a television there is always room; on a tablet the grid can
         // afford it only once the window is genuinely wide, or the channel names
@@ -369,7 +366,7 @@ fun MainTvScreen(
                 )
             }
 
-            isTabletLandscape -> {
+            isExpandedTvOrLandscape -> {
                 // This branch has no Scaffold, so the snackbar host is overlaid
                 // directly. Without it the import/sync messages were silently
                 // dropped on exactly the layout with the most room to show them.

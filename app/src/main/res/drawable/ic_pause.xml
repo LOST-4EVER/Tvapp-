@@ -3,7 +3,8 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Modern rounded pause capsule bars -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M6,19h4V5H6v14zm8,-14v14h4V5h-4z" />
+        android:pathData="M7,5h2c0.83,0 1.5,0.67 1.5,1.5v11c0,0.83 -0.67,1.5 -1.5,1.5H7c-0.83,0 -1.5,-0.67 -1.5,-1.5v-11C5.5,5.67 6.17,5 7,5zM15,5h2c0.83,0 1.5,0.67 1.5,1.5v11c0,0.83 -0.67,1.5 -1.5,1.5h-2c-0.83,0 -1.5,-0.67 -1.5,-1.5v-11c0,-0.83 0.67,-1.5 1.5,-1.5z" />
 </vector>

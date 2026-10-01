@@ -340,6 +340,11 @@ fun PlayerScreen(
                             true
                         } else false
 
+                    Key.Menu, Key.Info, Key.Guide -> {
+                        if (!isRepeat) isControlsVisible = !isControlsVisible
+                        true
+                    }
+
                     else -> false
                 }
             }

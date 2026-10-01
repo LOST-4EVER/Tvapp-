@@ -94,13 +94,13 @@ object NetworkClient {
                 .dns(safeDns)
                 .dispatcher(
                     Dispatcher().apply {
-                        maxRequests = 16
-                        maxRequestsPerHost = 8
+                        maxRequests = 32
+                        maxRequestsPerHost = 10
                     }
                 )
-                .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .connectionPool(ConnectionPool(32, 5, TimeUnit.MINUTES))
+                .connectTimeout(12, TimeUnit.SECONDS)
+                .readTimeout(25, TimeUnit.SECONDS)
                 .writeTimeout(15, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .followRedirects(true)

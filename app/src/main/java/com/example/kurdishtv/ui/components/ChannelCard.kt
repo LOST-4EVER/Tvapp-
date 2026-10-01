@@ -114,7 +114,7 @@ fun ChannelCard(
     val colors = LocalAppColors.current
     // Shared by the click and the focus ring below, so both are driven by the same
     // object and cannot disagree about where the viewer is.
-    val focusSource = remember { MutableInteractionSource() }
+    val focusSource = remember(channel.id) { MutableInteractionSource() }
     // The accent is derived from the channel's name, so it is the same for the whole
     // life of the card. Recomputing it on every recomposition meant a hash and a
     // modulo per card per frame for as long as the grid was on show; it is also what

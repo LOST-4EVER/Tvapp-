@@ -130,10 +130,10 @@ fun VideoPlayerView(
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                /* minBufferMs = */ 6000,
+                /* minBufferMs = */ 8000,
                 /* maxBufferMs = */ MAX_BUFFER_MS,
-                /* bufferForPlaybackMs = */ 800,
-                /* bufferForPlaybackAfterRebufferMs = */ 1500
+                /* bufferForPlaybackMs = */ 1000,
+                /* bufferForPlaybackAfterRebufferMs = */ 2000
             )
             .setBackBuffer(0, false)
             .setPrioritizeTimeOverSizeThresholds(true)
@@ -245,7 +245,12 @@ fun VideoPlayerView(
     ) {
         AndroidView(
             factory = { ctx ->
-                val view = LayoutInflater.from(ctx).inflate(R.layout.exo_player_texture_view, null) as PlayerView
+                val layoutRes = if (filterPaint != null) {
+                    R.layout.exo_player_texture_view
+                } else {
+                    R.layout.exo_player_surface_view
+                }
+                val view = LayoutInflater.from(ctx).inflate(layoutRes, null) as PlayerView
                 view.apply {
                     player = exoPlayer
                     useController = false

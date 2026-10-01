@@ -177,11 +177,11 @@ private fun ChannelSidebarRow(
 
     // One focus target for the row: the click's own. The ring observes it rather than
     // adding a second. See `expressiveFocusRing`.
-    val rowFocusSource = remember { MutableInteractionSource() }
+    val rowFocusSource = remember(channel.id) { MutableInteractionSource() }
     // The heart is a genuinely separate stop, reached with the right arrow and left
     // with the left — a second target in a *different place* on the row, which is not
     // the stacked-two-on-one-box problem the comment below is about.
-    val heartFocusSource = remember { MutableInteractionSource() }
+    val heartFocusSource = remember(channel.id) { MutableInteractionSource() }
 
     // Selected and focused are drawn differently on purpose. Focus is the accent
     // ring the viewer is looking for *right now*; selection is a quieter filled
@@ -203,7 +203,7 @@ private fun ChannelSidebarRow(
             // element's own bounds. Nothing needed it: the plate below is already
             // shape-aware, the press fill carries its own shape, and the row's
             // content sits inside its padding.
-            .background(if (isSelected) colors.surfaceHigh else colors.surface)
+            .background(if (isSelected) colors.surfaceHigh else colors.surface, plateShape)
             // The click keeps its own focus target and the ring watches the same
             // source, so there is one stop on this row rather than two competing ones.
             // `onLongClick` is how a remote reaches the favourite, since the heart is
