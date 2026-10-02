@@ -21,6 +21,12 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - It is `androidResources.localeFilters` and not the older
     `defaultConfig.resourceConfigurations`, which AGP deprecated in 8.8; this project
     is on 9.1.1.
+  - **Measured: the release APK went from 3,262,548 to 2,863,116 bytes — 399,432
+    bytes, 12.2%.** Every byte of it is `resources.arsc`, which fell from 447,588 to
+    48,160; the number of packaged files is unchanged at 236, because translations
+    live in the string table rather than as files of their own. Worth knowing for
+    the next time this looks like a no-op: the saving is invisible if you only count
+    files.
 - **Navigating between screens no longer cross-fades.** A `NavHost` runs through an
   `AnimatedContent` whether or not a transition is declared, and the default is a
   fade - which means **both destinations stay composed for its whole duration**. This
