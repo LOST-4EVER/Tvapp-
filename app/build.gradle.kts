@@ -99,6 +99,29 @@ android {
       isShrinkResources = false
     }
   }
+  androidResources {
+    // Keep only the default (English) resources, and drop every other locale.
+    //
+    // This app has no translations of its own: `res/values/strings.xml` holds one
+    // string, and every piece of visible text is written inline in Kotlin. So there
+    // is nothing here that *would* answer to a device set to another language — the
+    // Kurdish, Arabic and English labels on screen are the same bytes whatever the
+    // system locale is.
+    //
+    // What the filter does remove is every other language that the *dependencies*
+    // ship. Material 3, AndroidX AppCompat, Media3, Coil and the support libraries
+    // between them contribute `values-<locale>/strings.xml` for eighty-odd locales:
+    // accessibility and error strings the app never displays, and system-UI
+    // fragments that do not apply to a Compose tree. None of it was reachable, all
+    // of it was in the APK, and `isShrinkResources` cannot remove it — resource
+    // shrinking keeps a resource that any *declared* locale configuration can still
+    // select, which until now was every locale on earth.
+    //
+    // Note this is `androidResources.localeFilters`, not the older
+    // `defaultConfig.resourceConfigurations`. AGP deprecated the latter in 8.8 and
+    // this project is on 9.1.1, so the old spelling is on its way out.
+    localeFilters += listOf("en")
+  }
   packaging {
     resources {
       excludes += "/META-INF/{AL2.0,LGPL2.1}"
