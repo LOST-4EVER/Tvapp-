@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -38,7 +39,6 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.example.R
@@ -120,6 +120,22 @@ fun VideoPlayerView(
     // below — which is created once per player, not once per callback — never calls
     // a stale lambda.
     val currentAspectCallback by rememberUpdatedState(onVideoAspectChanged)
+
+    // Same reasoning as the aspect callback, and it fixes the case where it actually
+    // mattered.
+    //
+    // The listener below is installed once per *player*, not once per callback, so it
+    // closes over whatever [onPlaybackError] was at that composition. The player is
+    // remembered on the context alone, so it survives a channel change — and on the
+    // player screen `errorMessage` is `remember(channel.id)`, meaning the lambda
+    // closed over the error state of the channel the viewer has already left.
+    //
+    // The result was that changing to a channel whose stream was dead reported
+    // nothing at all: the error arrived, was written into the previous channel's
+    // state holder, and the "Channel unavailable" panel never appeared. Reading
+    // through current state is what makes the listener describe the screen it is
+    // actually on.
+    val currentErrorCallback by rememberUpdatedState(onPlaybackError)
 
     // Applied with drawWithContent rather than graphicsLayer: in Compose 1.7
     // GraphicsLayerScope has no colorFilter property, so graphicsLayer cannot
@@ -265,7 +281,7 @@ fun VideoPlayerView(
 
             override fun onPlayerError(error: PlaybackException) {
                 isBuffering = false
-                onPlaybackError(error.localizedMessage ?: "Stream playback failed")
+                currentErrorCallback(error.localizedMessage ?: "Stream playback failed")
             }
         }
         exoPlayer.addListener(listener)
@@ -282,48 +298,65 @@ fun VideoPlayerView(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        AndroidView(
-            factory = { ctx ->
-                val layoutRes = if (filterPaint != null) {
-                    R.layout.exo_player_texture_view
-                } else {
-                    R.layout.exo_player_surface_view
-                }
-                val view = LayoutInflater.from(ctx).inflate(layoutRes, null) as PlayerView
-                view.apply {
-                    player = exoPlayer
-                    useController = false
-                    this.resizeMode = resizeMode.mode
-                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    keepScreenOn = true
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
-            },
-            update = { playerView ->
-                playerView.resizeMode = resizeMode.mode
-                playerView.keepScreenOn = isPlaying
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .drawWithContent {
-                    val paint = filterPaint
-                    if (paint == null) {
-                        drawContent()
+        // Keyed on whether a filter is active, because that decision is made once,
+        // in the factory, and the factory runs once.
+        //
+        // A colour filter is applied by drawing into a `saveLayer`, and that only
+        // works on a `TextureView`. A `SurfaceView` hands its video to the window
+        // compositor as a separate layer, which the canvas never sees — so on a
+        // `SurfaceView` the filter is silently a no-op, not a wrong-looking image but
+        // no image of the correction at all.
+        //
+        // The consequence was that the *first* value of [colorFilter] decided this for
+        // the whole visit. A viewer who opened Settings, switched the filter on and
+        // came back got an unfiltered picture and no way to tell why; only a viewer
+        // who happened to have a filter already set when the player was created ever
+        // saw one. Re-creating the view when the mode flips is what makes the button
+        // do what it says.
+        key(filterPaint != null) {
+            AndroidView(
+                factory = { ctx ->
+                    val layoutRes = if (filterPaint != null) {
+                        R.layout.exo_player_texture_view
                     } else {
-                        drawIntoCanvas { canvas ->
-                            canvas.saveLayer(
-                                Rect(Offset.Zero, size),
-                                paint
-                            )
+                        R.layout.exo_player_surface_view
+                    }
+                    val view = LayoutInflater.from(ctx).inflate(layoutRes, null) as PlayerView
+                    view.apply {
+                        player = exoPlayer
+                        useController = false
+                        this.resizeMode = resizeMode.mode
+                        setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        keepScreenOn = true
+                        layoutParams = FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    }
+                },
+                update = { playerView ->
+                    playerView.resizeMode = resizeMode.mode
+                    playerView.keepScreenOn = isPlaying
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        val paint = filterPaint
+                        if (paint == null) {
                             drawContent()
-                            canvas.restore()
+                        } else {
+                            drawIntoCanvas { canvas ->
+                                canvas.saveLayer(
+                                    Rect(Offset.Zero, size),
+                                    paint
+                                )
+                                drawContent()
+                                canvas.restore()
+                            }
                         }
                     }
-                }
-        )
+            )
+        }
 
         if (isBuffering && !areControlsVisible) {
             PlayerBufferingIndicator(

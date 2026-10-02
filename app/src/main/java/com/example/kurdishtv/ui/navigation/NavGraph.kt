@@ -1,5 +1,7 @@
 package com.example.kurdishtv.ui.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
@@ -72,7 +74,36 @@ fun KurdishTvNavGraph(
     NavHost(
         navController = navController,
         startDestination = Screen.Main.route,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        // No transition between destinations, explicitly.
+        //
+        // navigation-compose runs a NavHost through an AnimatedContent, and with no
+        // transition declared the default is a fade. A fade is not a cosmetic
+        // default here — it means **both screens stay composed for its whole
+        // duration**, and this app has a decoder in each of two of them.
+        //
+        // `SidePlayerPane` holds its own ExoPlayer, and it is only released when the
+        // browse screen leaves the composition. So opening a channel used to start the
+        // fullscreen player while the preview pane's was still alive and still
+        // attached to a surface, for the length of the fade. Two video decoders, two
+        // surfaces, one of them feeding a pane that is already covered — which is a
+        // hardware-decoder allocation contended for exactly when first frame is
+        // wanted, on the low-end boxes this app is mostly used on.
+        //
+        // It also held the browse screen's D-pad focus machinery live underneath the
+        // player, so focus requests fired against a screen the viewer had already
+        // left.
+        //
+        // Cutting the transition removes the overlap rather than shortening it, and it
+        // matches what the rest of the app has already decided: see
+        // `ui/motion/ExpressiveMotion.kt`, where every animation was deleted on
+        // purpose because "animates to the same value instantly" still costs a frame
+        // callback and a recomposition. This was the one place that had been left
+        // running by omission rather than by choice.
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None }
     ) {
         composable(Screen.Main.route) {
             MainTvScreen(

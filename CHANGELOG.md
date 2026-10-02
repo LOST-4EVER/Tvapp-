@@ -8,6 +8,40 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- **The app ships one language's worth of resources instead of all of them.** This
+  app has no translations of its own - `strings.xml` holds a single string and every
+  visible label is written inline in Kotlin - so nothing here would ever answer to a
+  device set to another language. What the APK *did* carry was every other language
+  that the dependencies ship: Material 3, AppCompat, Media3 and Coil between them
+  contribute `values-<locale>/strings.xml` for eighty-odd locales, none of it
+  reachable. Resource shrinking cannot remove it, because it keeps any resource a
+  declared locale configuration can still select, and until now that was every
+  locale on earth. `androidResources.localeFilters` now keeps the default and drops
+  the rest.
+  - It is `androidResources.localeFilters` and not the older
+    `defaultConfig.resourceConfigurations`, which AGP deprecated in 8.8; this project
+    is on 9.1.1.
+  - **Measured: the release APK went from 3,262,548 to 2,863,116 bytes — 399,432
+    bytes, 12.2%.** Every byte of it is `resources.arsc`, which fell from 447,588 to
+    48,160; the number of packaged files is unchanged at 236, because translations
+    live in the string table rather than as files of their own. Worth knowing for
+    the next time this looks like a no-op: the saving is invisible if you only count
+    files.
+- **Navigating between screens no longer cross-fades.** A `NavHost` runs through an
+  `AnimatedContent` whether or not a transition is declared, and the default is a
+  fade - which means **both destinations stay composed for its whole duration**. This
+  app has a decoder in two of its three screens, so opening a channel used to start
+  the fullscreen player while the browse screen's preview pane still had its own
+  `ExoPlayer` alive and attached to a surface: two decoders, two surfaces, one of
+  them feeding a pane that is already covered. That is a hardware allocation
+  contended for exactly when first frame is wanted, on the low-end boxes this app
+  is mostly used on. It also kept the browse screen's D-pad focus machinery live
+  underneath the player, so focus requests fired against a screen the viewer had
+  already left. The transition is now explicitly none.
+  - This is also the last animation in the app that was still running by omission
+  rather than by choice - see the motion removal below for the reasoning, which
+  applies to exactly this case.
+
 - **A logo tile now shows a neutral placeholder while it loads, instead of the
   channel's monogram.** The monogram is the channel's real fallback identity - it is
   what a channel with no `tvg-logo` is *supposed* to look like - but it was also being
@@ -203,6 +237,32 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
       fall back to the icon-only form `LabelPillButton` already supports.
 
 ### Fixed
+- **Changing to a dead channel reported nothing at all.** The player's error listener
+  is installed once per *player*, not once per callback, so it closed over whatever
+  `onPlaybackError` was at that composition. The player is remembered on the context
+  alone and therefore survives a channel change, while on the player screen
+  `errorMessage` is `remember(channel.id)` - so the lambda closed over the error
+  state of the channel the viewer had **already left**. Changing to a channel whose
+  stream was dead delivered the error, wrote it into the previous channel's state
+  holder, and never showed the "Channel unavailable" panel. The listener now reads
+  through current state, the same way the aspect-ratio callback next to it already
+  did.
+- **The colour filter only worked if it was already on when the player opened.** A
+  filter is applied by drawing into a `saveLayer`, and that only reaches the picture
+  on a `TextureView`: a `SurfaceView` hands its video to the window compositor as a
+  separate layer that the canvas never sees, so a filter applied to one is a silent
+  no-op rather than a wrong-looking image. Which of the two layouts was inflated is
+  decided in the `AndroidView` factory, and the factory runs once - so the filter
+  setting *at the moment the player was created* decided it for the whole visit. A
+  viewer who switched a filter on while watching got an uncorrected picture and no
+  way to tell why; only a viewer who already had one set ever saw one. The view is
+  now keyed on whether a filter is active, so changing it re-creates the view in the
+  shape that can honour it.
+  - `VideoColorFilterTest` pins the contract this rests on: `isActive` must agree
+    with whether `toMatrix()` returns anything, and only `None` may return nothing.
+    Those two facts are what let the player decide SurfaceView-vs-TextureView from a
+    single flag, and nothing in the app would have noticed if they drifted apart.
+
 - **Every card in the grid painted its own surface twice.** The `Card` was given
   `containerColor = surface` *and* the `Box` inside it painted
   `background(surface, cardShape)` — the same colour, over the same shape, on top of
@@ -495,6 +555,20 @@ and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   at all. There is now a thirty second deadline across every source at once; past
   it the sources still in flight are cancelled and the ones that already answered
   are kept, so a slow merge degrades to a smaller grid rather than to no grid.
+
+### Added
+- **Dead imports are gone.** Thirty-seven unused `import` lines across nine files,
+  most of them in `MainTvScreen.kt` - the entire lazy-grid vocabulary
+  (`LazyVerticalGrid`, `GridCells`, `itemsIndexed`, `rememberLazyGridState`,
+  `GridItemSpan`), a dozen components that screen calls only through
+  `TvTopChrome` and `ChannelGrid`, and `ExperimentalFoundationApi` itself, left over
+  from the pass that split the grid out into its own file. Kotlin does not warn about
+  these by default, but they are the first thing that makes a file look like it
+  still owns code it moved three commits ago.
+  - Every removal was verified against the file's own body rather than by name. Two
+    classes of false positive were ruled out first: `getValue`/`setValue`, which read
+    as unused in twenty-one files but are required by `by`, and the composable
+    symbols that are called through a helper rather than named.
 
 ### Added
 - **A source that hiccups is now retried instead of written off.** Every remote

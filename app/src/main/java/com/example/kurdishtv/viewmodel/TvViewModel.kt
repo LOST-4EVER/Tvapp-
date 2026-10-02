@@ -464,7 +464,9 @@ class TvViewModel(
 
     fun clearActionMessage() {
         _uiState.update { it.copy(actionMessage = null) }
-    }fun clearFavorites() {
+    }
+
+    fun clearFavorites() {
             viewModelScope.launch {
                 // The write decides the message. Reporting "Favorites cleared" after a
                 // failed write was the worst version of this: the hearts vanished from
