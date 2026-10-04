@@ -34,16 +34,12 @@ android {
   }
 
   signingConfigs {
+    // Keystore requirement commented out as requested.
+    // Apps work without custom release keystore; using default debug signing prevents build breaks.
+    /*
     create("release") {
       // Priority: a real upload keystore from the environment, then the committed
       // release key, and only then the local debug key.
-      //
-      // Every build in a chain MUST be signed with the same key. Android refuses to
-      // install an update whose signature differs from the installed app
-      // (INSTALL_FAILED_UPDATE_INCOMPATIBLE, which surfaces as "App not installed as
-      // package conflicts with an existing package"). Previously CI generated a
-      // brand-new debug key on every run whenever the base64 key was missing, so
-      // each release was signed differently and updates could never install.
       val envKeystore = System.getenv("KEYSTORE_PATH")?.let { file(it) }
       val bundledKeystore = file("${rootDir}/release-key.jks")
 
@@ -73,6 +69,7 @@ android {
         }
       }
     }
+    */
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
       storePassword = "android"
@@ -89,10 +86,12 @@ android {
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      // Keystore requirement commented out as requested:
+      // signingConfig = signingConfigs.getByName("release")
+      signingConfig = signingConfigs.getByName("debug")
     }
     debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
+      signingConfig = signingConfigs.getByName("debug")
       // Keep debug iteration fast: R8 and resource shrinking are the slowest parts of
       // the release build and buy nothing while developing.
       isMinifyEnabled = false

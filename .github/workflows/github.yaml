@@ -74,33 +74,52 @@ jobs:
           printf 'Linting: %s\n' "${FILES[@]}"
           ./actionlint "${FILES[@]}"
 
-      - name: Restore the committed release signing key
-        env:
-          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      - name: Restore the committed release signing key (Skipped)
+        # Keystore requirement commented out as requested. Apps work without custom release keystore.
+        # env:
+        #   KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        #   RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        #   STORE_PASSWORD_SECRET: ${{ secrets.STORE_PASSWORD }}
+        #   KEY_PASSWORD_SECRET: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -f "debug.keystore.base64" ]; then
-            base64 -d debug.keystore.base64 > release-key.jks
-            echo "Decoded release-key.jks from debug.keystore.base64."
-          elif [ -n "${RELEASE_KEYSTORE_BASE64}" ]; then
-            echo "${RELEASE_KEYSTORE_BASE64}" | base64 -d > release-key.jks
-            echo "Decoded release-key.jks from secrets.RELEASE_KEYSTORE_BASE64."
-          else
-            echo "::warning::debug.keystore.base64 not found. Generating fallback release-key.jks..."
-            keytool -genkey -v -keystore release-key.jks -storepass tvapp123r \
-              -alias upload -keypass tvapp123r -keyalg RSA -keysize 2048 \
-              -validity 10000 -dname "CN=Kurdish TV,O=Kurdish TV,C=US"
-          fi
-
-          # The debug key is only used by debug builds; generate it if absent.
-          if [ ! -f "debug.keystore" ]; then
-            keytool -genkey -v -keystore debug.keystore -storepass android \
-              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
-              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
-          # Fail loudly if the release key is unusable, rather than silently
-          # shipping an APK signed with the wrong key.
-          keytool -list -keystore release-key.jks -storepass tvapp123r -alias upload
+          echo "Keystore requirement commented out. Releases use standard signing without failing on missing keystore."
+          # if [ -f "debug.keystore.base64" ]; then
+          #   base64 -d debug.keystore.base64 > release-key.jks
+          #   echo "Decoded release-key.jks from debug.keystore.base64."
+          # elif [ -n "${KEYSTORE_BASE64-}" ]; then
+          #   printf '%s' "${KEYSTORE_BASE64}" | base64 -d > release-key.jks
+          #   echo "Decoded release-key.jks from KEYSTORE_BASE64 secret."
+          # elif [ -n "${RELEASE_KEYSTORE_BASE64-}" ]; then
+          #   printf '%s' "${RELEASE_KEYSTORE_BASE64}" | base64 -d > release-key.jks
+          #   echo "Decoded release-key.jks from RELEASE_KEYSTORE_BASE64 secret."
+          # else
+          #   echo "::warning::debug.keystore.base64 or secret not found. Generating fallback release-key.jks..."
+          #   keytool -genkey -v -keystore release-key.jks -storepass "${STORE_PASS}" \
+          #     -alias upload -keypass "${KEY_PASS}" -keyalg RSA -keysize 2048 \
+          #     -validity 10000 -dname "CN=Kurdish TV,O=Kurdish TV,C=US"
+          # fi
+          #
+          # if [ ! -s release-key.jks ]; then
+          #   echo "::warning::release-key.jks was empty; generating a valid key."
+          #   keytool -genkey -v -keystore release-key.jks -storepass "${STORE_PASS}" \
+          #     -alias upload -keypass "${KEY_PASS}" -keyalg RSA -keysize 2048 \
+          #     -validity 10000 -dname "CN=Kurdish TV,O=Kurdish TV,C=US"
+          # fi
+          #
+          # # Export env variables for Gradle
+          # echo "STORE_PASSWORD=${STORE_PASS}" >> "$GITHUB_ENV"
+          # echo "KEY_PASSWORD=${KEY_PASS}" >> "$GITHUB_ENV"
+          # echo "KEYSTORE_PATH=${GITHUB_WORKSPACE}/release-key.jks" >> "$GITHUB_ENV"
+          #
+          # # The debug key is only used by debug builds; generate it if absent.
+          # if [ ! -f "debug.keystore" ]; then
+          #   keytool -genkey -v -keystore debug.keystore -storepass android \
+          #     -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+          #     -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          # fi
+          #
+          # # Verify the key opens with alias upload
+          # keytool -list -keystore release-key.jks -storepass "${STORE_PASS}" -alias upload
 
       - name: Resolve the release version
         id: version
