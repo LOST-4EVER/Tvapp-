@@ -99,7 +99,7 @@ jobs:
 
           # Fail loudly if the release key is unusable, rather than silently
           # shipping an APK signed with the wrong key.
-          keytool -list -keystore release-key.jks -storepass android -alias upload
+          keytool -list -keystore release-key.jks -storepass tvapp123r -alias upload
 
       - name: Resolve the release version
         id: version

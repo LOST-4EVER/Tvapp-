@@ -56,9 +56,9 @@ android {
         }
         bundledKeystore.exists() -> {
           storeFile = bundledKeystore
-          storePassword = System.getenv("STORE_PASSWORD") ?: "android"
+          storePassword = System.getenv("STORE_PASSWORD") ?: "tvapp123r"
           keyAlias = "upload"
-          keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+          keyPassword = System.getenv("KEY_PASSWORD") ?: "tvapp123r"
         }
         else -> {
           rootProject.logger.warn(
